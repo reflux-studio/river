@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="poker.js"></script>
+<style>
+html,body{margin:0;height:100%;background:#fff;}
+a{color:oklch(0.55 0.17 255);text-decoration:none;}
+a:hover{color:oklch(0.45 0.17 255);text-decoration:underline;}
+input[type=range]{accent-color:#1d1d1f;}
+textarea,input{font-family:inherit;}
+</style>
+</helmet>
+<div style="height:100vh;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Hiragino Sans GB','Helvetica Neue',sans-serif;color:#1d1d1f;background:#fff;overflow:hidden;min-width:880px;position:relative;">
+
+<div style="height:52px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #ebebe9;background:#f7f7f5;">
+<div style="display:flex;gap:8px;"><div style="width:12px;height:12px;border-radius:50%;background:#ff5f57;"></div><div style="width:12px;height:12px;border-radius:50%;background:#febc2e;"></div><div style="width:12px;height:12px;border-radius:50%;background:#28c840;"></div></div>
+<div style="font-size:16px;font-weight:600;margin-left:10px;">River</div>
+<div style="display:flex;gap:2px;margin-left:6px;min-width:0;overflow:hidden;">
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="5"><div onClick="{{ n.onClick }}" style="padding:6px 12px;border-radius:8px;font-size:14px;cursor:pointer;white-space:nowrap;background:{{ n.bg }};color:{{ n.color }};font-weight:{{ n.w }};">{{ n.l }}</div></sc-for>
+</div>
+<div style="flex:1;"></div>
+<sc-if value="{{ onTable }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:14px;">
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><div style="font-size:14px;font-weight:500;white-space:nowrap;">{{ tableTitle }}</div></sc-if>
+<div style="font-size:14px;color:#86868b;white-space:nowrap;">第 {{ handNo }} 手</div>
+<div onClick="{{ leaveTable }}" style="font-size:14px;padding:6px 13px;border:1px solid #e3e3e0;border-radius:9px;background:#fff;cursor:pointer;white-space:nowrap;" style-hover="background:#f5f5f3;">离桌</div>
+</div>
+</sc-if>
+<sc-if value="{{ notTable }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:baseline;gap:6px;font-size:14px;white-space:nowrap;"><span style="color:#86868b;">筹码</span><span style="font-weight:600;">{{ bankrollF }}</span></div></sc-if>
+</div>
+
+<div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+
+<sc-if value="{{ isTable }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;min-height:0;display:flex;">
+<sc-if value="{{ showChat }}" hint-placeholder-val="{{ true }}">
+<aside style="width:{{ chatW }};flex-shrink:0;border-right:1px solid #ebebe9;display:flex;flex-direction:column;min-height:0;">
+<div style="padding:12px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f0f0ee;"><span style="font-size:15px;font-weight:600;">公屏</span><span onClick="{{ toggleChat }}" style="font-size:12px;color:#86868b;cursor:pointer;white-space:nowrap;">收起</span><div style="flex:1;"></div>
+<div style="display:flex;padding:2px;background:#f1f1ef;border-radius:8px;"><sc-for list="{{ chattySeg }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.onClick }}" style="padding:3px 9px;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.sh }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for></div>
+</div>
+<div ref="{{ chatRef }}" style="flex:1;min-height:0;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;">
+<sc-for list="{{ chatView }}" as="m" hint-placeholder-count="4">
+<sc-if value="{{ m.isSys }}" hint-placeholder-val="{{ false }}"><div style="text-align:center;font-size:12px;color:#a1a1a6;">— {{ m.t }} —</div></sc-if>
+<sc-if value="{{ m.isAct }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:6px;align-items:center;font-size:12px;color:#86868b;padding-left:38px;"><span style="font-weight:600;color:#55555a;">{{ m.n }}</span><span>{{ m.act }}</span></div></sc-if>
+<sc-if value="{{ m.isMsg }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:10px;"><div style="width:28px;height:28px;flex-shrink:0;border-radius:50%;background:{{ m.av }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;">{{ m.ini }}</div><div style="display:flex;flex-direction:column;gap:3px;min-width:0;"><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:13px;font-weight:600;">{{ m.n }}</span><sc-if value="{{ m.hasAct }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;color:#6e6e73;background:#f1f1ef;padding:1px 6px;border-radius:5px;white-space:nowrap;">{{ m.act }}</span></sc-if></div><div style="font-size:14px;line-height:1.5;text-wrap:pretty;">{{ m.t }}</div></div></div></sc-if>
+</sc-for>
+</div>
+<div style="padding:12px 16px 16px;border-top:1px solid #ebebe9;display:flex;gap:8px;">
+<input value="{{ chatInput }}" onChange="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" placeholder="对桌上说点什么…" style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e3e3e0;border-radius:10px;font-size:14px;outline:none;">
+<div onClick="{{ sendChat }}" style="padding:9px 12px;border:1px solid #e3e3e0;border-radius:10px;font-size:14px;cursor:pointer;white-space:nowrap;" style-hover="background:#f5f5f3;">发送</div>
+</div>
+</aside>
+</sc-if>
+
+<main style="flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;">
+<div style="flex:1;position:relative;min-height:540px;">
+<sc-if value="{{ chatHidden }}" hint-placeholder-val="{{ false }}"><div onClick="{{ toggleChat }}" style="position:absolute;left:14px;top:14px;z-index:6;display:flex;align-items:center;gap:8px;padding:6px 12px;background:#fff;border:1px solid #e3e3e0;border-radius:999px;font-size:13px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.05);white-space:nowrap;">公屏<span style="max-width:180px;overflow:hidden;text-overflow:ellipsis;color:#86868b;">{{ lastChat }}</span></div></sc-if>
+<div style="position:absolute;left:14%;right:14%;top:16%;bottom:17%;border-radius:999px;background:#f5f5f3;"></div>
+<div style="position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:12px;">
+<div style="display:flex;gap:8px;align-items:baseline;padding:5px 14px;background:#fff;border:1px solid #ebebe9;border-radius:999px;font-size:14px;white-space:nowrap;"><span style="color:#86868b;">底池</span><span style="font-weight:600;">{{ potF }}</span></div>
+<div style="display:flex;gap:6px;">
+<sc-for list="{{ board }}" as="c" hint-placeholder-count="5">
+<sc-if value="{{ c.has }}" hint-placeholder-val="{{ false }}"><div style="width:54px;height:76px;box-sizing:border-box;background:#fff;border:1px solid #e3e3e0;border-radius:8px;padding:5px 7px;display:flex;flex-direction:column;justify-content:space-between;color:{{ c.color }};"><div style="font-size:21px;font-weight:600;line-height:1;">{{ c.r }}</div><div style="font-size:23px;line-height:1;align-self:flex-end;">{{ c.s }}</div></div></sc-if>
+<sc-if value="{{ c.empty }}" hint-placeholder-val="{{ true }}"><div style="width:54px;height:76px;box-sizing:border-box;border:1.5px dashed #dededa;border-radius:8px;"></div></sc-if>
+</sc-for>
+</div>
+</div>
+<sc-for list="{{ betsView }}" as="b" hint-placeholder-count="0"><div style="position:absolute;left:{{ b.x }};top:{{ b.y }};transform:translate(-50%,-50%);display:flex;gap:6px;align-items:center;padding:3px 11px 3px 5px;background:#fff;border:1px solid #ebebe9;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;"><span style="width:14px;height:14px;border-radius:50%;background:#1d1d1f;border:2px solid #fff;box-shadow:0 0 0 1px #1d1d1f;"></span>{{ b.amt }}</div></sc-for>
+<sc-for list="{{ seats }}" as="p" hint-placeholder-count="6">
+<div style="position:absolute;left:{{ p.x }};top:{{ p.y }};transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px;white-space:nowrap;z-index:{{ p.z }};">
+<sc-if value="{{ p.back }}" hint-placeholder-val="{{ false }}"><div style="display:flex;margin-bottom:-18px;"><div style="width:36px;height:50px;box-sizing:border-box;background:#f0f0ee;border:1px solid #e0e0dc;border-radius:6px;transform:rotate(-6deg);display:flex;align-items:center;justify-content:center;"><div style="width:8px;height:8px;border:1.5px solid #c4c4c0;transform:rotate(45deg);"></div></div><div style="width:36px;height:50px;box-sizing:border-box;background:#f0f0ee;border:1px solid #e0e0dc;border-radius:6px;transform:rotate(6deg);margin-left:-8px;display:flex;align-items:center;justify-content:center;"><div style="width:8px;height:8px;border:1.5px solid #c4c4c0;transform:rotate(45deg);"></div></div></div></sc-if>
+<sc-if value="{{ p.showCards }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:4px;margin-bottom:-16px;"><sc-for list="{{ p.cards }}" as="c" hint-placeholder-count="2"><div style="width:{{ p.cw }};height:{{ p.ch }};box-sizing:border-box;background:#fff;border:1px solid #e3e3e0;border-radius:8px;padding:5px 7px;display:flex;flex-direction:column;justify-content:space-between;color:{{ c.color }};transform:rotate({{ c.rot }});box-shadow:0 2px 6px rgba(0,0,0,0.05);"><div style="font-size:20px;font-weight:600;line-height:1;">{{ c.r }}</div><div style="font-size:21px;line-height:1;align-self:flex-end;">{{ c.s }}</div></div></sc-for></div></sc-if>
+<div style="position:relative;display:flex;align-items:center;gap:9px;padding:6px 16px 6px 6px;background:#fff;border:{{ p.border }};box-shadow:{{ p.shadow }};border-radius:999px;opacity:{{ p.op }};">
+<div style="width:36px;height:36px;border-radius:50%;background:{{ p.av }};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;">{{ p.ini }}</div>
+<div style="display:flex;flex-direction:column;"><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:14px;font-weight:600;">{{ p.name }}</span><sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ true }}"><span style="font-size:11px;color:#6e6e73;background:#f1f1ef;padding:1px 6px;border-radius:5px;">{{ p.tag }}</span></sc-if></div><span style="font-size:12px;color:#86868b;">{{ p.stack }}</span></div>
+<sc-if value="{{ p.dealer }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:-28px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;background:#1d1d1f;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;">D</div></sc-if>
+</div>
+<sc-if value="{{ p.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="max-width:200px;white-space:normal;padding:7px 12px;background:#1d1d1f;color:#fff;font-size:13px;line-height:1.4;border-radius:12px;text-align:center;">{{ p.bubble }}</div></sc-if>
+<sc-if value="{{ p.hasStatus }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:6px;padding:2px 9px;background:#fff;border:1px solid #ebebe9;border-radius:999px;font-size:12px;color:{{ p.statusColor }};"><span style="width:6px;height:6px;border-radius:50%;background:{{ p.statusColor }};"></span>{{ p.status }}</div></sc-if>
+</div>
+</sc-for>
+</div>
+
+<div style="flex-shrink:0;border-top:1px solid #ebebe9;padding:14px 20px;display:flex;flex-direction:column;gap:12px;background:#fbfbfa;position:relative;">
+<sc-if value="{{ notDone }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;align-items:center;gap:6px;">
+<div style="display:flex;gap:6px;opacity:{{ ctrlOp }};pointer-events:{{ ctrlPe }};"><sc-for list="{{ presets }}" as="o" hint-placeholder-count="5"><div onClick="{{ o.onClick }}" style="padding:5px 12px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;border:1px solid #e3e3e0;background:{{ o.bg }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for></div>
+<div style="flex:1;"></div>
+<span style="font-size:13px;color:{{ statusColor }};white-space:nowrap;">{{ statusText }}</span>
+</div>
+<div style="display:flex;gap:8px;align-items:stretch;opacity:{{ ctrlOp }};pointer-events:{{ ctrlPe }};">
+<div onClick="{{ onFold }}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 0;border:1px solid #e3e3e0;background:#fff;border-radius:10px;font-size:16px;cursor:pointer;white-space:nowrap;" style-hover="background:#f5f5f3;">弃牌<span style="font:11px ui-monospace,Menlo,monospace;color:#a1a1a6;border:1px solid #e3e3e0;border-radius:4px;padding:0 4px;">F</span></div>
+<div onClick="{{ onCall }}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 0;border:1px solid #e3e3e0;background:#fff;border-radius:10px;font-size:16px;cursor:pointer;white-space:nowrap;" style-hover="background:#f5f5f3;">{{ callLabel }}<span style="font:11px ui-monospace,Menlo,monospace;color:#a1a1a6;border:1px solid #e3e3e0;border-radius:4px;padding:0 4px;">C</span></div>
+<div style="display:flex;align-items:center;border:1px solid #e3e3e0;background:#fff;border-radius:10px;overflow:hidden;opacity:{{ raiseOp }};">
+<div onClick="{{ decRaise }}" style="padding:0 12px;font-size:18px;color:#55555a;cursor:pointer;">−</div>
+<div style="padding:0 6px;font-size:16px;font-weight:600;min-width:76px;text-align:center;">{{ raiseToF }}</div>
+<div onClick="{{ incRaise }}" style="padding:0 12px;font-size:18px;color:#55555a;cursor:pointer;">+</div>
+</div>
+<div onClick="{{ onRaise }}" style="flex:1.2;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 0;background:#1d1d1f;color:#fff;border-radius:10px;font-size:16px;font-weight:500;cursor:pointer;white-space:nowrap;opacity:{{ raiseOp }};">{{ raiseLabel }}<span style="font:11px ui-monospace,Menlo,monospace;color:#8e8e93;border:1px solid #48484a;border-radius:4px;padding:0 4px;">R</span></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:12px;min-height:96px;">
+<div style="display:flex;flex-direction:column;gap:4px;flex:1;"><span style="font-size:18px;font-weight:600;color:{{ resultColor }};">{{ resultText }}</span><span style="font-size:13px;color:#86868b;">{{ resultSub }}</span></div>
+<sc-if value="{{ heroBust }}" hint-placeholder-val="{{ false }}"><div onClick="{{ rebuy }}" style="padding:12px 22px;background:#1d1d1f;color:#fff;border-radius:10px;font-size:15px;cursor:pointer;white-space:nowrap;">重新买入 {{ buyInF }}</div></sc-if>
+<sc-if value="{{ notBust }}" hint-placeholder-val="{{ true }}"><div onClick="{{ nextHand }}" style="padding:12px 22px;background:#1d1d1f;color:#fff;border-radius:10px;font-size:15px;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center;">下一手<span style="font:11px ui-monospace,Menlo,monospace;color:#8e8e93;border:1px solid #48484a;border-radius:4px;padding:0 4px;">N</span></div></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ lockPaused }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;background:rgba(251,251,250,0.86);display:flex;align-items:center;justify-content:center;gap:12px;"><span style="font-size:14px;color:#3a3a3c;">教练暂停了牌局，先看看右侧的提醒</span><div onClick="{{ resume }}" style="padding:8px 16px;background:#1d1d1f;color:#fff;border-radius:999px;font-size:14px;cursor:pointer;">我看完了，继续</div></div></sc-if>
+</div>
+</main>
+
+<aside style="width:{{ coachW }};flex-shrink:0;border-left:1px solid #ebebe9;display:flex;flex-direction:column;min-height:0;">
+<div style="padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f0f0ee;">
+<div style="width:30px;height:30px;border-radius:50%;background:oklch(0.92 0.045 155);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;">师</div>
+<div onClick="{{ cycleCoach }}" style="display:flex;flex-direction:column;flex:1;cursor:pointer;min-width:0;"><span style="font-size:14px;font-weight:600;white-space:nowrap;">教练 · {{ coachPersonaName }} ▾</span><span style="font-size:12px;color:#86868b;white-space:nowrap;">{{ coachSub }}</span></div>
+<div onClick="{{ coachOnTog.onClick }}" style="width:34px;height:20px;border-radius:999px;background:{{ coachOnTog.track }};position:relative;cursor:pointer;flex-shrink:0;"><div style="position:absolute;top:2px;left:{{ coachOnTog.knob }};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div></div>
+</div>
+<div style="padding:10px 16px 0;"><div style="display:flex;padding:3px;background:#f1f1ef;border-radius:9px;"><sc-for list="{{ levelSeg }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="flex:1;text-align:center;padding:5px 0;border-radius:7px;font-size:13px;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.sh }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for></div></div>
+<div ref="{{ threadRef }}" style="flex:1;min-height:0;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:14px;">
+<sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#1d1d1f;color:#fff;border-radius:10px;font-size:13px;"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.8 0.15 80);flex-shrink:0;"></span><span style="flex:1;">牌局已暂停</span><span onClick="{{ resume }}" style="padding:3px 10px;background:#fff;color:#1d1d1f;border-radius:999px;cursor:pointer;white-space:nowrap;">继续</span></div></sc-if>
+<sc-if value="{{ alertShow }}" hint-placeholder-val="{{ false }}"><div style="padding:12px 14px;background:{{ alertBg }};border-radius:12px;display:flex;flex-direction:column;gap:6px;"><div style="font-size:12px;color:{{ alertLabelColor }};font-weight:600;">{{ alertLabel }}</div><div style="font-size:14px;line-height:1.6;text-wrap:pretty;">{{ alertText }}</div></div></sc-if>
+<sc-if value="{{ showNums }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px;padding:14px;background:#f7f7f5;border-radius:12px;">
+<div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:13px;color:#55555a;">胜率 vs 所需胜率</span><span style="font-size:13px;color:{{ verdictColor }};font-weight:600;">{{ verdict }}</span></div>
+<div style="display:flex;align-items:baseline;gap:6px;"><span style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">{{ eqPct }}</span><span style="font-size:14px;color:#86868b;">/ {{ needPct }}</span></div>
+<div style="position:relative;height:8px;background:#e8e8e5;border-radius:999px;"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ barW }};background:oklch(0.6 0.17 255);border-radius:999px;"></div><div style="position:absolute;left:{{ markL }};top:-4px;width:2px;height:16px;background:#1d1d1f;"></div></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;font-size:12px;color:#86868b;"><sc-for list="{{ numStats }}" as="s" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;"><span>{{ s.l }}</span><span style="font-size:15px;color:#1d1d1f;font-weight:600;">{{ s.v }}</span></div></sc-for></div>
+<div style="font-size:12px;color:#86868b;line-height:1.5;">本地计算 · 胜率按对手随机手牌估算{{ numsStale }}</div>
+</div>
+</sc-if>
+<sc-if value="{{ hardHint }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#86868b;padding:10px 12px;border:1px dashed #e3e3e0;border-radius:10px;">硬核模式：概率信息已隐藏。</div></sc-if>
+<sc-for list="{{ thread }}" as="m" hint-placeholder-count="0"><div style="align-self:{{ m.align }};max-width:90%;padding:9px 12px;background:{{ m.bg }};color:{{ m.color }};border-radius:12px;font-size:14px;line-height:1.6;white-space:pre-wrap;text-wrap:pretty;">{{ m.t }}</div></sc-for>
+<sc-if value="{{ coachLoading }}" hint-placeholder-val="{{ false }}"><div style="align-self:flex-start;font-size:13px;color:#86868b;padding:8px 12px;background:#f3f3f1;border-radius:12px;">教练正在看牌…</div></sc-if>
+<sc-if value="{{ coachEmpty }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#86868b;line-height:1.6;">轮到你时，教练会自己判断：保持沉默、提醒你，还是暂停牌局。你也可以随时提问，提问时牌局会暂停。</div></sc-if>
+</div>
+<div style="padding:12px 16px 16px;border-top:1px solid #ebebe9;display:flex;flex-direction:column;gap:10px;">
+<div style="display:flex;flex-wrap:wrap;gap:6px;"><sc-for list="{{ quick }}" as="q" hint-placeholder-count="3"><span onClick="{{ q.onClick }}" style="font-size:12px;padding:4px 10px;border:1px solid #ebebe9;border-radius:999px;color:#55555a;cursor:pointer;" style-hover="background:#f5f5f3;">{{ q.l }}</span></sc-for></div>
+<div style="display:flex;gap:8px;"><input value="{{ coachInput }}" onChange="{{ onCoachInput }}" onKeyDown="{{ onCoachKey }}" placeholder="问问教练…" style="flex:1;min-width:0;padding:9px 12px;border:1px solid #e3e3e0;border-radius:10px;font-size:14px;outline:none;"><div onClick="{{ askCoach }}" style="padding:9px 12px;background:#1d1d1f;color:#fff;border-radius:10px;font-size:14px;cursor:pointer;white-space:nowrap;">暂停并提问</div></div>
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#55555a;"><span style="flex:1;">硬核模式 · 隐藏概率</span><div onClick="{{ hardTog.onClick }}" style="width:34px;height:20px;border-radius:999px;background:{{ hardTog.track }};position:relative;cursor:pointer;flex-shrink:0;"><div style="position:absolute;top:2px;left:{{ hardTog.knob }};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div></div></div>
+</div>
+</aside>
+</div>
+</sc-if>
+
+<sc-if value="{{ isLobby }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;min-height:0;overflow:auto;background:#fbfbfa;">
+<div style="max-width:1120px;margin:0 auto;padding:40px 32px 64px;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:24px;align-items:start;">
+<div style="display:flex;flex-direction:column;gap:20px;">
+<div style="display:flex;flex-direction:column;gap:6px;"><div style="font-size:28px;font-weight:600;letter-spacing:-0.01em;">开一桌</div><div style="font-size:15px;color:#6e6e73;">只有你和 AI。每位对手都有自己的性格，会在公屏上聊天；教练坐在你身后。</div></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
+<sc-for list="{{ lobbyPresets }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.onClick }}" style="padding:16px;background:#fff;border:{{ o.border }};border-radius:14px;cursor:pointer;display:flex;flex-direction:column;gap:6px;"><span style="font-size:16px;font-weight:600;">{{ o.t }}</span><span style="font-size:13px;color:#86868b;line-height:1.5;">{{ o.d }}</span></div></sc-for>
+</div>
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:18px;">
+<div style="display:flex;align-items:center;gap:16px;"><span style="font-size:14px;color:#55555a;width:72px;">人数</span><div style="display:flex;padding:3px;background:#f1f1ef;border-radius:9px;"><sc-for list="{{ sizeSeg }}" as="o" hint-placeholder-count="5"><div onClick="{{ o.onClick }}" style="padding:5px 14px;border-radius:7px;font-size:13px;cursor:pointer;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.sh }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for></div></div>
+<div style="display:flex;align-items:center;gap:16px;"><span style="font-size:14px;color:#55555a;width:72px;">盲注</span><div style="display:flex;padding:3px;background:#f1f1ef;border-radius:9px;"><sc-for list="{{ blindSeg }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.onClick }}" style="padding:5px 14px;border-radius:7px;font-size:13px;cursor:pointer;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.sh }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for></div><span style="font-size:13px;color:#86868b;">买入 {{ lobbyBuyF }}（100 个大盲）</span></div>
+<div style="display:flex;align-items:flex-start;gap:16px;"><span style="font-size:14px;color:#55555a;width:72px;padding-top:6px;">对手</span><div style="flex:1;display:flex;flex-direction:column;gap:8px;"><div style="display:flex;flex-wrap:wrap;gap:8px;"><sc-for list="{{ lobbyPersonas }}" as="o" hint-placeholder-count="8"><div onClick="{{ o.onClick }}" style="display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;border-radius:999px;cursor:pointer;border:1px solid {{ o.bd }};background:{{ o.bg }};color:{{ o.color }};"><span style="width:24px;height:24px;border-radius:50%;background:{{ o.av }};color:#1d1d1f;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;">{{ o.ini }}</span><span style="font-size:13px;font-weight:500;white-space:nowrap;">{{ o.name }}</span><span style="font-size:11px;opacity:0.7;white-space:nowrap;">{{ o.tag }}</span></div></sc-for></div><span style="font-size:12px;color:#86868b;">{{ pickInfo }}</span></div></div>
+<div style="display:flex;align-items:center;gap:16px;"><span style="font-size:14px;color:#55555a;width:72px;">教练</span><div onClick="{{ coachOnTog.onClick }}" style="width:34px;height:20px;border-radius:999px;background:{{ coachOnTog.track }};position:relative;cursor:pointer;flex-shrink:0;"><div style="position:absolute;top:2px;left:{{ coachOnTog.knob }};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div></div><span style="font-size:13px;color:#86868b;">{{ coachPersonaName }} · {{ levelName }}</span></div>
+<div style="display:flex;align-items:center;gap:12px;padding-top:4px;border-top:1px solid #f0f0ee;"><div style="flex:1;"></div><div onClick="{{ startTable }}" style="margin-top:14px;padding:12px 26px;background:#1d1d1f;color:#fff;border-radius:999px;font-size:15px;font-weight:500;cursor:pointer;white-space:nowrap;">入座 · 买入 {{ lobbyBuyF }}</div></div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;padding-top:70px;">
+<sc-if value="{{ hasGame }}" hint-placeholder-val="{{ false }}"><div onClick="{{ resumeTable }}" style="padding:16px 18px;background:#1d1d1f;color:#fff;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;gap:4px;"><span style="font-size:15px;font-weight:600;">回到牌桌 →</span><span style="font-size:13px;color:#a1a1a6;">{{ tableTitle }} · 第 {{ handNo }} 手</span></div></sc-if>
+<div style="padding:18px;background:#fff;border:1px solid #ebebe9;border-radius:14px;display:flex;flex-direction:column;gap:10px;">
+<span style="font-size:15px;font-weight:600;">第一次玩德扑？</span>
+<span style="font-size:13px;color:#6e6e73;line-height:1.6;">先花一分钟看规则，再跟着教练打一手：3 人小桌，教练每一步都会说话。</span>
+<div style="display:flex;gap:8px;"><div onClick="{{ openRules }}" style="padding:7px 14px;border:1px solid #e3e3e0;border-radius:999px;font-size:13px;cursor:pointer;">规则介绍</div><div onClick="{{ startGuided }}" style="padding:7px 14px;background:#1d1d1f;color:#fff;border-radius:999px;font-size:13px;cursor:pointer;">教学牌局</div></div>
+</div>
+<div style="padding:18px;background:#fff;border:1px solid #ebebe9;border-radius:14px;display:flex;flex-direction:column;gap:10px;">
+<span style="font-size:15px;font-weight:600;">最近手牌</span>
+<sc-if value="{{ noRecent }}" hint-placeholder-val="{{ true }}"><span style="font-size:13px;color:#86868b;">还没有记录。</span></sc-if>
+<sc-for list="{{ recent }}" as="r" hint-placeholder-count="0"><div style="display:flex;align-items:center;gap:10px;font-size:13px;"><span style="color:#86868b;width:52px;">#{{ r.hand }}</span><span style="flex:1;font-weight:500;">{{ r.cards }}</span><span style="font-weight:600;color:{{ r.color }};">{{ r.net }}</span></div></sc-for>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isOpp }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;min-height:0;overflow:auto;background:#fbfbfa;">
+<div style="max-width:1120px;margin:0 auto;padding:40px 32px 64px;display:flex;flex-direction:column;gap:20px;">
+<div style="display:flex;flex-direction:column;gap:6px;"><div style="font-size:28px;font-weight:600;">AI 对手</div><div style="font-size:15px;color:#6e6e73;">每位对手由一段性格提示词驱动。LLM 按它来决策、说话；本地引擎按下面三项倾向来打。提示词可以直接改，下一手生效。</div></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;">
+<sc-for list="{{ oppCards }}" as="o" hint-placeholder-count="8">
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;align-items:center;gap:12px;"><div style="width:44px;height:44px;border-radius:50%;background:{{ o.av }};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;">{{ o.ini }}</div><div style="display:flex;flex-direction:column;flex:1;"><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:16px;font-weight:600;">{{ o.name }}</span><span style="font-size:11px;color:#6e6e73;background:#f1f1ef;padding:1px 6px;border-radius:5px;">{{ o.tag }}</span></div><span style="font-size:13px;color:#86868b;">{{ o.desc }}</span></div></div>
+<div style="display:flex;flex-direction:column;gap:6px;"><sc-for list="{{ o.bars }}" as="b" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;font-size:12px;color:#86868b;"><span style="width:44px;">{{ b.l }}</span><div style="flex:1;height:5px;background:#f0f0ee;border-radius:999px;position:relative;"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ b.w }};background:#1d1d1f;border-radius:999px;"></div></div></div></sc-for></div>
+<textarea value="{{ o.prompt }}" onChange="{{ o.onPrompt }}" rows="4" style="resize:vertical;padding:10px 12px;border:1px solid #e3e3e0;border-radius:10px;font-size:13px;line-height:1.55;color:#3a3a3c;outline:none;"></textarea>
+<div style="display:flex;align-items:center;gap:8px;"><div onClick="{{ o.onPick }}" style="padding:5px 12px;border-radius:999px;font-size:12px;cursor:pointer;border:1px solid {{ o.pickBd }};background:{{ o.pickBg }};color:{{ o.pickColor }};">{{ o.pickLabel }}</div><div style="flex:1;"></div><sc-if value="{{ o.edited }}" hint-placeholder-val="{{ false }}"><span onClick="{{ o.onReset }}" style="font-size:12px;color:#86868b;cursor:pointer;">恢复默认</span></sc-if></div>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isReplays }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;min-height:0;display:flex;background:#fbfbfa;">
+<aside style="width:300px;flex-shrink:0;border-right:1px solid #ebebe9;background:#fff;display:flex;flex-direction:column;min-height:0;">
+<div style="padding:16px 18px 10px;font-size:15px;font-weight:600;">手牌回放</div>
+<sc-if value="{{ noHistory }}" hint-placeholder-val="{{ true }}"><div style="padding:0 18px;font-size:13px;color:#86868b;">打完第一手后，这里会出现记录。</div></sc-if>
+<div style="flex:1;min-height:0;overflow:auto;padding:0 8px 12px;display:flex;flex-direction:column;gap:2px;">
+<sc-for list="{{ replayList }}" as="r" hint-placeholder-count="0"><div onClick="{{ r.onClick }}" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;background:{{ r.bg }};font-size:14px;"><span style="color:#86868b;width:46px;font-size:13px;">#{{ r.hand }}</span><span style="flex:1;font-weight:500;">{{ r.cards }}</span><span style="font-weight:600;color:{{ r.color }};">{{ r.net }}</span></div></sc-for>
+</div>
+</aside>
+<div style="flex:1;min-width:0;overflow:auto;">
+<sc-if value="{{ hasHistory }}" hint-placeholder-val="{{ false }}">
+<div style="max-width:820px;margin:0 auto;padding:32px;display:flex;flex-direction:column;gap:20px;">
+<div style="display:flex;align-items:baseline;gap:12px;"><span style="font-size:24px;font-weight:600;">{{ rpTitle }}</span><span style="font-size:15px;font-weight:600;color:{{ rpColor }};">{{ rpNet }}</span><div style="flex:1;"></div><span style="font-size:13px;color:#86868b;">{{ rpSub }}</span></div>
+<div style="display:flex;gap:6px;"><sc-for list="{{ rpBoard }}" as="c" hint-placeholder-count="5"><div style="width:50px;height:70px;box-sizing:border-box;background:#fff;border:1px solid #e3e3e0;border-radius:8px;padding:5px 7px;display:flex;flex-direction:column;justify-content:space-between;color:{{ c.color }};"><div style="font-size:19px;font-weight:600;line-height:1;">{{ c.r }}</div><div style="font-size:20px;line-height:1;align-self:flex-end;">{{ c.s }}</div></div></sc-for></div>
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:14px;padding:6px 16px;">
+<sc-for list="{{ rpPlayers }}" as="p" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f3f3f1;font-size:14px;"><span style="width:26px;height:26px;border-radius:50%;background:{{ p.av }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;">{{ p.ini }}</span><span style="width:70px;font-weight:600;">{{ p.name }}</span><span style="flex:1;font-weight:500;">{{ p.cards }}</span><span style="color:{{ p.color }};font-size:13px;">{{ p.note }}</span></div></sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;">
+<sc-for list="{{ rpStreets }}" as="st" hint-placeholder-count="2"><div style="display:flex;gap:16px;"><div style="width:80px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;"><span style="font-size:13px;font-weight:600;">{{ st.name }}</span><span style="font-size:12px;color:#86868b;">{{ st.board }}</span></div><div style="flex:1;display:flex;flex-wrap:wrap;gap:6px;"><sc-for list="{{ st.items }}" as="it" hint-placeholder-count="3"><span style="font-size:13px;padding:4px 10px;background:#fff;border:1px solid #ebebe9;border-radius:999px;white-space:nowrap;"><b style="font-weight:600;">{{ it.name }}</b> {{ it.label }}</span></sc-for></div></div></sc-for>
+</div>
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;">
+<div style="display:flex;align-items:center;gap:10px;"><span style="width:26px;height:26px;border-radius:50%;background:oklch(0.92 0.045 155);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;">师</span><span style="font-size:15px;font-weight:600;flex:1;">教练复盘</span><sc-if value="{{ rpCanReview }}" hint-placeholder-val="{{ true }}"><div onClick="{{ rpReview }}" style="padding:6px 14px;background:#1d1d1f;color:#fff;border-radius:999px;font-size:13px;cursor:pointer;">让教练复盘这一手</div></sc-if></div>
+<sc-if value="{{ rpLoading }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:#86868b;">教练正在回看这一手…</span></sc-if>
+<sc-if value="{{ rpHasReview }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px;line-height:1.7;white-space:pre-wrap;text-wrap:pretty;">{{ rpReviewText }}</div></sc-if>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isStats }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;min-height:0;overflow:auto;background:#fbfbfa;">
+<div style="max-width:1000px;margin:0 auto;padding:40px 32px 64px;display:flex;flex-direction:column;gap:20px;">
+<div style="display:flex;flex-direction:column;gap:6px;"><div style="font-size:28px;font-weight:600;">数据统计</div><div style="font-size:15px;color:#6e6e73;">基于最近 {{ statHands }} 手记录。</div></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
+<sc-for list="{{ kpis }}" as="k" hint-placeholder-count="6"><div style="background:#fff;border:1px solid #ebebe9;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:4px;"><span style="font-size:13px;color:#86868b;">{{ k.l }}</span><span style="font-size:28px;font-weight:600;letter-spacing:-0.01em;color:{{ k.color }};">{{ k.v }}</span><span style="font-size:12px;color:#a1a1a6;">{{ k.h }}</span></div></sc-for>
+</div>
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;">
+<span style="font-size:15px;font-weight:600;">每手盈亏</span>
+<div style="height:160px;display:flex;gap:3px;align-items:stretch;position:relative;"><div style="position:absolute;left:0;right:0;top:50%;height:1px;background:#ebebe9;"></div><sc-for list="{{ bars }}" as="b" hint-placeholder-count="0"><div style="flex:1;position:relative;max-width:22px;"><div style="position:absolute;left:0;right:0;top:{{ b.top }};height:{{ b.h }};background:{{ b.color }};border-radius:3px;"></div></div></sc-for></div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;min-height:0;overflow:auto;background:#fbfbfa;">
+<div style="max-width:760px;margin:0 auto;padding:40px 32px 64px;display:flex;flex-direction:column;gap:22px;">
+<div style="font-size:28px;font-weight:600;">设置</div>
+<sc-for list="{{ settingsGroups }}" as="grp" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:8px;">
+<span style="font-size:13px;color:#86868b;padding-left:4px;">{{ grp.t }}</span>
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:14px;padding:0 18px;">
+<sc-for list="{{ grp.rows }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid #f3f3f1;">
+<div style="flex:1;display:flex;flex-direction:column;gap:2px;"><span style="font-size:14px;font-weight:500;">{{ r.l }}</span><span style="font-size:12px;color:#86868b;line-height:1.5;">{{ r.d }}</span></div>
+<sc-if value="{{ r.isSeg }}" hint-placeholder-val="{{ false }}"><div style="display:flex;padding:3px;background:#f1f1ef;border-radius:9px;"><sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="padding:5px 12px;border-radius:7px;font-size:13px;cursor:pointer;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.sh }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for></div></sc-if>
+<sc-if value="{{ r.isTog }}" hint-placeholder-val="{{ false }}"><div onClick="{{ r.tog.onClick }}" style="width:34px;height:20px;border-radius:999px;background:{{ r.tog.track }};position:relative;cursor:pointer;flex-shrink:0;"><div style="position:absolute;top:2px;left:{{ r.tog.knob }};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.2);"></div></div></sc-if>
+<sc-if value="{{ r.isBtn }}" hint-placeholder-val="{{ false }}"><div onClick="{{ r.onClick }}" style="padding:6px 14px;border:1px solid #e3e3e0;border-radius:999px;font-size:13px;cursor:pointer;white-space:nowrap;">{{ r.btn }}</div></sc-if>
+<sc-if value="{{ r.isText }}" hint-placeholder-val="{{ false }}"><span style="font-size:14px;font-weight:600;">{{ r.text }}</span></sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+</div>
+
+<sc-if value="{{ showOnboard }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;background:rgba(28,28,30,0.28);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;box-sizing:border-box;">
+<div style="width:580px;max-width:100%;max-height:100%;overflow:auto;box-sizing:border-box;background:#fff;border-radius:20px;padding:30px 32px 24px;box-shadow:0 30px 80px rgba(0,0,0,0.18);display:flex;flex-direction:column;gap:18px;">
+<div style="display:flex;align-items:center;"><span style="font-size:13px;color:#86868b;white-space:nowrap;">规则入门 · {{ obPageLabel }}</span><div style="flex:1;"></div><span onClick="{{ closeOb }}" style="font-size:13px;color:#86868b;cursor:pointer;">跳过</span></div>
+<div style="font-size:24px;font-weight:600;letter-spacing:-0.01em;">{{ obTitle }}</div>
+<div style="font-size:15px;line-height:1.7;color:#3a3a3c;text-wrap:pretty;">{{ obBody }}</div>
+<sc-if value="{{ obIsRanks }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 20px;"><sc-for list="{{ ranks }}" as="r" hint-placeholder-count="10"><div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #f3f3f1;font-size:13px;"><span style="color:#a1a1a6;width:16px;">{{ r.i }}</span><span style="font-weight:600;width:74px;">{{ r.n }}</span><span style="color:#55555a;white-space:nowrap;">{{ r.ex }}</span></div></sc-for></div></sc-if>
+<sc-if value="{{ obIsFlow }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;gap:12px;"><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"><sc-for list="{{ flow }}" as="f" hint-placeholder-count="6"><span style="font-size:13px;padding:5px 11px;background:#f3f3f1;border-radius:999px;white-space:nowrap;">{{ f }}</span></sc-for></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;"><sc-for list="{{ acts }}" as="a" hint-placeholder-count="5"><div style="font-size:13px;line-height:1.5;"><b style="font-weight:600;">{{ a.n }}</b> <span style="color:#55555a;">{{ a.d }}</span></div></sc-for></div></div></sc-if>
+<div style="display:flex;align-items:center;gap:10px;padding-top:6px;">
+<div style="display:flex;gap:6px;"><sc-for list="{{ obDots }}" as="d" hint-placeholder-count="5"><span style="width:7px;height:7px;border-radius:50%;background:{{ d.bg }};"></span></sc-for></div>
+<div style="flex:1;"></div>
+<sc-if value="{{ obHasPrev }}" hint-placeholder-val="{{ false }}"><div onClick="{{ obPrev }}" style="padding:9px 16px;border:1px solid #e3e3e0;border-radius:999px;font-size:14px;cursor:pointer;">上一步</div></sc-if>
+<sc-if value="{{ obNotLast }}" hint-placeholder-val="{{ true }}"><div onClick="{{ obNext }}" style="padding:9px 18px;background:#1d1d1f;color:#fff;border-radius:999px;font-size:14px;cursor:pointer;">下一步</div></sc-if>
+<sc-if value="{{ obIsLast }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;"><div onClick="{{ closeOb }}" style="padding:9px 16px;border:1px solid #e3e3e0;border-radius:999px;font-size:14px;cursor:pointer;">直接开始</div><div onClick="{{ startGuided }}" style="padding:9px 18px;background:#1d1d1f;color:#fff;border-radius:999px;font-size:14px;cursor:pointer;">带我打一手</div></div></sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const PERSONAS = [
+  { id: 'li', name: '阿狸', tag: '激进', ini: '狸', hue: 25, desc: '爱施压、常诈唬，赢了会嘚瑟。', p: { tight: 0.2, aggr: 0.9, bluff: 0.7, call: 0.3 }, prompt: '你是阿狸，激进型牌手。喜欢持续下注、加注施压，经常诈唬。说话俏皮、爱挑衅，但不刻薄。', lines: { raise: ['这张牌对我太好了。', '谁敢跟？', '加点料～'], call: ['行，陪你玩。'], fold: ['这手先放过你们。'], win: ['谢谢各位～', '就说了吧。'], chat: ['专心打牌啦。'] } },
+  { id: 'k', name: '老K', tag: '紧凶', ini: 'K', hue: 60, desc: '只玩好牌，一出手就很重。话少。', p: { tight: 0.8, aggr: 0.7, bluff: 0.15, call: 0.1 }, prompt: '你是老K，紧凶型老牌手。只玩强牌，出手果断。话少，偶尔用长辈口吻点评年轻人。', lines: { raise: ['加。'], call: ['跟。'], fold: ['年轻人，慢一点。'], win: ['基本功。'], chat: ['嗯。'] } },
+  { id: 'bai', name: '小白', tag: '话痨', ini: '白', hue: 140, desc: '刚学会规则，什么都想跟，话特别多。', p: { tight: 0.1, aggr: 0.2, bluff: 0.1, call: 0.9 }, prompt: '你是小白，刚学德扑的新手，喜欢跟注看牌，很少弃牌。话多、情绪外露、爱问问题。', lines: { raise: ['我也加一次试试！'], call: ['我跟我跟，看看下一张！', '来都来了。'], check: ['过过过～'], fold: ['我弃了我弃了，太吓人'], win: ['啊？我赢了？！'], chat: ['哇你们都好厉害'] } },
+  { id: 'prof', name: '教授', tag: '数学派', ini: '教', hue: 200, desc: '按赔率和范围做决定，说话像在上课。', p: { tight: 0.55, aggr: 0.55, bluff: 0.35, call: 0.3 }, prompt: '你是教授，理性的数学派牌手，决策以底池赔率和胜率为依据。说话冷静，常引用数字。', lines: { raise: ['价值下注，合理。'], call: ['价格合适，跟。'], fold: ['赔率不够。'], win: ['期望值会说话。'], chat: ['从概率上讲，有道理。'] } },
+  { id: 'rock', name: '石头', tag: '超紧', ini: '石', hue: 290, desc: '一晚上只玩几手，一开口多半是大牌。', p: { tight: 0.95, aggr: 0.4, bluff: 0.02, call: 0.1 }, prompt: '你是石头，极紧的牌手。大多数牌都弃掉，只在拿到强牌时进入。惜字如金。', lines: { raise: ['……加。'], fold: ['……'], win: ['嗯。'] } },
+  { id: 'may', name: '阿May', tag: '情绪化', ini: 'M', hue: 340, desc: '顺风时很凶，输一手就上头。', p: { tight: 0.4, aggr: 0.6, bluff: 0.4, call: 0.5 }, prompt: '你是阿May，情绪化牌手。赢了很兴奋，输了容易上头、变得冲动。说话直接带情绪。', lines: { raise: ['来啊！'], fold: ['烦死了，弃。'], win: ['耶！终于！'], chat: ['别吵，我在想！'] } },
+  { id: 'cow', name: '牛仔', tag: '冒险家', ini: '牛', hue: 95, desc: '爱全下，信运气，喜欢讲故事。', p: { tight: 0.3, aggr: 0.8, bluff: 0.5, call: 0.6 }, prompt: '你是牛仔，冒险型牌手，相信运气，喜欢大底池和全下。说话豪爽，偶尔讲江湖故事。', lines: { raise: ['玩就玩大的！'], call: ['跟了，看天意。'], win: ['运气也是实力！'], chat: ['想当年我在拉斯维加斯……'] } },
+  { id: 'zen', name: '禅师', tag: '慢打', ini: '禅', hue: 170, desc: '拿到强牌反而装弱，喜欢过牌加注。', p: { tight: 0.6, aggr: 0.35, bluff: 0.2, call: 0.5 }, prompt: '你是禅师，喜欢慢打和设陷阱。强牌时常过牌或只跟注诱敌。说话平静，带点禅意。', lines: { call: ['随缘。'], check: ['静观其变。'], win: ['水到渠成。'], chat: ['心静，牌自明。'] } },
+];
+const LINES = { raise: ['加点。'], call: ['跟。'], check: ['过。'], fold: ['不跟了。'], win: ['谢了。'], chat: ['哈哈。'] };
+const COACHES = [
+  { n: '温和老师', s: '语气温和耐心，多鼓励，用生活化的比喻解释。' },
+  { n: '直白教练', s: '一针见血：先给结论，再用一两句理由。' },
+  { n: '数据派', s: '以数字说话：给出胜率、底池赔率、期望值的简单计算。' },
+];
+const BLINDS = [[10, 20], [50, 100], [100, 200]];
+const STORE = 'river.v1';
+const STREET = { preflop: '翻牌前', flop: '翻牌', turn: '转牌', river: '河牌', showdown: '摊牌' };
+
+class Component extends DCLogic {
+  state = this.load();
+  calls = [];
+  bT = {};
+  runId = 0;
+  chatRef = React.createRef();
+  threadRef = React.createRef();
+
+  load() {
+    let s = {};
+    try { s = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) {}
+    return {
+      screen: 'lobby', onboard: !s.seen, obPage: 0,
+      settings: Object.assign({ engine: 'llm', model: 'haiku', chatty: 1, coachOn: true, coachPersona: 0, level: 'novice', hard: false, speed: 1, autoNext: true }, s.settings || {}),
+      prompts: s.prompts || {}, lobby: Object.assign({ size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'] }, s.lobby || {}),
+      history: s.history || [], bankroll: s.bankroll ?? 100000,
+      tick: 0, chat: [], bubbles: {}, thinking: null, coach: { thread: [], alert: null, loading: false }, coachInput: '', chatInput: '',
+      raiseTo: 0, paused: false, nums: null, numsKey: null, replaySel: null, reviews: {}, reviewLoading: false, guided: false,
+    };
+  }
+  save() {
+    const s = this.state;
+    try { localStorage.setItem(STORE, JSON.stringify({ seen: this.seen || !s.onboard, settings: s.settings, prompts: s.prompts, lobby: s.lobby, history: s.history.slice(-60), bankroll: s.bankroll })); } catch (e) {}
+  }
+  componentDidMount() {
+    this.onKey = e => {
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || this.state.screen !== 'table') return;
+      const k = e.key.toLowerCase();
+      if (k === 'f') this.heroAct('fold');
+      else if (k === 'c') this.heroAct('call');
+      else if (k === 'r') this.heroAct('raise');
+      else if ((k === 'n' || k === ' ') && this.g && this.g.done) { e.preventDefault(); this.nextHand(); }
+    };
+    window.addEventListener('keydown', this.onKey);
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onResize();
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this.onKey); window.removeEventListener('resize', this.onResize); clearTimeout(this.t); clearTimeout(this.autoT); }
+  componentDidUpdate(pp, ps) {
+    this.save();
+    if (!ps || !ps.coach) return;
+    if (ps.chat.length !== this.state.chat.length && this.chatRef.current) this.chatRef.current.scrollTop = 1e6;
+    if ((ps.coach.thread.length !== this.state.coach.thread.length || ps.coach.loading !== this.state.coach.loading) && this.threadRef.current) this.threadRef.current.scrollTop = 1e6;
+  }
+
+  persona(id) { return PERSONAS.find(p => p.id === id) || PERSONAS[0]; }
+  promptOf(id) { return this.state.prompts[id] || this.persona(id).prompt; }
+  nameOf(id) { return id === 'hero' ? '你' : this.persona(id).name; }
+  bump() { this.setState(s => ({ tick: s.tick + 1 })); }
+  pushChat(m) { this.setState(s => ({ chat: [...s.chat, { ...m, k: Math.random() }].slice(-150) })); }
+  bubble(id, t) {
+    this.setState(s => ({ bubbles: { ...s.bubbles, [id]: t } }));
+    clearTimeout(this.bT[id]);
+    this.bT[id] = setTimeout(() => this.setState(s => { const b = { ...s.bubbles }; delete b[id]; return { bubbles: b }; }), 5000);
+  }
+  canned(id, type, force) {
+    const prob = [0.08, 0.22, 0.45][this.state.settings.chatty];
+    if (!force && Math.random() > prob) return null;
+    const pool = (this.persona(id).lines || {})[type] || LINES[type] || [];
+    return pool.length ? pool[Math.random() * pool.length | 0] : null;
+  }
+  canCall(reserve) { const now = Date.now(); this.calls = this.calls.filter(t => now - t < 60000); return this.calls.length < 14 - reserve; }
+  async llm(body) {
+    this.calls.push(Date.now());
+    const req = { max_tokens: 500, ...body };
+    if (!this.modelBad) req.model = this.state.settings.model === 'sonnet' ? 'claude-sonnet-4-5' : 'claude-haiku-4-5';
+    try { return await window.claude.complete(req); }
+    catch (e) { if (req.model && !this.modelBad) { this.modelBad = true; delete req.model; this.calls.push(Date.now()); return await window.claude.complete(req); } throw e; }
+  }
+  parseJSON(t, arr) {
+    if (!t) return null;
+    const m = t.match(arr ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/);
+    try { return m ? JSON.parse(m[0]) : null; } catch (e) { return null; }
+  }
+
+  startTable(opts) {
+    const E = window.RiverPoker; if (!E) return;
+    clearTimeout(this.t); clearTimeout(this.autoT); this.runId++;
+    const [sb, bb] = BLINDS[opts.blinds];
+    const buy = bb * 100;
+    let picks = opts.picks.slice(0, opts.size - 1);
+    PERSONAS.forEach(p => { if (picks.length < opts.size - 1 && !picks.includes(p.id)) picks.push(p.id); });
+    const back = this.g ? this.g.players[0].stack : 0;
+    const ps = [{ id: 'hero', name: '你', isHero: true, stack: buy }].concat(picks.map(id => ({ id, name: this.persona(id).name, stack: buy })));
+    this.g = E.newGame({ players: ps, sb, bb });
+    this.seen = true;
+    this.setState(s => ({
+      screen: 'table', onboard: false, bankroll: s.bankroll + back - buy, guided: !!opts.guided, paused: false, nums: null, bubbles: {},
+      chat: [{ sys: true, t: `入座 · ${sb}/${bb} · ${ps.length} 人桌` }],
+      coach: { thread: [], loading: false, alert: opts.guided ? { level: 'hint', message: '这是一手教学牌局。每次轮到你，我都会先说说局面；有任何不懂的，直接在下面问我。' } : null },
+      settings: opts.guided ? { ...s.settings, coachOn: true, level: 'novice' } : s.settings,
+    }), () => this.nextHand());
+  }
+  nextHand() {
+    const E = window.RiverPoker, g = this.g; if (!g) return;
+    clearTimeout(this.autoT);
+    g.players.forEach(p => { if (!p.isHero && p.stack <= 0) { p.stack = g.bb * 100; this.pushChat({ sys: true, t: `${p.name} 重新买入 ${E.fmt(p.stack)}` }); } });
+    if (g.players[0].stack <= 0) return;
+    E.startHand(g);
+    this.lastStreet = 'preflop'; this.heroKey = null; this.endKey = null;
+    this.pushChat({ sys: true, t: `第 ${g.hand} 手 · 翻牌前` });
+    this.setState(s => ({ paused: false, nums: null, coach: { ...s.coach, alert: s.guided && g.hand === 1 ? s.coach.alert : null } }), () => this.loop());
+  }
+  loop() {
+    const g = this.g, E = window.RiverPoker; if (!g) return;
+    this.bump();
+    if (g.done) { this.onHandEnd(); return; }
+    const rid = this.runId;
+    if (g.runout) {
+      clearTimeout(this.t);
+      this.t = setTimeout(() => { if (rid !== this.runId) return; E.runoutStep(g); this.afterAction(); }, 900);
+      return;
+    }
+    const p = g.players[g.toAct];
+    if (!p) return;
+    if (p.isHero) { this.onHeroTurn(); return; }
+    if (this.state.paused) return;
+    this.setState({ thinking: p.id });
+    clearTimeout(this.t);
+    this.t = setTimeout(() => this.aiAct(g.toAct, rid), [1500, 900, 400][this.state.settings.speed]);
+  }
+  async aiAct(i, rid) {
+    const E = window.RiverPoker, g = this.g;
+    if (!g || rid !== this.runId || g.toAct !== i || this.state.paused) return;
+    const hand = g.hand, logLen = g.log.length, p = g.players[i];
+    let a = null, say = null;
+    if (this.state.settings.engine === 'llm' && this.canCall(5)) { try { const r = await this.llmDecide(i); a = r.a; say = r.say; } catch (e) {} }
+    if (this.g !== g || rid !== this.runId || g.hand !== hand || g.log.length !== logLen) return;
+    if (this.state.paused) { this.pendingAI = { i, a, say }; return; }
+    if (!a) { a = E.decide(g, i, this.persona(p.id).p); say = this.canned(p.id, a.type); }
+    this.commitAI(i, a, say);
+  }
+  commitAI(i, a, say) {
+    const E = window.RiverPoker, g = this.g, p = g.players[i];
+    const label = E.apply(g, i, a);
+    this.pushChat(say ? { n: p.name, pid: p.id, t: say, act: label } : { n: p.name, pid: p.id, act: label });
+    if (say) this.bubble(p.id, say);
+    this.setState({ thinking: null });
+    this.afterAction();
+  }
+  afterAction() {
+    const g = this.g, E = window.RiverPoker;
+    if (g.street !== this.lastStreet) {
+      if (STREET[g.street] && g.street !== 'showdown') this.pushChat({ sys: true, t: `${STREET[g.street]} ${g.board.map(E.txt).join(' ')}` });
+      this.lastStreet = g.street;
+    }
+    this.loop();
+  }
+  resume() {
+    this.setState({ paused: false }, () => {
+      const pa = this.pendingAI; this.pendingAI = null;
+      if (pa && this.g && this.g.toAct === pa.i && !this.g.done) {
+        const E = window.RiverPoker;
+        const a = pa.a || E.decide(this.g, pa.i, this.persona(this.g.players[pa.i].id).p);
+        this.commitAI(pa.i, a, pa.say || (pa.a ? null : this.canned(this.g.players[pa.i].id, a.type)));
+      } else this.loop();
+    });
+  }
+  heroAct(type) {
+    const E = window.RiverPoker, g = this.g;
+    if (!g || g.done || g.runout || g.toAct !== 0 || this.state.paused) return;
+    const L = E.legal(g, 0);
+    const a = { type };
+    if (type === 'call' && L.toCall === 0) a.type = 'check';
+    if (type === 'fold' && L.toCall === 0) a.type = 'check';
+    if (type === 'raise') { if (!L.canRaise) return; a.to = this.state.raiseTo; }
+    const label = E.apply(g, 0, a);
+    this.pushChat({ n: '你', pid: 'hero', act: label });
+    this.afterAction();
+  }
+  computeNums() {
+    const E = window.RiverPoker, g = this.g; if (!g) return null;
+    const h = g.players[0];
+    if (h.folded) return null;
+    const opp = g.players.filter(p => !p.isHero && E.inHand(p)).length;
+    const eq = E.equity(h.hole, g.board, opp, 400);
+    const L = E.legal(g, 0);
+    const total = E.pot(g);
+    const need = L.toCall > 0 ? L.toCall / (total + L.toCall) : 0;
+    const fair = 1 / (opp + 1);
+    let sugg;
+    if (L.toCall === 0) sugg = eq > fair * 1.6 ? '下注' : '过牌';
+    else sugg = eq >= need ? (eq > fair * 2.2 && L.canRaise ? '加注' : '跟注') : '弃牌';
+    return { eq, need, outs: E.outs(h.hole, g.board), name: E.handName(h.hole.concat(g.board)), sugg, opp, toCall: L.toCall, street: g.street };
+  }
+  onHeroTurn() {
+    const E = window.RiverPoker, g = this.g;
+    const key = `${g.hand}-${g.log.length}`;
+    if (this.heroKey === key) return;
+    this.heroKey = key;
+    const L = E.legal(g, 0), total = E.pot(g), bb = g.bb;
+    const r = x => Math.round(x / bb) * bb;
+    const def = L.canRaise ? Math.max(L.minTo, Math.min(L.maxTo, g.currentBet === 0 ? r(total * 0.5) : r(g.currentBet * 2.5))) : 0;
+    this.setState({ thinking: null, raiseTo: def });
+    setTimeout(() => {
+      const nums = this.computeNums();
+      this.setState({ nums });
+      if (this.state.settings.coachOn) this.coachProactive(nums, key);
+    }, 30);
+  }
+  coachSystem() {
+    const st = this.state.settings, c = COACHES[st.coachPersona];
+    return `你是德州扑克教学 App「River」里的教练，人设：${c.n}。${c.s}\n你站在玩家这一边，只知道玩家能看到的信息：绝不假装知道对手底牌，只能根据行动推测范围。\n${st.level === 'novice' ? '玩家是新手：用最简单的语言，第一次出现的术语顺带解释。' : '玩家有基础：可以使用范围、EV、弃牌率、SPR 等术语。'}\n回答用中文，可夹少量英文术语，简洁（一般不超过 120 字，除非玩家要求详细）。不要使用 markdown 标题或列表符号。`;
+  }
+  snapshot(nums) {
+    const E = window.RiverPoker, g = this.g;
+    if (!g || !g.players[0].hole.length) return '当前不在牌局中。';
+    const h = g.players[0], L = E.legal(g, 0);
+    const opp = g.players.slice(1).filter(p => !p.out).map(p => `${p.name}（${this.persona(p.id).tag}，筹码 ${E.fmt(p.stack)}${p.folded ? '，已弃牌' : ''}${p.bet ? `，本轮已下 ${p.bet}` : ''}${p.allin ? '，已全下' : ''}）`).join('；');
+    const log = g.log.map(x => x.board ? `【${STREET[x.street]} ${x.label}】` : `${this.nameOf(x.id)}${x.label}`).join('，');
+    let t = `盲注 ${g.sb}/${g.bb}，第 ${g.hand} 手，当前阶段：${STREET[g.street] || ''}\n玩家底牌：${h.hole.map(E.txt).join(' ')}${h.folded ? '（玩家已弃牌）' : ''}\n公共牌：${g.board.map(E.txt).join(' ') || '无'}\n底池总额：${E.fmt(E.pot(g))}；玩家需跟注：${E.fmt(L.toCall)}；玩家筹码：${E.fmt(h.stack)}\n对手：${opp}\n本手行动：${log}`;
+    if (nums) t += `\n本地计算：胜率约 ${Math.round(nums.eq * 100)}%（对 ${nums.opp} 位对手的随机手牌），所需胜率 ${(nums.need * 100).toFixed(1)}%，出路 ${nums.outs ?? '—'}，当前牌型 ${nums.name}，简单规则建议 ${nums.sugg}`;
+    return t;
+  }
+  async coachProactive(nums, key) {
+    if (!this.canCall(1)) return;
+    const guided = this.state.guided;
+    this.setState(s => ({ coach: { ...s.coach, loading: true } }));
+    try {
+      const txt = await this.llm({
+        system: this.coachSystem(),
+        messages: [{ role: 'user', content: `${this.snapshot(nums)}\n\n现在轮到玩家决策。你有三个工具，选一个：\n- silent：常规决策，不打扰\n- hint：有值得提醒的点，给一句提醒\n- pause：关键或高代价决策（大额跟注、全下、容易犯错的地方），暂停牌局让玩家先想清楚\n${guided ? '这是教学牌局：不要选 silent，每一步都至少给 hint，并解释现在该考虑什么。' : '大多数时候应该选 silent。'}\n只输出 JSON：{"tool":"silent|hint|pause","message":"给玩家的话（silent 时为空）"}` }],
+        max_tokens: 300,
+      });
+      if (this.heroKey !== key) return;
+      const j = this.parseJSON(txt);
+      if (j && (j.tool === 'hint' || j.tool === 'pause') && j.message) this.setState(s => ({ coach: { ...s.coach, alert: { level: j.tool, message: j.message } }, paused: j.tool === 'pause' }));
+    } catch (e) {} finally { this.setState(s => ({ coach: { ...s.coach, loading: false } })); }
+  }
+  async askCoach(q) {
+    q = (q || this.state.coachInput).trim(); if (!q) return;
+    const g = this.g;
+    const thread = [...this.state.coach.thread, { role: 'user', t: q }];
+    this.setState(s => ({ coachInput: '', paused: !!(g && !g.done), coach: { ...s.coach, thread, loading: true } }));
+    let reply;
+    try {
+      if (!this.canCall(0)) throw new Error('budget');
+      const nums = this.state.nums || this.computeNums();
+      reply = await this.llm({ system: this.coachSystem() + '\n\n当前局面（玩家视角）：\n' + this.snapshot(nums), messages: thread.slice(-12).map(m => ({ role: m.role, content: m.t })), max_tokens: 700 });
+    } catch (e) { reply = '（教练暂时没连上，可能是调用太频繁了，等几秒再问一次。）'; }
+    this.setState(s => ({ coach: { ...s.coach, loading: false, thread: [...s.coach.thread, { role: 'assistant', t: (reply || '').trim() }] } }));
+  }
+  aiView(i) {
+    const E = window.RiverPoker, g = this.g, p = g.players[i];
+    const L = E.legal(g, i);
+    const opp = g.players.filter((q, j) => j !== i && E.inHand(q));
+    const eq = E.equity(p.hole, g.board, opp.length, 150);
+    const others = g.players.filter((q, j) => j !== i && !q.out).map(q => `${q.name}（筹码 ${q.stack}${q.folded ? '，已弃牌' : ''}${q.bet ? `，本轮已下 ${q.bet}` : ''}${q.allin ? '，已全下' : ''}）`).join('；');
+    const log = g.log.map(x => x.board ? `【${STREET[x.street]} ${x.label}】` : `${this.nameOf(x.id)}${x.label}`).join('，');
+    return `盲注 ${g.sb}/${g.bb}。阶段：${STREET[g.street]}\n你的底牌：${p.hole.map(E.txt).join(' ')}\n公共牌：${g.board.map(E.txt).join(' ') || '无'}\n底池：${E.pot(g)}；你需跟注：${L.toCall}；你的筹码：${p.stack}\n其他玩家：${others}\n本手行动：${log}\n参考：你对随机手牌的胜率约 ${Math.round(eq * 100)}%`;
+  }
+  async llmDecide(i) {
+    const E = window.RiverPoker, g = this.g, p = g.players[i], per = this.persona(p.id), L = E.legal(g, i);
+    const chatty = ['很少说话（大约十次行动说一句）', '偶尔说话（大约三次行动说一句）', '很爱说话（大多数行动都说一句）'][this.state.settings.chatty];
+    const opts = [L.toCall === 0 ? 'check（过牌）' : `fold（弃牌）/ call（跟注 ${L.toCall}）`];
+    if (L.canRaise) opts.push(`raise（加注到总额 ${L.minTo}~${L.maxTo}）`);
+    const txt = await this.llm({
+      system: `你在一张 PvE 娱乐德州扑克桌上扮演 AI 玩家「${per.name}」。${this.promptOf(p.id)}\n按人设决策，但别做明显送钱的离谱决定。发言：${chatty}；发言不超过 20 字，中文口语。绝不透露或暗示自己的底牌：发言中不得出现任何牌面点数（A、K、Q、J、数字）、花色或"对子/口袋"等描述自己手牌的词。\n只输出一个 JSON 对象，不要任何其他内容。`,
+      messages: [{ role: 'user', content: `${this.aiView(i)}\n可选行动：${opts.join(' / ')}\n输出格式：{"action":"fold|check|call|raise","to":加注到的总额数字,"say":"一句话或空字符串"}` }],
+      max_tokens: 160,
+    });
+    const j = this.parseJSON(txt);
+    if (!j || !['fold', 'check', 'call', 'raise'].includes(j.action)) throw new Error('bad');
+    let type = j.action;
+    if (type === 'check' && L.toCall > 0) type = 'call';
+    if ((type === 'call' || type === 'fold') && L.toCall === 0) type = 'check';
+    if (type === 'raise' && !L.canRaise) type = L.toCall ? 'call' : 'check';
+    let say = String(j.say || '').trim().slice(0, 40);
+    const leaks = p.hole.some(c => { const r = c[0] === 'T' ? '10' : c[0]; return /\d/.test(r) ? new RegExp(`(^|[^\\d])${r}([^\\d]|$)`).test(say) : new RegExp(`(^|[^A-Za-z老])${r}([^A-Za-z]|$)`).test(say); });
+    if (leaks || /[♠♥♦♣]|口袋|底牌是|我有一对|对子/.test(say)) say = '';
+    return { a: { type, to: +j.to || L.minTo }, say: say || null };
+  }
+  async sendChat() {
+    const t = this.state.chatInput.trim(); if (!t) return;
+    this.pushChat({ n: '你', pid: 'hero', t });
+    this.setState({ chatInput: '' });
+    const g = this.g; if (!g) return;
+    const at = g.players.filter(p => !p.isHero && !p.out);
+    const fallback = () => { const p = at[Math.random() * at.length | 0]; const r = this.canned(p.id, 'chat', true); if (r) setTimeout(() => { this.pushChat({ n: p.name, pid: p.id, t: r }); this.bubble(p.id, r); }, 700); };
+    if (!this.canCall(3)) return fallback();
+    try {
+      const txt = await this.llm({
+        system: `你同时扮演牌桌上的这些 AI 玩家：\n${at.map(p => `- ${p.name}：${this.promptOf(p.id)}`).join('\n')}\n真人玩家在公屏说了一句话。选 1~${[1, 2, 3][this.state.settings.chatty]} 位最可能回应的角色，各回一句（不超过 25 字，口语，符合人设，绝不透露底牌）。只输出 JSON 数组：[{"name":"角色名","text":"..."}]`,
+        messages: [{ role: 'user', content: `最近公屏：\n${this.state.chat.slice(-10).filter(m => m.t).map(m => `${m.n || '系统'}：${m.t}`).join('\n')}\n\n真人玩家刚说：「${t}」` }],
+        max_tokens: 300,
+      });
+      const arr = this.parseJSON(txt, true);
+      if (!arr || !arr.length) return fallback();
+      arr.slice(0, 3).forEach((r, k) => { const p = at.find(x => x.name === r.name); if (p && r.text) setTimeout(() => { this.pushChat({ n: p.name, pid: p.id, t: r.text }); this.bubble(p.id, r.text); }, 400 + k * 1000); });
+    } catch (e) { fallback(); }
+  }
+  onHandEnd() {
+    const E = window.RiverPoker, g = this.g;
+    if (this.endKey === g.hand) return;
+    this.endKey = g.hand;
+    this.setState({ thinking: null, paused: false });
+    g.winners.forEach(w => {
+      const p = g.players.find(x => x.id === w.id);
+      this.pushChat({ sys: true, t: `${p.name} 赢得 ${E.fmt(w.amount)}${w.handName ? ' · ' + w.handName : ''}` });
+      if (!p.isHero) { const l = this.canned(p.id, 'win'); if (l) { this.pushChat({ n: p.name, pid: p.id, t: l }); this.bubble(p.id, l); } }
+    });
+    const h = g.players[0];
+    const pre = g.log.filter(x => x.street === 'preflop' && x.id === 'hero' && !/盲/.test(x.label));
+    const rec = {
+      hand: g.hand, sb: g.sb, bb: g.bb, net: h.stack - h.startStack, pot: g.players.reduce((a, p) => a + p.contrib, 0), showdown: g.showdown,
+      hero: h.hole.slice(), board: g.board.slice(),
+      players: g.players.filter(p => !p.out).map(p => ({ id: p.id, name: p.name, hole: p.isHero || (g.showdown && !p.folded) ? p.hole.slice() : null, folded: p.folded, handName: p.handName || '', won: (g.winners.find(w => w.id === p.id) || {}).amount || 0 })),
+      log: g.log.map(x => ({ street: x.street, board: !!x.board, name: x.board ? '' : this.nameOf(x.id), label: x.label })),
+      vpip: pre.some(x => /跟注|加注|全下|下注/.test(x.label)), pfr: pre.some(x => /加注|全下/.test(x.label)),
+    };
+    this.setState(s => ({ history: [...s.history, rec].slice(-60) }));
+    if (this.state.settings.autoNext && h.stack > 0) { const rid = this.runId; this.autoT = setTimeout(() => { if (rid === this.runId && this.g && this.g.done && !this.state.paused) this.nextHand(); }, 4500); }
+  }
+  leave() {
+    clearTimeout(this.t); clearTimeout(this.autoT); this.runId++;
+    const g = this.g; if (!g) return;
+    const back = g.players[0].stack;
+    this.g = null;
+    this.setState(s => ({ bankroll: s.bankroll + back, screen: 'lobby', thinking: null, paused: false }));
+  }
+  rebuy() {
+    const g = this.g; if (!g) return;
+    g.players[0].stack = g.bb * 100;
+    this.setState(s => ({ bankroll: s.bankroll - g.bb * 100 }), () => this.nextHand());
+  }
+  async review(rec) {
+    if (!this.canCall(0)) { this.setState(s => ({ reviews: { ...s.reviews, [rec.hand]: '（调用太频繁，稍后再试。）' } })); return; }
+    this.setState({ reviewLoading: true });
+    const t = `盲注 ${rec.sb}/${rec.bb}\n玩家底牌：${rec.hero.map(window.RiverPoker.txt).join(' ')}\n公共牌：${rec.board.map(window.RiverPoker.txt).join(' ') || '无'}\n行动：${rec.log.map(x => x.board ? `【${STREET[x.street]} ${x.label}】` : `${x.name}${x.label}`).join('，')}\n结果：玩家${rec.net >= 0 ? '赢' : '输'} ${Math.abs(rec.net)}\n摊牌：${rec.players.filter(p => p.hole && p.id !== 'hero').map(p => `${p.name} ${p.hole.map(window.RiverPoker.txt).join(' ')}`).join('；') || '无'}`;
+    let r;
+    try { r = await this.llm({ system: this.coachSystem() + '\n现在是赛后复盘，可以稍详细（200 字内）：指出这手牌玩家做得好的一步和可以改进的一步，并给一个下次可用的原则。', messages: [{ role: 'user', content: t }], max_tokens: 700 }); }
+    catch (e) { r = '（复盘失败，稍后再试。）'; }
+    this.setState(s => ({ reviewLoading: false, reviews: { ...s.reviews, [rec.hand]: (r || '').trim() } }));
+  }
+
+  renderVals() {
+    const s = this.state, st = s.settings, g = this.g, E = window.RiverPoker;
+    const blue = 'oklch(0.6 0.17 255)', green = 'oklch(0.55 0.14 155)', red = 'oklch(0.56 0.2 25)';
+    const fmt = n => Math.round(n).toLocaleString('en-US');
+    const signed = n => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
+    const cardV = (c, rot) => { const d = E ? E.disp(c) : { r: c[0], s: '', red: false }; return { r: d.r, s: d.s, color: d.red ? red : '#1d1d1f', rot: rot || '0deg' }; };
+    const cardTxt = cs => cs && E ? cs.map(E.txt).join(' ') : '';
+    const avOf = id => id === 'hero' ? 'oklch(0.9 0.045 255)' : `oklch(0.91 0.045 ${this.persona(id).hue})`;
+    const iniOf = id => id === 'hero' ? '你' : this.persona(id).ini;
+    const setS = (k, v) => this.setState(x => ({ settings: { ...x.settings, [k]: v } }));
+    const segOf = (cur, labels, vals, fn) => labels.map((l, i) => { const v = vals ? vals[i] : i; const on = cur === v; return { l, bg: on ? '#fff' : 'transparent', sh: on ? '0 1px 2px rgba(0,0,0,0.08)' : 'none', w: on ? 600 : 400, onClick: () => fn(v) }; });
+    const seg = (k, labels, vals) => segOf(st[k], labels, vals, v => setS(k, v));
+    const tog = (on, fn) => ({ on, onClick: fn, track: on ? '#1d1d1f' : '#dcdcd8', knob: on ? '16px' : '2px' });
+    const scr = s.screen === 'table' && !g ? 'lobby' : s.screen;
+    const nav = [['lobby', '大厅']].concat(g ? [['table', '牌桌']] : [], [['opponents', 'AI 对手'], ['replays', '手牌回放'], ['stats', '数据统计'], ['settings', '设置']])
+      .map(([k, l]) => ({ l, bg: scr === k ? '#e9e9e6' : 'transparent', color: scr === k ? '#1d1d1f' : '#55555a', w: scr === k ? 600 : 400, onClick: () => this.setState({ screen: k }) }));
+    const coachOnTog = tog(st.coachOn, () => setS('coachOn', !st.coachOn));
+    const hardTog = tog(st.hard, () => setS('hard', !st.hard));
+
+    const out = {
+      nav, coachOnTog, hardTog,
+      isTable: scr === 'table', isLobby: scr === 'lobby', isOpp: scr === 'opponents', isReplays: scr === 'replays', isStats: scr === 'stats', isSettings: scr === 'settings',
+      onTable: scr === 'table', notTable: scr !== 'table', bankrollF: fmt(s.bankroll),
+      tableTitle: g ? `无限注 · ${g.sb}/${g.bb} · ${g.players.length} 人桌` : '', handNo: g ? g.hand : 0,
+      leaveTable: () => this.leave(), hasGame: !!g, resumeTable: () => this.setState({ screen: 'table' }),
+      coachPersonaName: COACHES[st.coachPersona].n, levelName: st.level === 'novice' ? '新手' : '进阶',
+      chattySeg: seg('chatty', ['安静', '适中', '热闹']),
+      levelSeg: seg('level', ['新手讲解', '进阶分析'], ['novice', 'pro']),
+    };
+
+    // table
+    if (g && E) {
+      const n = g.players.length, hero = g.players[0];
+      const heroTurn = !g.done && !g.runout && g.toAct === 0;
+      const L = E.legal(g, 0), total = E.pot(g), bets = g.players.reduce((a, p) => a + p.bet, 0);
+      const thinking = s.thinking && g.players.find(p => p.id === s.thinking);
+      out.seats = g.players.map((p, i) => {
+        const ang = (90 + i * 360 / n) * Math.PI / 180;
+        const win = g.done && g.winners && g.winners.find(w => w.id === p.id);
+        const reveal = p.isHero || (g.street === 'showdown' && g.showdown && !p.folded);
+        const isThink = s.thinking === p.id, myTurn = p.isHero && heroTurn;
+        let status = '', sc = '#86868b';
+        if (isThink) { status = '思考中…'; sc = blue; }
+        else if (win) { status = `赢得 ${fmt(win.amount)}${win.handName ? ' · ' + win.handName : ''}`; sc = green; }
+        else if (p.out) status = '旁观';
+        else if (p.folded) status = '已弃牌';
+        else if (myTurn) { status = '轮到你'; sc = blue; }
+        else if (g.street === 'showdown' && p.handName) status = p.handName;
+        else status = p.last || '';
+        const bubble = s.bubbles[p.id];
+        return {
+          x: `${50 + 40 * Math.cos(ang)}%`, y: `${50 + 37 * Math.sin(ang)}%`, z: bubble ? 5 : 2,
+          name: p.name, tag: p.isHero ? '' : this.persona(p.id).tag, hasTag: !p.isHero, stack: fmt(p.stack), ini: iniOf(p.id), av: avOf(p.id),
+          border: (isThink || myTurn) ? `2px solid ${blue}` : win ? `2px solid ${green}` : '1px solid #ebebe9',
+          shadow: (isThink || myTurn) ? '0 0 0 5px oklch(0.6 0.17 255 / 0.12)' : win ? '0 0 0 5px oklch(0.55 0.14 155 / 0.12)' : 'none',
+          op: p.folded || p.out ? 0.45 : 1,
+          back: !reveal && !p.folded && !p.out && p.hole.length > 0,
+          showCards: reveal && p.hole.length > 0, cards: p.hole.map((c, k) => cardV(c, p.isHero ? (k ? '4deg' : '-4deg') : '0deg')),
+          cw: p.isHero ? '52px' : '44px', ch: p.isHero ? '72px' : '62px',
+          dealer: i === g.dealer, hasBubble: !!bubble && !p.isHero, bubble: bubble || '',
+          hasStatus: !!status, status, statusColor: sc,
+        };
+      });
+      out.betsView = g.players.map((p, i) => { const ang = (90 + i * 360 / n) * Math.PI / 180; return p.bet > 0 ? { x: `${50 + 24 * Math.cos(ang)}%`, y: `${50 + 21 * Math.sin(ang)}%`, amt: fmt(p.bet) } : null; }).filter(Boolean);
+      out.board = [0, 1, 2, 3, 4].map(k => g.board[k] ? { has: true, empty: false, ...cardV(g.board[k]) } : { has: false, empty: true, r: '', s: '', color: '' });
+      out.potF = fmt(total - bets);
+      const r = x => Math.round(x / g.bb) * g.bb;
+      const clamp = x => Math.max(L.minTo, Math.min(L.maxTo, x));
+      out.presets = [['⅓ 池', 0.33], ['½ 池', 0.5], ['¾ 池', 0.75], ['满池', 1], ['全下', null]].map(([l, f]) => {
+        const to = f === null ? L.maxTo : clamp(g.currentBet + r((total + L.toCall) * f));
+        const on = s.raiseTo === to;
+        return { l, w: on ? 600 : 400, bg: on ? '#ececea' : '#fff', onClick: () => this.setState({ raiseTo: to }) };
+      });
+      out.raiseToF = heroTurn && L.canRaise ? fmt(s.raiseTo) : '—';
+      out.decRaise = () => this.setState(x => ({ raiseTo: clamp(x.raiseTo - g.bb) }));
+      out.incRaise = () => this.setState(x => ({ raiseTo: clamp(x.raiseTo + g.bb) }));
+      out.callLabel = L.toCall === 0 ? '过牌' : L.toCall >= hero.stack ? `全下 ${fmt(L.toCall)}` : `跟注 ${fmt(L.toCall)}`;
+      out.raiseLabel = s.raiseTo >= L.maxTo && heroTurn ? '全下' : g.currentBet === 0 ? '下注' : '加注至';
+      out.raiseOp = heroTurn && L.canRaise ? 1 : 0.4;
+      out.onFold = () => this.heroAct('fold'); out.onCall = () => this.heroAct('call'); out.onRaise = () => this.heroAct('raise');
+      out.ctrlOp = heroTurn && !s.paused ? 1 : 0.4; out.ctrlPe = heroTurn && !s.paused ? 'auto' : 'none';
+      out.statusText = heroTurn ? (s.paused ? '牌局已暂停' : `轮到你 · 需跟注 ${fmt(L.toCall)}`) : hero.folded ? `你已弃牌${thinking ? ` · ${thinking.name} 正在思考…` : ''}` : thinking ? `等待 ${thinking.name} 行动…` : g.runout ? '发牌中…' : s.paused ? '牌局已暂停' : '';
+      out.statusColor = heroTurn ? blue : '#86868b';
+      out.isDone = g.done; out.notDone = !g.done;
+      const hw = g.done && g.winners ? g.winners.find(w => w.id === 'hero') : null;
+      const net = hero.stack - (hero.startStack || 0);
+      out.resultText = !g.done ? '' : hw ? `你赢得 ${fmt(hw.amount)}${hw.handName ? ' · ' + hw.handName : ''}` : `${g.winners.map(w => this.nameOf(w.id)).join('、')} 赢下这一手`;
+      out.resultColor = hw ? green : '#1d1d1f';
+      out.resultSub = g.done ? `本手 ${signed(net)} · ${st.autoNext && hero.stack > 0 ? '4 秒后自动发下一手' : '准备好了就发下一手'}` : '';
+      out.heroBust = g.done && hero.stack <= 0; out.notBust = !out.heroBust;
+      out.buyInF = fmt(g.bb * 100); out.rebuy = () => this.rebuy(); out.nextHand = () => this.nextHand();
+      out.lockPaused = heroTurn && s.paused;
+    } else {
+      Object.assign(out, { seats: [], betsView: [], board: [], potF: '0', presets: [], raiseToF: '—', callLabel: '跟注', raiseLabel: '加注', raiseOp: 0.4, ctrlOp: 0.4, ctrlPe: 'none', statusText: '', isDone: false, notDone: true, heroBust: false, notBust: true, lockPaused: false });
+    }
+    out.paused = s.paused; out.resume = () => this.resume();
+
+    // responsive
+    const vw = s.vw || 1440;
+    const showChat = s.chatShown == null ? vw >= 1280 : s.chatShown;
+    out.wide = vw >= 1200; out.showChat = showChat; out.chatHidden = !showChat;
+    out.chatW = vw < 1100 ? '248px' : '288px'; out.coachW = vw < 1100 ? '296px' : '344px';
+    out.toggleChat = () => this.setState({ chatShown: !showChat });
+    const lm = [...s.chat].reverse().find(m => m.t && !m.sys);
+    out.lastChat = lm ? `${lm.n}：${lm.t}` : '';
+
+    // chat
+    out.chatView = s.chat.map(m => ({ ...m, isSys: !!m.sys, isAct: !m.sys && !m.t, isMsg: !m.sys && !!m.t, hasAct: !!m.act, ini: m.pid ? iniOf(m.pid) : '', av: m.pid ? avOf(m.pid) : '#eee' }));
+    out.chatRef = this.chatRef; out.chatInput = s.chatInput;
+    out.onChatInput = e => this.setState({ chatInput: e.target.value });
+    out.onChatKey = e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) this.sendChat(); };
+    out.sendChat = () => this.sendChat();
+
+    // coach
+    const nums = s.nums, al = s.coach.alert;
+    out.cycleCoach = () => setS('coachPersona', (st.coachPersona + 1) % COACHES.length);
+    out.coachSub = st.coachOn ? '主动提醒已开启 · 点名字切换人设' : '主动提醒已关闭 · 仍可随时提问';
+    out.alertShow = !!al; out.alertText = al ? al.message : '';
+    out.alertLabel = al ? (al.level === 'pause' ? '教练暂停了牌局' : '教练提醒') : '';
+    out.alertBg = al && al.level === 'pause' ? 'oklch(0.96 0.03 80)' : 'oklch(0.97 0.015 255)';
+    out.alertLabelColor = al && al.level === 'pause' ? 'oklch(0.5 0.12 70)' : 'oklch(0.5 0.15 255)';
+    out.showNums = !!nums && !st.hard; out.hardHint = !!nums && st.hard;
+    if (nums) {
+      out.eqPct = Math.round(nums.eq * 100) + '%';
+      out.needPct = nums.toCall > 0 ? (nums.need * 100).toFixed(1) + '%' : '0%';
+      out.barW = Math.min(100, nums.eq * 100) + '%'; out.markL = nums.need * 100 + '%';
+      out.verdict = nums.toCall === 0 ? '可免费看牌' : nums.eq >= nums.need ? '跟注 +EV' : '跟注 −EV';
+      out.verdictColor = nums.toCall === 0 || nums.eq >= nums.need ? green : red;
+      out.numStats = [{ l: '当前牌型', v: nums.name }, { l: '出路', v: nums.outs == null ? '—' : String(nums.outs) }, { l: '规则建议', v: nums.sugg }];
+      const fresh = g && !g.done && g.toAct === 0 && g.street === nums.street;
+      out.numsStale = fresh ? '' : ' · 数据来自你上一次决策';
+    }
+    out.thread = s.coach.thread.map(m => ({ t: m.t, align: m.role === 'user' ? 'flex-end' : 'flex-start', bg: m.role === 'user' ? '#1d1d1f' : '#f3f3f1', color: m.role === 'user' ? '#fff' : '#1d1d1f' }));
+    out.threadRef = this.threadRef; out.coachLoading = s.coach.loading;
+    out.coachEmpty = !al && !s.coach.thread.length && !s.coach.loading;
+    out.coachInput = s.coachInput;
+    out.onCoachInput = e => this.setState({ coachInput: e.target.value });
+    out.onCoachKey = e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) this.askCoach(); };
+    out.askCoach = () => this.askCoach();
+    out.quick = (st.level === 'novice' ? ['现在该怎么打？', '对手可能有什么牌？', '什么是底池赔率？'] : ['对手的范围？', '加注还是平跟？', '河牌怎么计划？']).map(l => ({ l, onClick: () => this.askCoach(l) }));
+
+    // lobby
+    const lb = s.lobby;
+    const setL = patch => this.setState(x => ({ lobby: { ...x.lobby, ...patch } }));
+    const presetsL = [
+      { t: '新手桌', d: '3 人 · 10/20 · 对手温和', cfg: { size: 3, blinds: 0, picks: ['bai', 'zen'] } },
+      { t: '常规桌', d: '6 人 · 50/100 · 各种性格', cfg: { size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'] } },
+      { t: '单挑', d: '2 人 · 100/200 · 对阵阿狸', cfg: { size: 2, blinds: 2, picks: ['li'] } },
+    ];
+    out.lobbyPresets = presetsL.map(o => { const on = o.cfg.size === lb.size && o.cfg.blinds === lb.blinds && o.cfg.picks.join() === lb.picks.slice(0, lb.size - 1).join(); return { t: o.t, d: o.d, border: on ? '1.5px solid #1d1d1f' : '1px solid #ebebe9', onClick: () => setL(o.cfg) }; });
+    out.sizeSeg = segOf(lb.size, ['2', '3', '4', '5', '6'], [2, 3, 4, 5, 6], v => setL({ size: v, picks: lb.picks.slice(0, v - 1) }));
+    out.blindSeg = segOf(lb.blinds, BLINDS.map(b => b.join('/')), [0, 1, 2], v => setL({ blinds: v }));
+    out.lobbyBuyF = fmt(BLINDS[lb.blinds][1] * 100);
+    out.lobbyPersonas = PERSONAS.map(p => {
+      const on = lb.picks.includes(p.id);
+      return { name: p.name, tag: p.tag, ini: p.ini, av: avOf(p.id), bg: on ? '#1d1d1f' : '#fff', color: on ? '#fff' : '#1d1d1f', bd: on ? '#1d1d1f' : '#e3e3e0',
+        onClick: () => { let pk = on ? lb.picks.filter(x => x !== p.id) : [...lb.picks, p.id]; if (pk.length > lb.size - 1) pk = pk.slice(pk.length - (lb.size - 1)); setL({ picks: pk }); } };
+    });
+    const need = lb.size - 1;
+    out.pickInfo = lb.picks.length >= need ? `已选 ${need} 位` : `已选 ${lb.picks.length} / ${need} 位，其余随机补位`;
+    out.startTable = () => this.startTable(lb);
+    out.startGuided = () => this.startTable({ size: 3, blinds: 0, picks: ['bai', 'zen'], guided: true });
+    out.openRules = () => this.setState({ onboard: true, obPage: 0 });
+    const H = s.history;
+    out.recent = H.slice(-5).reverse().map(r => ({ hand: r.hand, cards: cardTxt(r.hero), net: signed(r.net), color: r.net > 0 ? green : r.net < 0 ? red : '#86868b' }));
+    out.noRecent = !H.length;
+
+    // opponents
+    out.oppCards = PERSONAS.map(p => {
+      const on = lb.picks.includes(p.id);
+      return { name: p.name, tag: p.tag, ini: p.ini, av: avOf(p.id), desc: p.desc,
+        bars: [{ l: '紧度', w: p.p.tight * 100 + '%' }, { l: '攻击性', w: p.p.aggr * 100 + '%' }, { l: '诈唬', w: p.p.bluff * 100 + '%' }],
+        prompt: this.promptOf(p.id), edited: !!s.prompts[p.id],
+        onPrompt: e => { const v = e.target.value; this.setState(x => ({ prompts: { ...x.prompts, [p.id]: v } })); },
+        onReset: () => this.setState(x => { const pr = { ...x.prompts }; delete pr[p.id]; return { prompts: pr }; }),
+        pickLabel: on ? '✓ 已加入下一桌' : '加入下一桌', pickBg: on ? '#1d1d1f' : '#fff', pickColor: on ? '#fff' : '#1d1d1f', pickBd: on ? '#1d1d1f' : '#e3e3e0',
+        onPick: () => { let pk = on ? lb.picks.filter(x => x !== p.id) : [...lb.picks, p.id]; if (pk.length > 5) pk = pk.slice(-5); setL({ picks: pk, size: Math.max(lb.size, Math.min(6, pk.length + 1)) }); } };
+    });
+
+    // replays
+    const selIdx = s.replaySel == null ? H.length - 1 : Math.min(s.replaySel, H.length - 1);
+    out.hasHistory = H.length > 0; out.noHistory = !H.length;
+    out.replayList = H.map((r, i) => ({ i, hand: r.hand, cards: cardTxt(r.hero), net: signed(r.net), color: r.net > 0 ? green : r.net < 0 ? red : '#86868b', bg: i === selIdx ? '#f1f1ef' : 'transparent', onClick: () => this.setState({ replaySel: i }) })).reverse();
+    const rec = H[selIdx];
+    if (rec) {
+      out.rpTitle = `第 ${rec.hand} 手`; out.rpNet = signed(rec.net); out.rpColor = rec.net > 0 ? green : rec.net < 0 ? red : '#86868b';
+      out.rpSub = `盲注 ${rec.sb}/${rec.bb} · 底池 ${fmt(rec.pot)}${rec.showdown ? ' · 摊牌' : ''}`;
+      out.rpBoard = rec.board.map(c => cardV(c));
+      out.rpPlayers = rec.players.map(p => ({ name: p.name, ini: iniOf(p.id), av: avOf(p.id), cards: p.hole ? cardTxt(p.hole) : (p.folded ? '已弃牌' : '未亮牌'), note: p.won ? `赢得 ${fmt(p.won)}${p.handName ? ' · ' + p.handName : ''}` : (p.hole && p.handName ? p.handName : ''), color: p.won ? green : '#86868b' }));
+      const streets = [];
+      rec.log.forEach(x => { if (x.board || !streets.length) streets.push({ name: STREET[x.street], board: x.board ? x.label : '', items: [] }); if (!x.board) streets[streets.length - 1].items.push({ name: x.name, label: x.label }); });
+      out.rpStreets = streets;
+      const rv = s.reviews[rec.hand];
+      out.rpHasReview = !!rv; out.rpReviewText = rv || ''; out.rpLoading = s.reviewLoading; out.rpCanReview = !rv && !s.reviewLoading;
+      out.rpReview = () => this.review(rec);
+    }
+
+    // stats
+    const hands = H.length, pct = x => hands ? Math.round(x / hands * 100) + '%' : '—';
+    const netSum = H.reduce((a, r) => a + r.net, 0), sd = H.filter(r => r.showdown);
+    out.statHands = hands;
+    out.kpis = [
+      { l: '已打手数', v: String(hands), h: '最多保留最近 60 手', color: '#1d1d1f' },
+      { l: '净盈亏', v: signed(netSum), h: '筹码', color: netSum > 0 ? green : netSum < 0 ? red : '#1d1d1f' },
+      { l: '赢下的手牌', v: pct(H.filter(r => r.net > 0).length), h: '赢得底池的比例', color: '#1d1d1f' },
+      { l: 'VPIP 入池率', v: pct(H.filter(r => r.vpip).length), h: '翻牌前主动投入筹码的比例，常见 20–30%', color: '#1d1d1f' },
+      { l: 'PFR 翻前加注', v: pct(H.filter(r => r.pfr).length), h: '翻牌前加注的比例，越接近 VPIP 越凶', color: '#1d1d1f' },
+      { l: '摊牌胜率', v: sd.length ? Math.round(sd.filter(r => r.net > 0).length / sd.length * 100) + '%' : '—', h: `共摊牌 ${sd.length} 次`, color: '#1d1d1f' },
+    ];
+    const last = H.slice(-40), mx = Math.max(1, ...last.map(r => Math.abs(r.net)));
+    out.bars = last.map(r => { const h = Math.max(2, Math.abs(r.net) / mx * 76); return { h: h + 'px', top: r.net >= 0 ? `calc(50% - ${h}px)` : '50%', color: r.net >= 0 ? green : red }; });
+
+    // settings
+    const segRow = (l, d, opts) => ({ l, d, isSeg: true, opts });
+    const togRow = (l, d, t) => ({ l, d, isTog: true, tog: t });
+    const usage = (() => { const now = Date.now(); return this.calls.filter(t => now - t < 60000).length; })();
+    out.settingsGroups = [
+      { t: 'AI 对手', rows: [
+        segRow('决策引擎', 'LLM 按性格提示词决策和说话；每分钟调用超过上限时，自动改用本地引擎。', seg('engine', ['LLM', '本地引擎'], ['llm', 'local'])),
+        segRow('模型', 'Haiku 更快，Sonnet 更会演。', seg('model', ['Haiku', 'Sonnet'], ['haiku', 'sonnet'])),
+        segRow('话痨程度', '控制 AI 在公屏和座位气泡里说话的频率。', seg('chatty', ['安静', '适中', '热闹'])),
+        segRow('思考速度', 'AI 行动前的停顿。', seg('speed', ['慢', '中', '快'])),
+      ] },
+      { t: '教练', rows: [
+        togRow('主动提醒', '每次轮到你时，教练自己判断是保持沉默、提醒你，还是暂停牌局。', coachOnTog),
+        segRow('人设', '教练说话的风格。', seg('coachPersona', COACHES.map(c => c.n))),
+        segRow('讲解深度', '新手模式会解释术语；进阶模式会谈范围和 EV。', seg('level', ['新手', '进阶'], ['novice', 'pro'])),
+        togRow('硬核模式', '隐藏胜率、底池赔率和出路。', hardTog),
+      ] },
+      { t: '牌局与数据', rows: [
+        togRow('自动下一手', '一手结束 4 秒后自动发牌。', tog(st.autoNext, () => setS('autoNext', !st.autoNext))),
+        { l: 'LLM 用量', d: '近 60 秒内的调用次数，上限约 15 次；教练提问优先占用。', isText: true, text: `${usage} / 15` },
+        { l: '规则介绍', d: '重新看一遍首次进入时的规则卡片。', isBtn: true, btn: '打开', onClick: () => this.setState({ onboard: true, obPage: 0 }) },
+        { l: '清空记录', d: '清除手牌历史和统计，筹码重置为 100,000。', isBtn: true, btn: '清空', onClick: () => this.setState({ history: [], bankroll: 100000, reviews: {}, replaySel: null }) },
+      ] },
+    ];
+
+    // onboarding
+    const pages = [
+      { t: '欢迎来到 River', b: '桌上只有你和 AI。每位对手都有自己的性格，会在公屏上说话，也会互相调侃。教练站在你这边，只看你能看到的牌，随时可以问。' },
+      { t: '目标：用 5 张牌比大小', b: '每人发 2 张只有自己能看的底牌，桌面陆续翻开 5 张公共牌。用这 7 张里任意 5 张组成最大的牌型；或者靠下注让其他人全部弃牌，也能直接赢下底池。' },
+      { t: '牌型大小', b: '从大到小，上面的牌型永远大于下面的：', ranks: true },
+      { t: '一手牌的流程', b: '每手牌由两位玩家先放盲注，然后分四轮下注：', flow: true },
+      { t: '教练和概率', b: '右侧会一直显示你的胜率和"所需胜率"（底池赔率）。胜率高于所需，跟注长期来看就是赚的。遇到关键决策，教练可能会主动提醒你，甚至暂停牌局。你也可以随时提问，提问时牌局会暂停。' },
+    ];
+    const pg = pages[s.obPage] || pages[0];
+    Object.assign(out, {
+      showOnboard: s.onboard, obTitle: pg.t, obBody: pg.b, obIsRanks: !!pg.ranks, obIsFlow: !!pg.flow, obPageLabel: `${s.obPage + 1} / ${pages.length}`,
+      ranks: [['皇家同花顺', 'A♠ K♠ Q♠ J♠ 10♠'], ['同花顺', '9♥ 8♥ 7♥ 6♥ 5♥'], ['四条', 'Q Q Q Q 3'], ['葫芦', 'K K K 7 7'], ['同花', 'A♦ J♦ 8♦ 4♦ 2♦'], ['顺子', '10 9 8 7 6'], ['三条', '8 8 8 K 2'], ['两对', 'J J 4 4 A'], ['一对', '10 10 K 6 3'], ['高牌', 'A J 8 5 2']].map(([n, ex], i) => ({ i: i + 1, n, ex })),
+      flow: ['盲注', '翻牌前 · 2 张底牌', '翻牌 · 3 张', '转牌 · 1 张', '河牌 · 1 张', '摊牌'],
+      acts: [{ n: '过牌', d: '没人下注时，不花钱继续' }, { n: '下注', d: '率先投入筹码' }, { n: '跟注', d: '补齐到当前下注额' }, { n: '加注', d: '在别人的下注上再加' }, { n: '弃牌', d: '放弃这手牌和已投入的筹码' }, { n: '全下', d: '把剩余筹码全部推入' }],
+      obDots: pages.map((_, i) => ({ bg: i === s.obPage ? '#1d1d1f' : '#dcdcd8' })),
+      obHasPrev: s.obPage > 0, obNotLast: s.obPage < pages.length - 1, obIsLast: s.obPage === pages.length - 1,
+      obPrev: () => this.setState(x => ({ obPage: x.obPage - 1 })), obNext: () => this.setState(x => ({ obPage: x.obPage + 1 })),
+      closeOb: () => { this.seen = true; this.setState({ onboard: false }); },
+    });
+    return out;
+  }
+}
+</script>
+</body>
+</html>
