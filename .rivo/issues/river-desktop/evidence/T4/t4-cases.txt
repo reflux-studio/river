@@ -1,0 +1,41 @@
+ ✓ test/leak.test.ts > filterSay > 本人底牌点数（字母） 1ms
+ ✓ test/leak.test.ts > filterSay > 本人底牌点数（数字，T 视为 10） 0ms
+ ✓ test/leak.test.ts > filterSay > 花色与关键词 0ms
+ ✓ test/leak.test.ts > filterSay > 超过 40 字截断，空白整句丢弃 0ms
+ ✓ test/queue.test.ts > AgentQueue > 串行执行 27ms
+ ✓ test/queue.test.ts > AgentQueue > 非 durable 任务排队超过 2 个被拒，durable 不受限 35ms
+ ✓ test/views.test.ts > buildSeatView > 各阶段、弃牌、全下、摊牌下每个座位只看到自己的底牌 109ms
+ ✓ test/views.test.ts > buildSeatView > 字段：选项与加注范围、行动记录用名字 0ms
+ ✓ test/views.test.ts > buildSeatView > view_hero 工具只含座位 0 的底牌 2ms
+ ✓ test/views.test.ts > publicHandResult > 玩家弃牌、其他人摊牌：只含亮出的牌，不含玩家底牌 2ms
+ ✓ test/views.test.ts > publicHandResult > 玩家未亮牌（其余全弃）：不含任何底牌 1ms
+ ✓ test/views.test.ts > publicHandResult > 全下后摊牌：弃牌者不亮牌，玩家摊牌则亮出 1ms
+ ✓ test/views.test.ts > heroHandSummary > 含玩家底牌，对手底牌只含摊牌亮出的 1ms
+ ✓ test/queue.test.ts > AgentQueue > 抢占：中止当前任务并等待其结束，丢弃未开始的非 durable，先执行 durable 118ms
+ ✓ test/queue.test.ts > AgentQueue > 抢占：durable 当前任务不被中止 54ms
+ ✓ test/resolve.test.ts > resolveModel / modelReady > 内置提供方返回 { id, apiKey }，不带 url 5ms
+ ✓ test/resolve.test.ts > resolveModel / modelReady > 兼容接口返回 { providerId, modelId, url, apiKey } 3ms
+ ✓ test/resolve.test.ts > resolveModel / modelReady > 未配置、提供方不存在时未就绪 5ms
+ ✓ test/resolve.test.ts > resolveModel / modelReady > 解密失败置 needsKey 并返回未就绪；clearNeedsKey 后恢复 2ms
+ ✓ test/resolve.test.ts > testProvider > 接受 required：记 supportsRequired=true 38ms
+ ✓ test/resolve.test.ts > testProvider > 拒绝 required、auto 成功：记 supportsRequired=false 14ms
+ ✓ test/agents.test.ts > opponent decide > 依次调用 view_table、act：意图写入，act 之后不再调用模型 63ms
+ ✓ test/agents.test.ts > opponent decide > 同一步 say + act + updateWorkingMemory 三者都执行，WM 写入 SQLite 38ms
+ ✓ test/agents.test.ts > opponent decide > instructions：人设名、提示词覆盖、健谈度、泄牌约束与 decide 片段 27ms
+ ✓ test/agents.test.ts > opponent decide > 一步里两个 act 取第一个 27ms
+ ✓ test/agents.test.ts > opponent decide > 提供方不支持 required 时改用 auto 27ms
+ ✓ test/resolve.test.ts > testProvider > 测试期间 baseUrl 被改或提供方被删：不写回 216ms
+ ✓ test/resolve.test.ts > testProvider > 端点不可达：返回错误 6ms
+ ✓ test/agents.test.ts > opponent decide > 被中止时不抛错：aborted=true、ok=false，onCall 记失败 76ms
+ ✓ test/agents.test.ts > opponent decide > 模型报错时返回 error 不抛出 27ms
+ ✓ test/agents.test.ts > opponent decide > chat 模式只开放 read_chat、hand_history、say、updateWorkingMemory，toolChoice auto 27ms
+ ✓ test/agents.test.ts > coach > proactive：pause 优先于 hint，工具含 updateWorkingMemory 26ms
+ ✓ test/agents.test.ts > coach > ask 流式输出 26ms
+ ✓ test/agents.test.ts > coach > ask 被中止返回 aborted 73ms
+ ✓ test/agents.test.ts > coach > review 不暴露 updateWorkingMemory，且不写 working memory 19ms
+ ✓ test/agents.test.ts > memory 维护 > appendThreadMessage 先建 thread 再写消息；resetMemories 删 thread 并恢复模板 11ms
+ ✓ test/agents.test.ts > 工具 > read_chat 把 from 换成名字，hero 为“你” 9ms
+ ✓ test/agents.test.ts > 工具 > hand_history 经 publicHandResult 输出，不含玩家未亮的底牌 11ms
+ ✓ test/queue.test.ts > AgentQueue > 被中止任务 2 秒内未结束：直接执行抢占任务，旧结果作废；idle 等它也结束 2608ms
+ ✓ test/queue.test.ts > AgentQueue > idle() 在队列清空后 resolve 44ms
+ ✓ test/queue.test.ts > AgentQueue > 任务抛错时 reject，队列继续 1ms

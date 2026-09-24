@@ -1,0 +1,2 @@
+$ tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json
+exit 0
