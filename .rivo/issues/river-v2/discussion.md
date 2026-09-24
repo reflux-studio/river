@@ -1,6 +1,6 @@
-# River v2：方案讨论快照（第 4 轮）
+# River v2：方案讨论快照（第 5 轮）
 
-本文件记录讨论收敛出的完整做法。调查依据见 `note.md`；审阅见 `reviews/design-1.md`（第 1 轮）、`reviews/design-2.md`（第 3 轮）；决策记录见 `adr/004`、`adr/005`。本轮并入用户 2026-09-24 的后续答复与审阅 2 的 9 条修改（对照见 §13）。
+本文件记录讨论收敛出的完整做法。调查依据见 `note.md`；审阅见 `reviews/design-1.md`（第 1 轮）、`reviews/design-2.md`（第 3 轮）；决策记录见 `adr/004`、`adr/005`。第 4 轮并入用户 2026-09-24 的后续答复与审阅 2 的 9 条修改（对照见 §13）；第 5 轮按审阅 3（`reviews/design-3.md`）修订，见 §14。
 
 ## 1. 用户请求与决定
 
@@ -200,3 +200,14 @@ startHand ─► 轮到对手 ─► act（maxRetries 2，限时 45s）─┬─
 | F7 价格前提 | §6 CI 快照 + 运行时刷新；首个任务核实 `cost` 字段 |
 | F8 记忆与快照 | §2 note 频率与截断；§5 决策读最新提示词、删除用快照、副标题 |
 | F9 文案与发布 | §9 文案；§7 自动发布正式 Release、开发环境跳过；§1 注明 U4 |
+
+## 14. 第 5 轮修订（审阅 3）
+
+| 发现 | 处理 |
+| --- | --- |
+| F1 自签证书接入会静默失败 | `electron-builder.yml` 删除 `mac.identity: '-'`，改由 CI 指定身份；macOS 构建开启 `forceCodeSigning`（签不上即失败，不再静默出未签名包）。CI 在 macOS job 内自建钥匙串、导入 p12、`add-trusted-cert` 设为代码签名受信任，再用 `CSC_NAME` 指定身份构建；证书 Secret 只注入 macOS job，Windows、Linux 不签名（不设 `CSC_LINK`，避免 Windows 包被自签证书签上导致更新校验失败）。构建后断言 `codesign -dvvv` 的 Authority 为该证书。T1 已在 macOS runner 上实跑这条路径（`evidence/T1/`）。退回 ADR-005 选项 B 的条件改为：T1 实跑中 `codesign --verify -R` 不满足，或 electron-builder 在受信任后仍找不到身份 |
+| F2 教练调用互斥的三处缺口 | 提问期间牌局暂停：在途的对手调用照常完成并落子，之后 TableRunner 不再推进（不开新的对手调用、不发下一街），直到回答结束或失败；因此“提问途中轮到玩家”时，教练发言等回答结束后才开始，“提问途中一手结束”时，复盘等回答结束后才开始。复盘「重试」期间「下一手」「重新买入」重新置灰。教练栏按钮文案保留“暂停并提问”（与设计稿一致） |
+| F3 `act` 参数校验失败即停下 | `act` 的 schema 放宽：`action` 为字符串、`to` 为数字或数字字符串，均可缺省；由规范化处理：`bet`/`raise`/`allin`/`all-in`/`all_in` → 加注（全下取最大值），`check`/`call`/`fold` 按 §2 规则，其他未知值按“能过牌则过牌、否则跟注”。只有完全没调用 `act` 才停下 |
+| 低优先级 | 在 plan 中处理：`endBettingRound` 每次只推进一街（已在引擎实现并测试）；`winners` 按底池列出，同一座位可能多条，界面按座位求和；中止的调用 Mastra 可能返回 0 token，记账时 `aborted` 的调用 token 记为空；设置实际存于 `river_kv` 的 `settings` 键（§8 表名按实际理解）；设计稿文案逐条在任务中处理 |
+
+T1 实测补充（2026-09-24，GitHub Actions）：models.dev `api.json` 223 个提供方、8173 个模型，其中 7749 个带 `cost`（`input`、`output`、`cache_read`、`cache_write`，美元/百万 token）。
