@@ -11,6 +11,7 @@ export const PERSONAS: Persona[] = [
   { id: 'zen', name: '禅师', tag: '慢打', ini: '禅', hue: 170, desc: '拿到强牌反而装弱，喜欢过牌加注。', profile: { tight: 0.6, aggr: 0.35, bluff: 0.2, call: 0.5 }, talk: 0.25, prompt: '你是禅师，喜欢慢打和设陷阱。强牌时常过牌或只跟注诱敌。说话平静，带点禅意。', lines: { call: ['随缘。'], check: ['静观其变。'], win: ['水到渠成。'], chat: ['心静，牌自明。'] } },
 ]
 
+export const personaOf = (pid?: string) => PERSONAS.find((p) => p.id === pid)
 export const LINES: Partial<Record<LineKind, string[]>> = { raise: ['加点。'], call: ['跟。'], check: ['过。'], fold: ['不跟了。'], win: ['谢了。'], chat: ['哈哈。'] }
 export const COACHES: { n: string; s: string }[] = [
   { n: '温和老师', s: '语气温和耐心，多鼓励，用生活化的比喻解释。' },

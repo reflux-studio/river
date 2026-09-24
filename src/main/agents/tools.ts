@@ -2,7 +2,7 @@
 import { createTool } from '@mastra/core/tools'
 import type { RequestContext } from '@mastra/core/request-context'
 import { z } from 'zod'
-import { PERSONAS } from '../../shared/personas'
+import { personaOf } from '../../shared/personas'
 import { handsForPersona, recentHands } from '../db'
 import { recordIntent, type IntentCollector } from './intents'
 import { heroHandSummary, publicHandResult, type TableQuery } from './views'
@@ -12,7 +12,7 @@ const get = <T>(ctx: Ctx, key: string) => ctx.requestContext!.get(key) as T
 const table = (ctx: Ctx) => get<TableQuery>(ctx, 'table')
 const intents = (ctx: Ctx) => get<IntentCollector>(ctx, 'intents')
 const clamp = (n: number | undefined, def: number, max: number) => Math.max(1, Math.min(max, Math.floor(n ?? def)))
-const speaker = (from?: string) => (from === 'hero' ? '你' : (PERSONAS.find((p) => p.id === from)?.name ?? '系统'))
+const speaker = (from?: string) => (from === 'hero' ? '你' : (personaOf(from)?.name ?? '系统'))
 
 const noInput = z.object({})
 

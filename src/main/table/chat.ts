@@ -1,4 +1,4 @@
-import { LINES, PERSONAS } from '../../shared/personas'
+import { LINES, personaOf } from '../../shared/personas'
 import type { LineKind, Persona } from '../../shared/types'
 import type { Player, Rng } from '../engine/poker'
 
@@ -10,8 +10,6 @@ export interface Say {
 }
 
 export const REPLY_COOLDOWN_MS = 10_000
-
-export const personaOf = (pid: string): Persona => PERSONAS.find((p) => p.id === pid)!
 
 // 原型 canned()：全局话痨档位改为按角色健谈度映射概率；预设台词一律按 reply 处理，不引起回应
 export function canned(persona: Persona, type: LineKind, rng: Rng): Say | null {
@@ -27,6 +25,6 @@ export function pickResponders(players: Player[], o: { from?: string; thinking: 
     const pid = p.personaId
     if (!pid || pid === o.from || p.out || pid === o.thinking) return false
     if (o.now - (o.lastTriggered.get(pid) ?? -Infinity) < REPLY_COOLDOWN_MS) return false
-    return o.rng() < personaOf(pid).talk
+    return o.rng() < personaOf(pid)!.talk
   })
 }

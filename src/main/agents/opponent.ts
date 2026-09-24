@@ -2,7 +2,7 @@ import { Agent } from '@mastra/core/agent'
 import type { MastraModelConfig } from '@mastra/core/llm'
 import type { RequestContext } from '@mastra/core/request-context'
 import type { Memory } from '@mastra/memory'
-import { PERSONAS } from '../../shared/personas'
+import { personaOf } from '../../shared/personas'
 import { getPromptOverrides } from '../db'
 import { supportsRequired, type resolveModel } from '../models/resolve'
 import type { IntentCollector } from './intents'
@@ -34,7 +34,7 @@ const talkText = (talk: number) => (talk < 0.2 ? '你话很少，大多数时候
 
 async function instructions({ requestContext }: { requestContext: RequestContext }) {
   const pid = requestContext.get('personaId') as string
-  const p = PERSONAS.find((x) => x.id === pid)!
+  const p = personaOf(pid)!
   const prompt = (await getPromptOverrides())[pid] ?? p.prompt
   return [
     `你在一张 PvE 娱乐德州扑克桌上扮演「${p.name}」。按人设决策，但别做明显送钱的离谱决定。`,

@@ -1,5 +1,5 @@
 // Renderer 能看到的一切都经这里裁剪：未摊牌的对手底牌不得离开主进程。
-import { PERSONAS } from '../../shared/personas'
+import { personaOf } from '../../shared/personas'
 import type { BreakerState, CoachAlert, TableView } from '../../shared/types'
 import { fmt, signed } from '../../shared/format'
 import { legal, pot, type Game } from '../engine/poker'
@@ -29,7 +29,6 @@ export interface ViewState {
   now: number
 }
 
-const persona = (pid?: string) => PERSONAS.find((p) => p.id === pid)
 
 // 摊牌时未弃牌者亮牌（原型 renderVals 第 697 行 reveal 规则）
 const revealed = (g: Game, i: number) => g.players[i].isHero || (g.street === 'showdown' && g.showdown && !g.players[i].folded)
@@ -42,7 +41,7 @@ export function buildTableView(s: ViewState): TableView {
   const total = pot(g)
   const bets = g.players.reduce((a, p) => a + p.bet, 0)
   const seats = g.players.map((p, i) => {
-    const per = persona(p.personaId)
+    const per = personaOf(p.personaId)
     const win = g.done ? g.winners?.find((w) => w.id === p.id) : undefined
     const thinking = !!p.personaId && s.thinking === p.personaId
     const myTurn = p.isHero && heroTurn

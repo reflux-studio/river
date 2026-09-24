@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { cardsText, fmt } from '../../shared/format'
-import { BLINDS, PERSONAS, STREET } from '../../shared/personas'
+import { BLINDS, PERSONAS, personaOf, STREET } from '../../shared/personas'
 import type { AgentCall, BreakerState, ChatMessage, CoachAlert, CoachEntry, Events, HandRecord, TableStart, TableView } from '../../shared/types'
 import { coachAsk, coachProactive, coachReview } from '../agents/coach'
 import { coachAlert } from '../agents/intents'
@@ -15,7 +15,7 @@ import {
   type Action, type Game, type Rng
 } from '../engine/poker'
 import { modelReady, type Role } from '../models/resolve'
-import { canned, personaOf, pickResponders, type Say } from './chat'
+import { canned, pickResponders, type Say } from './chat'
 import { buildTableView, type Nums } from './view'
 
 export interface AgentDeps {
@@ -144,7 +144,7 @@ export class TableRunner {
     for (const p of PERSONAS) if (picks.length < size - 1 && !picks.includes(p.id)) picks.push(p.id)
     const players = [
       { id: 'hero', name: '你', isHero: true, stack: buy },
-      ...picks.map((id) => ({ id, personaId: id, name: personaOf(id).name, isHero: false, stack: buy }))
+      ...picks.map((id) => ({ id, personaId: id, name: personaOf(id)!.name, isHero: false, stack: buy }))
     ]
     this.game = newGame({ sb, bb, players }, this.rng)
     this.tableId = randomUUID()
@@ -272,7 +272,7 @@ export class TableRunner {
 
   private async opponentTurn(g: Game, seat: number, rid: number) {
     const p = g.players[seat]
-    const persona = personaOf(p.personaId!)
+    const persona = personaOf(p.personaId)!
     const leave = this.leaveSignal
     this.thinking = persona.id
     this.broadcast()
@@ -513,7 +513,7 @@ export class TableRunner {
     const w = (g.winners ?? []).filter((x) => x.id !== g.players[0].id).sort((a, b) => b.amount - a.amount)[0]
     if (!w) return
     const seat = g.players.findIndex((p) => p.id === w.id)
-    const persona = personaOf(g.players[seat].personaId!)
+    const persona = personaOf(g.players[seat].personaId)!
     if (!this.useLLMForOpponents()) return this.postSay(seat, canned(persona, 'win', this.rng), false)
     const hand = g.hand
     this.winSpeechInFlight = hand
@@ -591,7 +591,7 @@ export class TableRunner {
 
   private async chatReply(g: Game, seat: number, msg: ChatMessage) {
     const rid = this.runId
-    const who = msg.from === 'hero' ? '玩家「你」' : personaOf(msg.from!).name
+    const who = msg.from === 'hero' ? '玩家「你」' : personaOf(msg.from)!.name
     const input = `公屏上${who}${msg.act ? `（${msg.act}）` : ''}说：「${msg.text}」（消息 id：${msg.id}）`
     const r = await this.guarded(this.queue(g.players[seat].personaId!), this.limits.chat, (s) => this.agents.opponentChat(this.opponentCtx(g, seat), 'chat', input, s))
     if (rid !== this.runId || r.kind !== 'done' || !r.value.ok || !r.value.intents.say) return
@@ -683,7 +683,7 @@ export class TableRunner {
     return {
       viewFor: (seat) => {
         check()
-        return buildSeatView(g, seat, (id) => g.players.find((p) => p.id === id)?.name ?? '', (pid) => (pid ? personaOf(pid).tag : ''))
+        return buildSeatView(g, seat, (id) => g.players.find((p) => p.id === id)?.name ?? '', (pid) => (pid ? personaOf(pid)!.tag : ''))
       },
       chat: (limit) => (check(), this.chat.slice(-limit)),
       equityFor: (seat, iters) => {
