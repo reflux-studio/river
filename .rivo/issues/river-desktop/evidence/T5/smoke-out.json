@@ -1,0 +1,97 @@
+[
+ {
+  "step": "bootstrap",
+  "keys": [
+   "settings",
+   "lobby",
+   "bankroll",
+   "onboarded",
+   "personas",
+   "providers",
+   "hasTable",
+   "lastCall",
+   "coachThread",
+   "chat"
+  ],
+  "bankroll": 100000,
+  "hasTable": false,
+  "providers": 0,
+  "personas": 8,
+  "engine": "llm"
+ },
+ {
+  "step": "played",
+  "acted": [
+   {
+    "hand": 1,
+    "street": "preflop",
+    "toCall": 10
+   },
+   {
+    "hand": 1,
+    "street": "flop",
+    "toCall": 0
+   },
+   {
+    "hand": 1,
+    "street": "flop",
+    "toCall": 140
+   }
+  ],
+  "views": 16,
+  "chat": 10,
+  "lastTitle": "无限注 · 10/20 · 3 人桌",
+  "handNo": 1,
+  "oppCardsShown": 0,
+  "street": "flop",
+  "sampleChat": [
+   [
+    "sys",
+    null,
+    null,
+    "入座 · 10/20 · 3 人桌"
+   ],
+   [
+    "sys",
+    null,
+    null,
+    "第 1 手 · 翻牌前"
+   ],
+   [
+    "act",
+    "bai",
+    "跟注 20",
+    null
+   ],
+   [
+    "act",
+    "hero",
+    "跟注 10",
+    null
+   ],
+   [
+    "msg",
+    "li",
+    "过牌",
+    "过。"
+   ],
+   [
+    "sys",
+    null,
+    null,
+    "翻牌 K♣ A♣ A♦"
+   ]
+  ]
+ },
+ {
+  "step": "left",
+  "hasTable": false,
+  "bankrollEvents": [
+   98000,
+   99840
+  ],
+  "bankroll": 99840,
+  "handsTotal": 0,
+  "engineRestored": "llm"
+ }
+]

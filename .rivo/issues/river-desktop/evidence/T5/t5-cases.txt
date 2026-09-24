@@ -1,0 +1,37 @@
+
+ RUN  v5.0.1 /Users/suziming/Documents/AI/river
+
+ ✓ test/chat.test.ts > 公屏触发表 > 玩家发言触发；chat 模式的回应不再触发（限一层） 25ms
+ ✓ test/chat.test.ts > 公屏触发表 > 10 秒冷却：冷却内再次发言不触发同一对手，满 10 秒后恢复 20ms
+ ✓ test/chat.test.ts > 公屏触发表 > 正在决策的对手不被触发 24ms
+ ✓ test/chat.test.ts > 公屏触发表 > decide 的 free 发言触发，reply 发言不触发 33ms
+ ✓ test/chat.test.ts > 公屏触发表 > 赢家发言触发其他对手回应 21ms
+ ✓ test/chat.test.ts > 公屏触发表 > 托管预设台词不触发 22ms
+ ✓ test/chat.test.ts > 公屏触发表 > 本地引擎模式：玩家发言不发起任何对手调用，行动台词取预设 26ms
+ ✓ test/chat.test.ts > 泄牌过滤 > decide 的 say 含本人底牌点数 → 整句丢弃，行动照常 15ms
+ ✓ test/chat.test.ts > 泄牌过滤 > chat 与 win 的 say 含本人底牌点数 → 公屏不出现 17ms
+ ✓ test/runner.test.ts > 完整牌局 > 6 人桌全 AI 决策 20 手：筹码守恒、每手落库并写入对手 thread、视图不含未亮底牌 967ms
+ ✓ test/runner.test.ts > 超时托管与熔断 > 决策 11 秒 → 托管并标记；连续 3 次 → breaker 且不再调用；retryModels 恢复 61ms
+ ✓ test/runner.test.ts > 超时托管与熔断 > 过期结果丢弃：决策期间离桌，返回后不 apply、不计失败 3ms
+ ✓ test/runner.test.ts > 超时托管与熔断 > 暂停挂起：决策返回时已暂停，resume 后提交原决策 3ms
+ ✓ test/runner.test.ts > 超时托管与熔断 > 决策在途时暂停又恢复：不重复发起决策，原结果照常提交且不算失败 2ms
+ ✓ test/runner.test.ts > 教练 > proactive 返回 pause → 暂停；resume 后同一决策点不再调用教练 16ms
+ ✓ test/runner.test.ts > 教练 > 教练晚到：proactive 返回前玩家已行动 → 丢弃 pause 10ms
+ ✓ test/runner.test.ts > 教练 > 教练连续 3 次失败 → breaker，之后 proactive 与 ask 都不发起 170ms
+ ✓ test/runner.test.ts > 教练 > 未配置教练模型：ask 不暂停，命令返回后才推 coach:done not_configured 2ms
+ ✓ test/runner.test.ts > 教练 > 连续两次 ask：第一次 interrupted，askInFlight 在第二次结束才清除；ask 期间不发起 proactive 27ms
+ ✓ test/runner.test.ts > 教练 > 自动下一手等 ask 结束 11ms
+ ✓ test/runner.test.ts > 教练 > 复盘：失败与被队列拒绝都推 review:done 带 error；成功落库 5ms
+ ✓ test/runner.test.ts > 一手结束 > 赢家发言延迟 6 秒：发言写入公屏，下一手在发言返回后才开始 10ms
+ ✓ test/runner.test.ts > 一手结束 > 赢家发言被队列拒绝：取预设台词，自动下一手仍在 4.5 秒后触发 18ms
+ ✓ test/runner.test.ts > 一手结束 > 赢家发言返回前手动发下一手：整体丢弃，不补台词 18ms
+ ✓ test/runner.test.ts > 一手结束 > 每手结果 durable：下一手决策抢占时仍写入 thread，且先于决策 19ms
+ ✓ test/runner.test.ts > 离桌与退出 > 中途退出：before-quit 先拦下，余额加回玩家筹码并写库后才退出 55ms
+ ✓ test/runner.test.ts > 离桌与退出 > table.start 已有桌时先退回原桌筹码；rebuy 扣余额；教学牌局固定配置 18ms
+ ✓ test/runner.test.ts > IPC > provider.save 带新 key 后清除 needsKey；bootstrap 不含明文 key 与底牌 17ms
+
+ Test Files  2 passed (2)
+      Tests  28 passed (28)
+   Start at  06:40:40
+   Duration  1.77s (tests 74%, import 20%, transform 6%)
+

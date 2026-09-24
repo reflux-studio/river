@@ -1,0 +1,12 @@
+== M4 revealed 改为所有未弃牌者亮牌 (src/main/table/view.ts)
+     × 6 人桌全 AI 决策 20 手：筹码守恒、每手落库并写入对手 thread、视图不含未亮底牌 939ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  1 failed | 27 passed (28)
+== M6 HandRecord 总写入全部底牌 (src/main/table/runner.ts)
+     × 6 人桌全 AI 决策 20 手：筹码守恒、每手落库并写入对手 thread、视图不含未亮底牌 982ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  1 failed | 27 passed (28)
+== M7 log.board 不转布尔 (src/main/table/runner.ts)
+     × 6 人桌全 AI 决策 20 手：筹码守恒、每手落库并写入对手 thread、视图不含未亮底牌 952ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  1 failed | 27 passed (28)
