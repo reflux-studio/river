@@ -77,10 +77,11 @@ jobs:
           A=out-0.0.1/mac-arm64/River.app
           B=out-0.0.2/mac-arm64/River.app
           codesign -dvvv "$A" 2>&1 | grep -E 'Authority|Identifier|Signature|TeamIdentifier'
-          REQ=$(codesign -d -r- "$A" 2>&1 | sed -n 's/^designated => //p')
+          REQ=$(codesign -d -r- "$A" 2>&1 | sed -n 's/^#* *designated => //p')
           echo "DR(0.0.1): $REQ"
           codesign --verify --deep --strict "$B" && echo 'B 签名完整'
-          codesign --verify --deep --strict -R="=$REQ" "$B" && echo 'PASS: 0.0.2 满足 0.0.1 的 DR'
+          codesign --verify --deep --strict -R "=$REQ" "$B"
+          echo 'PASS: 0.0.2 满足 0.0.1 的 DR'
           /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$B/Contents/Info.plist"
       - name: 对照：ad-hoc 签名的两个版本
         continue-on-error: true
@@ -89,6 +90,6 @@ jobs:
             pnpm exec electron-builder --mac dir --arm64 --publish never \
               -c.mac.identity=- -c.extraMetadata.version=$v -c.directories.output=adhoc-$v
           done
-          REQ=$(codesign -d -r- adhoc-0.0.1/mac-arm64/River.app 2>&1 | sed -n 's/^designated => //p')
+          REQ=$(codesign -d -r- adhoc-0.0.1/mac-arm64/River.app 2>&1 | sed -n 's/^#* *designated => //p')
           echo "DR(adhoc 0.0.1): $REQ"
-          if codesign --verify --deep --strict -R="=$REQ" adhoc-0.0.2/mac-arm64/River.app; then echo 'adhoc 也通过（意外）'; else echo 'EXPECTED: adhoc 0.0.2 不满足 0.0.1 的 DR'; fi
+          if codesign --verify --deep --strict -R "=$REQ" adhoc-0.0.2/mac-arm64/River.app; then echo 'adhoc 也通过（意外）'; else echo 'EXPECTED: adhoc 0.0.2 不满足 0.0.1 的 DR'; fi
