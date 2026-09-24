@@ -59,7 +59,6 @@ export function setState(patch: Partial<RiverState> | ((s: RiverState) => Partia
   state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) }
   subs.forEach((f) => f())
 }
-export const getState = () => state
 
 const subscribe = (f: () => void) => (subs.add(f), () => void subs.delete(f))
 
@@ -67,8 +66,6 @@ const subscribe = (f: () => void) => (subs.add(f), () => void subs.delete(f))
 export function useRiver<T>(select: (s: RiverState) => T): T {
   return useSyncExternalStore(subscribe, () => select(state))
 }
-
-export const useBootstrap = () => useRiver((s) => s)
 
 // 用于页面自己关心、且不必进全局状态的事件（如 review:done、hands:changed）
 export function useEvent<K extends keyof Events>(event: K, cb: (payload: Events[K]) => void) {

@@ -23,7 +23,6 @@ type ModelArg = MastraModelConfig | typeof resolveModel
 
 interface Runtime {
   storage: LibSQLStore
-  mastra: Mastra
   opponentMemory: Memory
   coachMemory: Memory
   opponent: Agent
@@ -51,8 +50,9 @@ export async function initMastra(opts: { url: string; onCall?: OnCall; model?: M
   const model = opts.model ?? resolveModel
   const opponent = createOpponentAgent(opponentMemory, model)
   const coach = createCoachAgent(coachMemory, model)
-  const mastra = new Mastra({ agents: { opponent, coach }, storage })
-  runtime = { storage, mastra, opponentMemory, coachMemory, opponent, coach, onCall: opts.onCall }
+  // 只取构造的副作用：把 agent 注册进 Mastra（注入 storage 等），实例本身无人读取
+  new Mastra({ agents: { opponent, coach }, storage })
+  runtime = { storage, opponentMemory, coachMemory, opponent, coach, onCall: opts.onCall }
   return runtime
 }
 
