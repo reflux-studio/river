@@ -1,7 +1,8 @@
 // Renderer 能看到的一切都经这里裁剪：未摊牌的对手底牌不得离开主进程。
 import { PERSONAS } from '../../shared/personas'
 import type { BreakerState, CoachAlert, TableView } from '../../shared/types'
-import { fmt, legal, pot, type Game } from '../engine/poker'
+import { fmt, signed } from '../../shared/format'
+import { legal, pot, type Game } from '../engine/poker'
 
 export interface Nums {
   eq: number
@@ -29,7 +30,6 @@ export interface ViewState {
   now: number
 }
 
-const signed = (n: number) => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n))
 const persona = (pid?: string) => PERSONAS.find((p) => p.id === pid)
 
 // 摊牌时未弃牌者亮牌（原型 renderVals 第 697 行 reveal 规则）

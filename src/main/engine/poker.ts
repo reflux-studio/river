@@ -1,6 +1,7 @@
 // 逐函数移植自 design-source/poker.js；算法、常量、文案须与原型保持一致（test/engine.test.ts 对照验证）。
 
-import type { Card, Street } from '../../shared/types'
+import { fmt, txt } from '../../shared/format'
+import type { Card, Legal, Persona, Street } from '../../shared/types'
 
 export type Rng = () => number
 
@@ -55,16 +56,14 @@ export interface Game {
   rng: Rng
 }
 
-export interface Legal { toCall: number; canCheck: boolean; minTo: number; maxTo: number; canRaise: boolean; bet: number; stack: number }
 export interface Action { type: 'fold' | 'check' | 'call' | 'raise'; to?: number }
-export interface Profile { tight: number; aggr: number; bluff: number; call: number }
+export type Profile = Persona['profile']
 export interface SeatConfig { id: string; personaId?: string; name: string; isHero: boolean; stack: number }
 export interface GameConfig { sb: number; bb: number; players: SeatConfig[] }
 
 const R = '23456789TJQKA'
 const FULL: Card[] = []
 for (const r of R) for (const s of 'shdc') FULL.push(r + s)
-const SYM: Record<string, string> = { s: '♠', h: '♥', d: '♦', c: '♣' }
 const CAT = ['高牌', '一对', '两对', '三条', '顺子', '同花', '葫芦', '四条', '同花顺']
 const shuffle = <T>(a: T[], rng: Rng): T[] => { for (let i = a.length - 1; i > 0; i--) { const j = rng() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]] } return a }
 const rv = (c: Card) => R.indexOf(c[0]) + 2
@@ -148,8 +147,6 @@ export function outs(hole: Card[], board: Card[]): number | null {
   }
   return n
 }
-export const disp = (c: Card) => ({ r: c[0] === 'T' ? '10' : c[0], s: SYM[c[1]], red: c[1] === 'h' || c[1] === 'd' })
-export const txt = (c: Card) => (c[0] === 'T' ? '10' : c[0]) + SYM[c[1]]
 
 export const canAct = (p: Player) => !p.out && !p.folded && !p.allin
 export const inHand = (p: Player) => !p.out && !p.folded
@@ -279,4 +276,3 @@ export function decide(g: Game, i: number, pp: Profile, rng: Rng = g.rng): Actio
   if (L.canRaise && r < pp.bluff * 0.07) return { type: 'raise', to: sizeTo(0.8) }
   return { type: 'fold' }
 }
-export function fmt(n: number): string { return Math.round(n).toLocaleString('en-US') }

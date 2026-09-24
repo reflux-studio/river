@@ -1,10 +1,10 @@
-import { cardParts } from '@/lib/format'
+import { disp } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Card } from '../../../shared/types'
 
 // 字号随牌高缩放：76px 高的公共牌对应设计稿的 21/23px
 export function PlayingCard({ card, w = 54, h = 76, rot = 0, className }: { card: Card; w?: number; h?: number; rot?: number; className?: string }) {
-  const p = cardParts(card)
+  const p = disp(card)
   return (
     <div
       className={cn('box-border flex shrink-0 flex-col justify-between rounded-lg border border-input bg-white px-[7px] py-[5px]', p.red ? 'text-lose' : 'text-foreground', className)}

@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
+import { disp } from '../src/shared/format'
 import {
-  apply, best, decide, disp, equity, handName, legal, newGame, outs, runoutStep, showdown, startHand,
+  apply, best, decide, equity, handName, legal, newGame, outs, runoutStep, showdown, startHand,
   type Action, type Game, type Profile
 } from '../src/main/engine/poker'
 

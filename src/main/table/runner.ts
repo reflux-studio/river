@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { cardsText, fmt } from '../../shared/format'
 import { BLINDS, PERSONAS, STREET } from '../../shared/personas'
 import type { AgentCall, BreakerState, ChatMessage, CoachAlert, CoachEntry, Events, HandRecord, TableStart, TableView } from '../../shared/types'
 import { coachAsk, coachProactive, coachReview } from '../agents/coach'
@@ -10,7 +11,7 @@ import { AgentQueue, Dropped } from '../agents/queue'
 import { buildSeatView, publicHandResult, type TableQuery } from '../agents/views'
 import { getBankroll, getHand, getSettings, insertHand, saveReview, setBankroll, updateSettings } from '../db'
 import {
-  apply, decide, equity, fmt, handName, inHand, legal, newGame, outs, pot, runoutStep, startHand, txt,
+  apply, decide, equity, handName, inHand, legal, newGame, outs, pot, runoutStep, startHand,
   type Action, type Game, type Rng
 } from '../engine/poker'
 import { modelReady, type Role } from '../models/resolve'
@@ -339,7 +340,7 @@ export class TableRunner {
   private afterAction() {
     const g = this.game!
     if (g.street !== this.lastStreet) {
-      if (g.street !== 'showdown' && g.street !== 'idle') this.sys(`${STREET[g.street]} ${g.board.map(txt).join(' ')}`)
+      if (g.street !== 'showdown' && g.street !== 'idle') this.sys(`${STREET[g.street]} ${cardsText(g.board)}`)
       this.lastStreet = g.street
     }
     void this.loop()

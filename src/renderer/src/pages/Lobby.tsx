@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Avatar } from '@/components/Avatar'
 import { Segmented } from '@/components/Segmented'
 import { Switch } from '@/components/ui/switch'
-import { cardText, fmt, netColor, signed } from '@/lib/format'
+import { cardsText, fmt, netColor, signed } from '@/lib/format'
 import { go, invoke, openRules, startGuided, startTable, updateLobby, updateSettings, useEvent, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import { BLINDS, COACHES } from '../../../shared/personas'
@@ -38,7 +38,7 @@ function Recent() {
       {hands.map((h) => (
         <div key={h.id} className="flex items-center gap-2.5 text-[13px]">
           <span className="w-[52px] text-muted-foreground">#{h.handNo}</span>
-          <span className="flex-1 font-medium">{cardText(h.hero)}</span>
+          <span className="flex-1 font-medium">{cardsText(h.hero)}</span>
           <span className={cn('font-semibold', netColor(h.net))}>{signed(h.net)}</span>
         </div>
       ))}

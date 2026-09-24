@@ -111,7 +111,6 @@ export interface ProviderPublic {
   supportsRequired: boolean | null
 }
 
-// 与 engine/poker.ts 的 Legal 同构（结构兼容）。Renderer 不能引用主进程模块，故在此另行声明。
 export interface Legal {
   toCall: number
   canCheck: boolean

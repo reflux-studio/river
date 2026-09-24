@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { RequestContext } from '@mastra/core/request-context'
 import { coachTools } from '../src/main/agents/tools'
 import { buildSeatView, heroHandSummary, publicHandResult, type TableQuery } from '../src/main/agents/views'
-import { apply, newGame, runoutStep, startHand, txt, type Action, type Game } from '../src/main/engine/poker'
+import { apply, newGame, runoutStep, startHand, type Action, type Game } from '../src/main/engine/poker'
+import { txt } from '../src/shared/format'
 import type { Card, HandRecord } from '../src/shared/types'
 
 function seeded(seed: number) {

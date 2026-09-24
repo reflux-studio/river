@@ -1,7 +1,8 @@
 // 信息隔离的唯一出口：agent 能看到的牌局与手牌记录都经这里裁剪，T5 不另行拼装。
 import { STREET } from '../../shared/personas'
 import type { Card, ChatMessage, HandPlayer, HandRecord, Street } from '../../shared/types'
-import { fmt, legal, pot, txt, type Game } from '../engine/poker'
+import { cardsText as cards, fmt, signed } from '../../shared/format'
+import { legal, pot, type Game } from '../engine/poker'
 
 export interface SeatView {
   street: Street
@@ -53,8 +54,6 @@ export function buildSeatView(g: Game, seat: number, nameOf: (id: string) => str
   }
 }
 
-const cards = (cs: Card[]) => cs.map(txt).join(' ')
-const signed = (n: number) => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n))
 // 玩家（hero）的 hole 在记录里恒非空（供回放），是否亮过牌只能按“摊牌且未弃牌”判断
 const shown = (rec: HandRecord, p: HandPlayer) => rec.showdown && !p.folded && p.hole !== null
 

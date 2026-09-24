@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Avatar } from '@/components/Avatar'
 import { PlayingCard } from '@/components/PlayingCard'
-import { cardText, fmt, netColor, signed } from '@/lib/format'
+import { cardsText, fmt, netColor, signed } from '@/lib/format'
 import { coachConfigured, go, invoke, toastError, useEvent, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import { STREET } from '../../../shared/personas'
@@ -80,7 +80,7 @@ function HandDetail({ d, ...review }: { d: Detail } & Omit<Parameters<typeof Rev
             <div key={p.id} className="flex items-center gap-3 border-b border-divider py-2.5 text-sm last:border-b-0">
               <Avatar ini={persona?.ini ?? '你'} hue={persona?.hue} />
               <span className="w-[70px] font-semibold">{p.name}</span>
-              <span className="flex-1 font-medium">{p.hole ? cardText(p.hole) : p.folded ? '已弃牌' : '未亮牌'}</span>
+              <span className="flex-1 font-medium">{p.hole ? cardsText(p.hole) : p.folded ? '已弃牌' : '未亮牌'}</span>
               <span className={cn('text-[13px]', p.won ? 'text-win' : 'text-muted-foreground')}>
                 {p.won ? `赢得 ${fmt(p.won)}${p.handName ? ' · ' + p.handName : ''}` : p.hole && p.handName ? p.handName : ''}
               </span>
@@ -186,7 +186,7 @@ export function Replays() {
                 <span className="text-[13px]">#{h.handNo}</span>
                 <span className="text-[11px]">{new Date(h.playedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
               </span>
-              <span className="flex-1 font-medium">{cardText(h.hero)}</span>
+              <span className="flex-1 font-medium">{cardsText(h.hero)}</span>
               <span className={cn('font-semibold', netColor(h.net))}>{signed(h.net)}</span>
             </button>
           ))}
