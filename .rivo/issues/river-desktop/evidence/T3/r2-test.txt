@@ -1,0 +1,11 @@
+$ vitest run
+
+ RUN  v5.0.1 /Users/suziming/Documents/AI/river
+
+
+ Test Files  2 passed (2)
+      Tests  31 passed (31)
+   Start at  01:49:49
+   Duration  12.78s (tests 99%, transform 1%)
+
+exit=0

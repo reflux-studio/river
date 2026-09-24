@@ -1,0 +1,9 @@
+# 第 4 轮变异检查（F1/F2 各自还原后，对应新测试失败）
+## M1 F1 还原：同步关闭旧 client
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/db.test.ts > 写锁冲突 > BUSY 重建 client 时，同一轮微任务里的并发读不被 CLIENT_CLOSED 拒绝
+      Tests  1 failed | 18 passed (19)
+## M2 F2 还原：不检查 generation
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/db.test.ts > 写锁冲突 > 退避中 closeDb + initDb 换库：旧写入不落到新库，写计数不被打乱
+      Tests  1 failed | 18 passed (19)

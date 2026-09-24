@@ -1,0 +1,16 @@
+ ✓ test/db.test.ts > 迁移 > 重复执行不丢数据，user_version 为 1 4ms
+ ✓ test/db.test.ts > kv > 默认值 1ms
+ ✓ test/db.test.ts > kv > settings 部分更新合并，并持久化、同步缓存 2ms
+ ✓ test/db.test.ts > kv > 并发的 settings / lobby 更新互不覆盖 3ms
+ ✓ test/db.test.ts > kv > lobby / onboarded / 提示词覆盖 3ms
+ ✓ test/db.test.ts > 手牌 > 插入与倒序列表、getHand、recentHands 2ms
+ ✓ test/db.test.ts > 手牌 > handsForPersona 只返回含该角色的最近 n 手 3ms
+ ✓ test/db.test.ts > 手牌 > clearHistory 后余额 100000，reviews 一并删除 3ms
+ ✓ test/db.test.ts > 提供方 > 脱敏结果不含明文，keyTail 为末 4 位，密钥可由注入的 decrypt 取回 2ms
+ ✓ test/db.test.ts > 提供方 > openai-compatible 必须有 baseUrl，apiKey 可空；内置提供方必须有 key 2ms
+ ✓ test/db.test.ts > 提供方 > 更新时不带 key 保留原 key；setSupportsRequired 与 needsKey 合并；重启后缓存恢复 2ms
+ ✓ test/db.test.ts > 提供方 > kind 或 baseUrl 变化时 supportsRequired 重置，只换 key 保留 3ms
+ ✓ test/db.test.ts > 提供方 > getProviderSecret 在解密失败时抛出 2ms
+ ✓ test/db.test.ts > 提供方 > deleteProvider 与 updateSettings 并发后 models 不残留已删引用 3ms
+ ✓ test/db.test.ts > 提供方 > 删除被引用的提供方后清空对应角色的 models 3ms
+      Tests  15 passed (15)

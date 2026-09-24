@@ -1,0 +1,1 @@
+personas.ts 与原型第299-317行 deepStrictEqual 通过（p→profile，去掉 talk 后）; talk: li=0.6 k=0.15 bai=0.85 prof=0.35 rock=0.05 may=0.5 cow=0.6 zen=0.25

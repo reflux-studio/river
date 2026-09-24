@@ -1,0 +1,26 @@
+userData= /Users/suziming/Library/Application Support/River-dev
+checks= {'toolExecuted': True, 'modelFnGotRequestContext': True, 'stopWhenStoppedAfterFirstStep': True, 'memoryHasUpdateWorkingMemory': True, 'workingMemoryWritten': True, 'abortedReturnsWithoutThrow': True, 'mastraTablesInRiverDb': True, 'providerRegistryReadable': True, 'safeStorage': True}
+Cache
+Code Cache
+Cookies
+Cookies-journal
+DIPS
+DawnGraphiteCache
+DawnWebGPUCache
+GPUCache
+GPUPersistentCache
+GraphiteDawnCache
+Local State
+Local Storage
+Network Persistent State
+Preferences
+Session Storage
+Shared Dictionary
+Trust Tokens
+Trust Tokens-journal
+blob_storage
+declarative_performance_observer.db
+declarative_performance_observer.db-journal
+river.db
+spike-key.bin
+spike-result.json

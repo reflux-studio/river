@@ -1,0 +1,9 @@
+# 第 2 轮：变异检查（把实现临时改回审阅前的读-改-写顺序/不重置 supportsRequired，新测试应失败）
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/db.test.ts > kv > 并发的 settings / lobby 更新互不覆盖
+ FAIL  test/db.test.ts > 提供方 > kind 或 baseUrl 变化时 supportsRequired 重置，只换 key 保留
+      Tests  2 failed | 13 passed (15)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/db.test.ts > kv > 并发的 settings / lobby 更新互不覆盖
+ FAIL  test/db.test.ts > 提供方 > deleteProvider 与 updateSettings 并发后 models 不残留已删引用
+      Tests  2 failed | 13 passed (15)
