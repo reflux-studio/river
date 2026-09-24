@@ -64,8 +64,7 @@ export function dropTempDb() {
 export async function setup(settings: Partial<Settings> = {}) {
   await tempDb()
   await db.updateSettings({ speed: 2, coachOn: false, autoNext: false, engine: 'llm', ...settings })
-  // setImmediate 保留真实实现：coach:done 的“下一轮事件循环”语义要靠它
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
+  vi.useFakeTimers()
 }
 
 export function teardown() {
