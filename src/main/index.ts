@@ -4,6 +4,7 @@ import { initDb } from './db'
 import { guardQuit, registerIpc } from './ipc'
 import { loadPrices, refreshPrices } from './models/prices'
 import { TableRunner } from './table/runner'
+import { initUpdater, installUpdate, readyVersion } from './updater'
 
 let win: BrowserWindow | null = null
 
@@ -51,9 +52,10 @@ app.whenReady().then(async () => {
     return
   }
   void refreshPrices()
-  registerIpc(ipcMain, runner, { version: () => app.getVersion(), update: () => null, install: () => {} })
+  registerIpc(ipcMain, runner, { version: () => app.getVersion(), update: readyVersion, install: installUpdate })
   guardQuit(app, runner)
   createWindow()
+  initUpdater(runner.emit)
 })
 
 app.on('window-all-closed', () => app.quit())

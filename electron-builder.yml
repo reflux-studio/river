@@ -12,12 +12,21 @@ extraResources:
 asarUnpack:
   - node_modules/@libsql/**
   - node_modules/libsql/**
+# 自动更新读取 GitHub Releases 上的 latest*.yml（ADR-005）
+publish:
+  provider: github
+  owner: reflux-studio
+  repo: river
 mac:
   icon: build/icon.icns
   target:
+    # zip 供自动更新使用，dmg 供首次安装
     - target: dmg
       arch: arm64
-  # 不签名（null）会留下残缺的链接器签名，带下载隔离标记时 macOS 直接判为“已损坏”；ad-hoc 签名则走可放行的“未验证开发者”流程
+    - target: zip
+      arch: arm64
+  # 本地构建用 ad-hoc 签名（不签名会留下残缺签名，被判为“已损坏”）。
+  # CI 发布时改用固定的自签证书（-c.mac.identity、forceCodeSigning），否则新版本无法通过 Squirrel.Mac 的签名校验
   identity: '-'
   # hardened runtime 只在公证时需要；ad-hoc 签名下开启它会让库校验拦下 libsql 的 .node
   hardenedRuntime: false

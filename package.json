@@ -18,6 +18,7 @@
     "@mastra/core": "~1.69.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "electron-updater": "^6.8.9",
     "lucide-react": "^1.47.0",
     "radix-ui": "^1.6.7",
     "react": "^19.3.0",
