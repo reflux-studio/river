@@ -1,5 +1,4 @@
 import { Toaster } from '@/components/ui/sonner'
-import { TooltipProvider } from '@/components/ui/tooltip'
 import { GuidedDialog, Onboarding } from '@/components/Onboarding'
 import { TopBar } from '@/components/TopBar'
 import { useRiver, type Page } from '@/lib/river'
@@ -20,7 +19,7 @@ export function App() {
   const Page = PAGES[page]
 
   return (
-    <TooltipProvider>
+    <>
       <div className="flex h-full min-w-[880px] flex-col overflow-hidden">
         <TopBar page={page} />
         <main className="flex min-h-0 flex-1 flex-col">{ready && <Page />}</main>
@@ -28,6 +27,6 @@ export function App() {
       <Onboarding />
       <GuidedDialog />
       <Toaster position="top-center" />
-    </TooltipProvider>
+    </>
   )
 }
