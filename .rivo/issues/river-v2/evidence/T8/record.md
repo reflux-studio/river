@@ -30,3 +30,9 @@ updaterCacheDirName: river-updater
 
 - `src/main/updater.ts`：仅打包后启用；启动 10 s 后与每 6 h 检查，自动下载；下载完成推 `update:ready`，退出时自动安装。
 - 顶栏在不在牌桌时显示“新版本 x 已就绪 · 重启更新”；`update.install` 在牌桌上拒绝。
+
+## CI 实跑（手动触发，分支 claude/beautiful-heisenberg-6shavz）
+
+- run 35996055552（3d8ae83）：Linux、Windows 打包失败。`版本号` 步骤中 `node -p 'require(\"./package.json\")…'` 的转义引号让 Node 报语法错误，`VERSION` 为空并经 `extraMetadata.version` 覆盖了 `package.json`，electron-builder 报 `Please specify 'version'`。标签发布不走这一分支，不受影响。
+- 修正（54abe9d）：改用 `node -p "require('./package.json').version"`，并校验 `VERSION` 格式，为空时直接报错。
+- run 35998026554（54abe9d）：test ✅、build (ubuntu) ✅、build (windows) ✅；build (macos) 在“导入 macOS 签名证书”按预期失败（未配置 `MAC_CERT_P12`）；release 跳过（非标签）。价格快照步骤输出 `priced models: 7749`。
