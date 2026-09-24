@@ -48,10 +48,28 @@
 
 适用边界：以上为文档和类型核对，尚未在 Electron 主进程中实际运行。
 
-待核实（实施前的首个验证任务）：
-- `libsql` 使用 Neon/N-API 原生模块（`@libsql/darwin-arm64/index.node`），在 Electron 打包时需要 `asarUnpack`；N-API 理论上无需针对 Electron ABI 重编译，需实测。
-- `@mastra/core` 需要 ES2022 模块；Electron 主进程需以 ESM 构建（electron-vite 支持），需实测。
-- 用户所选模型能否在一次 loop 内稳定调用“行动工具”；不稳定时的退化路径见方案。
+T1 实测结论（2026-09-24，@mastra/core 1.69.0、@mastra/memory 1.31.x、electron 44.4.5、electron-builder 26，证据 evidence/T1/）：
+- 主进程 ESM 可加载 Mastra；LibSQLStore 建出 44 张 `mastra_` 表；打包后 libsql 原生模块经 asarUnpack 正常加载。
+- Memory 注入的工具名为 `updateWorkingMemory`；`activeTools` 过滤后仍可调用它写入 working memory。
+- `stopWhen` 回调中 `steps[].toolCalls` 元素为 `{ toolCallId, toolName, args }`；同一步内其他工具会执行完。
+- 被中止的 `generate` 返回 `finishReason: 'aborted'` 不抛错；带 Memory 的 Agent 即使被中止也必须传 `memory: { thread, resource }`。
+- 未签名应用在覆盖安装新版本后，safeStorage 仍能解密旧密文（钥匙串条目 “River Safe Storage”）。
+- pnpm 11 必须用默认 isolated 布局：hoisted 下 electron-builder 26 按 `pnpm list` 收集依赖会装错嵌套版本（`@ai-sdk/provider`）导致启动失败。
+- 开发与打包默认共用 userData `~/Library/Application Support/River`。
+
+T3 实测结论（2026-09-24，@libsql/client 0.18.x，证据 evidence/T3/r3-busy.md）：
+- `file:` 客户端是连接池，`PRAGMA foreign_keys` 只对执行它的连接生效，`ON DELETE CASCADE` 不可依赖。
+- Mastra 与业务层写同一 `river.db` 时，Mastra 跨多个 await 持有写事务，业务写会立即得到 `SQLITE_BUSY`；设置 `busy_timeout` 会在主线程同步阻塞。
+- libsql 0.18 缺陷：一次写得到 `SQLITE_BUSY` 后，该连接滞留在未提交事务中并持锁；之后在这条连接上的写“返回成功、自己可读”，但其他连接永远读不到（静默丢写）。只做退避重试不够，必须换一条干净的连接，而连接池无法单独丢弃某条连接，只能关闭整个 client。
+- 因此业务层与 Mastra 必须各自建 client（同一文件）：业务写遇到 BUSY/LOCKED 时关闭并重建自己的 client，再异步退避重试（100ms 起，5 次）；Mastra 用 `new LibSQLStore({ id, url })` 自建 client，不能共用业务 client（关闭会打断 Mastra 事务）。
+- 实测：4 个业务 worker 2000 次写与 Mastra 300 轮重负载并发，全部落库、事件循环不被阻塞。Mastra 自身的 BUSY 重试不换连接，理论上仍有静默丢写风险；业务写不跨 await 持锁，实测 Mastra 未遇 BUSY。新增其他写入方时需重新评估。
+
+T4 实测结论（2026-09-24，@mastra/core 1.69.0，证据 evidence/T4/、reviews/T4-1.md）：
+- `agent.generate` 调用模型的 `doGenerate`，只有 `stream` 走 `doStream`；mock 模型与假端点两者都要实现。
+- `generate` 遇模型错误不一定抛出，可能返回带 `error` 的结果；调用方需同时处理抛出与返回错误。
+- `memory.options.readOnly: true` 仍会创建 thread，但不保存消息，模型拿不到 `updateWorkingMemory`。
+- resource 作用域下 `memory.updateWorkingMemory` 不要求 thread 存在，`threadId` 可为占位值。
+- Mastra 1.69 会拒绝执行不在 `activeTools` 中的已注册工具，但项目不应依赖这一点做信息隔离：对手与教练 agent 分别注册各自的工具，工具内再校验调用者角色。
 
 ## 业务数据存储
 

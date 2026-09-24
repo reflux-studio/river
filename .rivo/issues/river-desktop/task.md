@@ -2,7 +2,7 @@
 
 ## 目标与共同约定
 
-依据：`plan.md`（第 4 轮独立审阅通过，reviews/plan-4.md）。用户已批准方案，并授权按 Rivo 流程一直做到实施（2026-09-23）。任务不改变方案；发现方案缺口时停止受影响任务，回到方案讨论。
+依据：`plan.md`（第 4 轮独立审阅通过 reviews/plan-4.md；赢家发言修订经 reviews/plan-5-task-5.md 复审通过）。用户已批准方案，并授权按 Rivo 流程一直做到实施（2026-09-23）。任务不改变方案；发现方案缺口时停止受影响任务，回到方案讨论。
 
 项目根目录：`/Users/suziming/Documents/AI/river`（新建，git init）。平台：macOS arm64。包管理：pnpm。Node ≥ 20.3（`AbortSignal.any`）；Electron ≥ 29。
 
@@ -65,7 +65,7 @@ T2、T3 可并行；T6、T7、T8 可并行（共用 T6 产出的主题与 shadcn
 6. electron-builder 配置：mac target `dmg`、arch `arm64`、`asarUnpack: ['node_modules/@libsql/**','node_modules/libsql/**']`，不签名（`mac.identity: null`）。打包、安装后启动能读写 `river.db`。
 
 工程注意事项：
-- libsql 为 Neon/N-API 原生模块（`@libsql/darwin-arm64/index.node`），必须 asarUnpack；pnpm 下注意 `node-linker=hoisted` 或 `shamefully-hoist` 让 electron-builder 正确收集依赖。
+- libsql 为 Neon/N-API 原生模块（`@libsql/darwin-arm64/index.node`），必须 asarUnpack。pnpm 使用默认 isolated 布局（实测 hoisted 下 electron-builder 26 收集依赖出错）；pnpm 11 的设置写在 `pnpm-workspace.yaml`。
 - Mastra 要求 ES2022 模块；CommonJS 会失败。
 - 被中止的 `generate` 返回 `finishReason: 'aborted'` 而不抛错。
 
@@ -75,7 +75,11 @@ T2、T3 可并行；T6、T7、T8 可并行（共用 T6 产出的主题与 shadcn
 - 打包产物覆盖安装后 safeStorage 解密成功。
 - 任一前提失败（含 safeStorage）：停止，记录证据，回到方案讨论（Mastra 相关备选：`utilityProcess` 承载；safeStorage 失败时由用户决定是否接受“重装后需重新输入 key”）。
 
-结果：（交付阶段记录）
+结果：已完成（2026-09-24）。独立审阅 reviews/T1-1.md 通过。证据 evidence/T1/。
+- 四个前提在开发与打包产物中均通过（9 项断言；safeStorage 在 0.1.0→0.1.1 覆盖安装后解密成功；44 张 mastra_ 表；PROVIDER_REGISTRY 208 项）。
+- 偏差（均有证据，已采纳）：pnpm 默认布局替代 hoisted；设置在 `pnpm-workspace.yaml`（含 `allowBuilds`，以及 pnpm 11 最短发布时长保护对 `@mastra/core` 1.69.0、`electron` 44.4.5 的豁免）；`postinstall: install-electron`；preload 输出 `.cjs`（sandbox 要求）；vite ^7（electron-vite 5 限制）；typescript ~5.9。
+- `src/main/spike.ts` 由 `--spike` 或 `RIVER_SPIKE=1` 触发，保留到 T9 验收，发布前移除（见 T9）。
+
 
 ## 任务 T2：牌局引擎
 
@@ -110,7 +114,12 @@ T2、T3 可并行；T6、T7、T8 可并行（共用 T6 产出的主题与 shadcn
 - 固定种子下 `decide` 与 `equity` 结果可复现。
 - 与原型对照：用同一种子序列，在 Node 中加载 `design-source/poker.js`（把 `window` 换成全局对象）跑 200 手随机局面，`legal/apply/showdown` 结果与移植版一致。
 
-结果：（交付阶段记录）
+结果：已完成（2026-09-24）。独立审阅 reviews/T2-1.md 通过，收尾复审 reviews/T2-2.md 通过。证据 evidence/T2/。
+- 移植与原型逐步对照（200 手，每步整体状态比较）一致；`Card`、`Street` 从 `src/shared/types.ts` 导入；`Legal`、`Profile`、`Rng` 暂留引擎（T5 需要时迁移到 shared）。
+- `newGame` 为满足类型补了发牌前初值，`startHand` 后与原型完全一致。
+- `Game.rng` 是函数字段：`Game` 不能 structuredClone、JSON 序列化或经 IPC 发送；T5 构造 `TableView`、`HandRecord` 时从字段取值。
+- `tsconfig.node.json` 已包含 `test/**/*`，`pnpm typecheck` 覆盖测试；临时探针不要放在 `test/` 下。
+
 
 ## 任务 T3：数据层与共享定义
 
@@ -118,7 +127,7 @@ T2、T3 可并行；T6、T7、T8 可并行（共用 T6 产出的主题与 shadcn
 
 前置依赖：T1。
 
-修改位置：`src/shared/types.ts`、`src/shared/personas.ts`、`src/main/db/index.ts`、`test/db.test.ts`。
+修改位置：`src/shared/types.ts`、`src/shared/personas.ts`、`src/main/db/index.ts`、`test/db.test.ts`；`src/main/index.ts` 中开发环境 `setPath('userData', …River-dev)` 的最小改动。
 
 输入输出：
 - `types.ts` 定义共享类型：`Settings`、`Lobby`、`Persona`、`ChatMessage`、`HandRecord`、`HandSummary`、`ProviderPublic`（字段见“目标与共同约定”与下文）。`HandRecord`：`hand, sb, bb, net, pot, showdown, hero: Card[], board: Card[], players: {id, personaId?, name, hole: Card[]|null, folded, handName, won, net}[], log: {street, board, name, label, autopilot?}[], vpip, pfr`（`hole` 仅玩家与摊牌者非空）。
@@ -139,11 +148,18 @@ CREATE TABLE river_providers (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT
 - 仓储函数：`getSettings/updateSettings`、`getLobby/updateLobby`、`getBankroll/setBankroll`、`getOnboarded/setOnboarded`、`getPromptOverrides/setPrompt/resetPrompt`、`insertHand(tableId, record): id`、`listHands(): HandSummary[]`（倒序，`{id,handNo,playedAt,hero,net,showdown}`）、`getHand(id)`、`recentHands(n)`、`handsForPersona(personaId, n)`（record.players 含该 personaId 的最近 n 手）、`saveReview/getReview`、`clearHistory()`（删 hands 与 reviews，余额 100000）、`listProviders/saveProvider/deleteProvider/getProviderSecret`。
 - 提供方：`saveProvider({id?,name,kind,baseUrl?,apiKey?})` 用注入的 `encrypt(text): Buffer` 加密；`kind !== 'openai-compatible'` 时忽略 `baseUrl`；`openai-compatible` 必须有 `baseUrl`，`apiKey` 可空。返回脱敏 `{id,name,kind,baseUrl?,keyTail,needsKey,supportsRequired}`；`keyTail` 在保存时从明文取末 4 位存入 kv（`provider_tail:<id>`），不从密文解出。`setSupportsRequired(id, bool)` 持久化测试结果。`needsKey` 是主进程内存标记（解密失败时由 T4 置位），`listProviders(needsKeySet)` 合并返回。`deleteProvider` 同时清空 settings.models 中引用它的角色。仓储提供同步内存缓存 `settingsCache`、`providersCache`，写入时同时更新，供 `resolveModel` 同步读取。
 
-工程注意事项：`db/index.ts` 使用 `@libsql/client`，与 LibSQLStore 同一文件；加解密函数由调用方注入，便于在 vitest 中用明文替身测试。
+工程注意事项：开发环境（`!app.isPackaged`）在 `app.whenReady` 之前 `app.setPath('userData', <appData>/River-dev)`；数据库与 Mastra 的路径必须在函数内（初始化时）调用 `app.getPath`，不得在模块顶层求值，否则 ESM 导入先于 setPath 执行会使切换失效；避免开发数据写入正式目录（T1 实测两者默认共用 `~/Library/Application Support/River`）。`db/index.ts` 使用 `@libsql/client`，与 LibSQLStore 同一文件；加解密函数由调用方注入，便于在 vitest 中用明文替身测试。
 
 验证与完成标准（vitest，使用临时 `file:` 数据库）：迁移可重复执行；默认值读取；settings 部分更新合并；hands 插入与倒序列表；`handsForPersona` 过滤；删除被引用提供方后 models 清空；`clearHistory` 后余额 100000 且 reviews 级联删除；脱敏结果不含明文。
 
-结果：（交付阶段记录）
+结果：已完成（2026-09-24）。独立审阅 reviews/T3-1.md（需修改）→ T3-2.md（通过，R1 转本轮）→ T3-3.md（通过，F1/F2 小修复）→ T3-4.md（通过）。证据 evidence/T3/。衔接约定：
+- `updateSettings` 对 `models` 按角色合并；清除某角色传 `{ models: { coach: undefined } }`（T5/T6 注意）。`getSettings()`、`getLobby()` 为同步函数。
+- 外键级联不生效：任何删除 `river_hands` 的路径必须在同一批操作中显式删除 `river_reviews`。
+- 业务写遇 SQLITE_BUSY/LOCKED 时重建业务 client 并异步退避重试（最长约 1.5 秒被拒）；最终失败后从库重载缓存。被拒绝的 settings/lobby 修改可能被后续写入带进库，界面不要把拒绝等同“一定没保存”。
+- Mastra 必须用 `new LibSQLStore({ id: 'river', url })` 自建 client，与业务层同一 url，不得传入或共用业务 client（原因见 note“T3 实测结论”）。
+- 启动顺序（T5）：`whenReady` 后先 `await initDb({ url, encrypt, decrypt })`，成功后再构造 LibSQLStore 与 Mastra，两者不并发；`initDb` 失败按启动失败处理。WAL 由 LibSQLStore 设置，业务层不设。
+- 升级 `@libsql/client` 后必须重新验证静默丢写问题（test/db-mastra.test.ts）。
+
 
 ## 任务 T4：智能体、工具与队列
 
@@ -256,10 +272,11 @@ export const resolveModel = ({ requestContext }) => {
     ? { providerId: p.id, modelId: sel.modelId, url: p.baseUrl, apiKey }
     : { id: `${p.kind}/${sel.modelId}`, apiKey }
 }
-// settings、providers 取自 T3 的同步缓存
-export function modelReady(role): boolean  // 调用前检查：已配置、提供方存在、未 needsKey；解密失败时置 needsKey 并返回 false（不计熔断）；`provider.save` 带新 key 成功保存后清除该提供方的 needsKey
+// settings、providers 取自 T3 的同步缓存；settings.models 引用的提供方不存在时（例如删除后又被设回）视为未配置
+export function modelReady(role): boolean  // 调用前检查：已配置、提供方存在、未 needsKey；解密失败时置 needsKey 并返回 false（不计熔断）（清除由 T5 的 `provider.save` 负责：带新 key 保存成功后调用 T4 导出的 `clearNeedsKey(providerId)`）
 export async function testProvider(providerId, modelId): Promise<{ ok, supportsRequired, error? }>
   // 带单个工具、toolChoice:'required' 的最小调用；因 required 被拒则 auto 重试，成功记 supportsRequired=false
+  // 开始时记下提供方的 kind/baseUrl；结束时若该提供方已被删除或 kind/baseUrl 已变，则不写回结果（避免旧端点结果写到新端点）
 ```
 
 AgentQueue：
@@ -288,7 +305,7 @@ class AgentQueue {
 
 每次 generate 结束（成功或失败）由本模块发出回调 `onCall({ role, modelId, ms, ok })`，T5 转为 `agent:last` 事件并记为 `lastCall`。
 
-工程注意事项：超时由调用方计时器 abort；判断超时看计时器是否触发，不看异常。`getMemory()` 为异步。
+工程注意事项：超时由调用方计时器 abort；判断超时看计时器是否触发，不看异常。`getMemory()` 为异步。带 Memory 的 Agent 每次 generate（含被中止的）都必须传 `memory: { thread, resource }`，否则保存消息时报 “Thread ID is required”（T1 实测）。stopWhen 回调中 `steps[].toolCalls` 元素为 `{ toolCallId, toolName, args }`。
 
 验证与完成标准（vitest，mock LanguageModel，临时 LibSQLStore）：
 - decide：mock 依次调用 view_table、act → intents.act 存在，stopWhen 后不再调用模型；同步调用 say+act+updateWorkingMemory 时三者都执行，WM 写入 SQLite。
@@ -299,7 +316,16 @@ class AgentQueue {
 - AgentQueue：抢占等待被中止任务结束；超过 2 秒直接执行；未开始的非 durable 任务被丢弃；durable 保留并先执行；`idle()` 在清空后 resolve。
 - resolveModel：内置提供方不传 url；兼容接口传 url；未配置时 `modelReady` 为 false。
 
-结果：（交付阶段记录）
+结果：已完成（2026-09-24）。独立审阅 reviews/T4-1.md（需修改）→ T4-2.md（通过）。证据 evidence/T4/。
+- 实际导出：`agents/mastra.ts`：`initMastra({ url, … })`、`closeMastra`、`rt()`（含 `opponentMemory`、`coachMemory`）、`callAgent`、`appendThreadMessage`、`resetMemories`、`MODE_TIMEOUT_MS`；`agents/opponent.ts`：`opponentDecide`、`opponentChat`；`agents/coach.ts`：`coachProactive`、`coachAsk`（流式，被中止时保留已输出文本）、`coachReview`；`agents/queue.ts`：`AgentQueue`、`Dropped`；`agents/views.ts`：`buildSeatView`、`publicHandResult`、`heroHandSummary`、`SeatView`、`TableQuery`；`agents/leak.ts`：`filterSay`；`models/resolve.ts`：`resolveModel`、`modelReady`、`needsKey`、`clearNeedsKey`、`supportsRequired`、`testProvider`。T5 以代码为准。
+- 信息隔离：对手与教练 agent 各自只注册本角色工具（`opponentTools`、`coachTools`），专属工具内再校验 `role`；不依赖 Mastra 的 activeTools 过滤。
+- 泄牌过滤先截断到 40 字再检查最终文本（与原型一致）。
+- 共享类型修改：`HandLogEntry.board` 由 `Card[]` 改为 `boolean`（与原型、引擎一致）；T5 构造 `HandRecord.log` 时写 `board: !!x.board`。
+- 偏差（已审阅接受）：教学牌局提示放在 proactive 输入而非 instructions（`CoachCtx.guided` 由 T5 传入）；队列“超过 2 个被拒”只计未开始任务；被越过的旧任务返回 `Dropped`，`idle()` 仍等待它结束；对手提示词修改在下一次调用即生效（满足“下一手生效”的上限承诺）；`testProvider` 每次尝试最多 20 秒、两次共约 40 秒（T6 显示进行中状态）；`initMastra` 的 `model` 参数仅供测试。
+- 队列语义：当前任务为 durable 时，抢占不越过、等待其结束（task 正文“最多 2 秒”对 durable 当前任务不适用）；durable 任务必须是有界的本地写入，其等待计入调用方时限。T5 等待 `queue.run` 结果时与自身时限计时器赛跑，防止异常的 durable 任务卡住牌局。
+- fn 开始前已被抢占时拿到的 `signal` 已是 aborted，不会再收到 abort 事件；自己监听 abort 的 fn 先检查 `signal.aborted`。
+- `mastra.ts` 与 `opponent.ts`、`coach.ts` 存在循环 import，这些模块顶层不得使用对方导出的值。
+
 
 ## 任务 T5：TableRunner、公屏与 IPC
 
@@ -311,7 +337,7 @@ class AgentQueue {
 
 输入输出：
 
-TableRunner 状态：`tableId`（UUID）、`game`、`runId`、`paused`、`pendingAI {seat,hand,logLen,action,say,autopilot}`、`heroKey`（`${hand}-${log.length}`）、`thinking`、`autopilotCount`、`breaker {opponent:n, coach:n, trippedOpponent, trippedCoach}`、`guided`、`chat`（≤300 条）、`bubbles`（personaId → {text, until: now+5000}）、`askInFlight`、`askId`、`coachThread`、`leaveController`、`limits {decide,chat,proactive,ask,review}`、`lastCall`、`nums`（本地概率）。
+TableRunner 状态：`tableId`（UUID）、`game`、`runId`、`paused`、`pendingAI {seat,hand,logLen,action,say,autopilot}`、`heroKey`（`${hand}-${log.length}`）、`thinking`、`autopilotCount`、`breaker {opponent:n, coach:n, trippedOpponent, trippedCoach}`、`guided`、`chat`（≤300 条）、`bubbles`（personaId → {text, until: now+5000}）、`askInFlight`、`winSpeechInFlight`、`askId`、`coachThread`、`leaveController`、`limits {decide,chat,win,proactive,ask,review}`（开发环境可由 `RIVER_LIMIT_DECIDE_MS` 覆盖 decide）、`lastCall`、`nums`（本地概率）。
 
 主循环（伪代码）：
 
@@ -358,8 +384,8 @@ async loop() {
 onHeroTurn：`key = ${hand}-${log.length}`；若 `key === this.heroKey` 直接返回（与原型第 508–510 行一致：resume 后对同一决策点不再重复计算与触发教练）；否则记录 `heroKey`，计算默认加注额（原型第 511–514 行）与 `nums`（`equityFor(0,400)`，原型 `computeNums`），然后若 `coachOn && modelReady('coach') && !trippedCoach && !askInFlight`：`coachQueue.run({ preempt:true, fn: coachProactive })`（12s 计时器同样在 run 前启动），返回时 `heroKey` 未变才应用：`pause` → `paused=true` + `coach:alert {level:'pause'}`；否则 `hint` → `coach:alert {level:'hint'}`。成功清零 `breaker.coach`；超时/抛错计 `countFailure('coach')`；被 ask 抢占或离桌中止不计。
 
 教练规则：
-- `coach.ask(text)`：生成 `requestId`；`this.askId = requestId`；牌局未结束时 `paused=true`；`askInFlight=true`；`coachQueue.run({ preempt:true })`（30s）；流式 `coach:delta`；结束时推 `coach:done {requestId, ok, error?}`：被下一次提问抢占为 `error:'interrupted'`（不计失败），成功清零 `breaker.coach`；超时/抛错计 `countFailure('coach')` 并 `error:'failed'`；教练模型未配置时立即返回 `coach:done {ok:false, error:'not_configured'}`；只有 `this.askId === requestId` 时才置 `askInFlight=false` 并检查自动下一手。
-- 教练熔断后：proactive 与 ask 都不发起，ask 立即返回 `coach:done {ok:false, error:'breaker'}`。
+- `coach.ask(text)`：先检查教练模型已配置且未熔断，否则不暂停牌局，直接返回 `requestId` 并随后推 `coach:done {requestId, ok:false, error:'not_configured'|'breaker'}`（事件在命令返回后的下一个事件循环发送，Renderer 以 `requestId` 关联；Renderer 在命令返回前收到的同 id 事件先缓存）。检查通过后生成 `requestId`；`this.askId = requestId`；牌局未结束时 `paused=true`；`askInFlight=true`；`coachQueue.run({ preempt:true })`（30s）；流式 `coach:delta`；结束时推 `coach:done {requestId, ok, error?}`：被下一次提问抢占为 `error:'interrupted'`（不计失败），成功清零 `breaker.coach`；超时/抛错计 `countFailure('coach')` 并 `error:'failed'`；只有 `this.askId === requestId` 时才置 `askInFlight=false` 并检查自动下一手。
+- 教练熔断后：proactive 与 ask 都不发起（ask 按上条返回 `error:'breaker'`）。
 - `coachThread`：TableRunner 状态中保存本桌 `{role, text, requestId, interrupted?}[]`（提问与回答），供 bootstrap 返回。
 - `coach:alert`：下一手开始时清空（教学牌局第 1 手保留开场提醒，与原型第 422 行一致）。
 - 复盘 `hands.review(id)`：复盘队列 `run({})`（45s）；同一 handId 进行中重复请求忽略；成功 `saveReview` 并推 `review:done {handId, text}`；失败、中止或被队列拒绝（`Dropped`）都推 `review:done {handId, error}`。复盘不计入熔断。
@@ -368,10 +394,10 @@ onHandEnd（同一手只执行一次）：
 1. 系统消息“{name} 赢得 x · 牌型”。
 2. 构造 `HandRecord`（原型 `rec` + `players[].personaId`、`players[].net`、`log[].autopilot`），`insertHand`，推送给 Renderer（`hands:changed`）。
 3. 对每个在座对手：`queues[pid].run({ durable:true, fn: () => appendThreadMessage(...) })`，文本如“第 12 手结束：摊牌，你亮出 A♠ K♦，玩家亮出 Q♥ Q♣ 赢得 2,400；你本手 −1,200”（未亮牌不写他人底牌）。
-4. 赢家发言：非玩家赢家中赢得最多的一位；LLM 可用且未熔断 → `queues[pid].run({ fn: opponentChat(mode:'win', '你赢了这一手') })`（8s，不受冷却），成功且有 say → 公屏 `triggers:true` 并 `triggerReplies`；否则取预设 win 台词（`triggers:false`）。
-5. 自动下一手：`autoNext && hero.stack>0` 时 4.5s 后，若 `runId` 未变、`!paused`、`!askInFlight` 则 `nextHand()`；ask 结束时若条件满足重新计时。
+4. 赢家发言：非玩家赢家中赢得最多的一位；LLM 可用且未熔断 → `queues[pid].run({ fn: opponentChat(mode:'win', '你赢了这一手') })`（`limits.win` 默认 8s，不受冷却），未过期且成功有 say → 公屏 `triggers:true` 并 `triggerReplies`；未过期但调用失败 → 取预设 win 台词（`triggers:false`）；LLM 不可用或熔断 → 直接取预设 win 台词。
+5. 自动下一手：`autoNext && hero.stack>0` 时 4.5s 后，若 `runId` 未变、`!paused`、`!askInFlight`、`!winSpeechInFlight` 则 `nextHand()`；ask 或赢家发言结束时若条件满足且 4.5s 已过则立即发下一手，未过则等满 4.5s。
 
-赢家发言返回时若 `runId` 或手号已变（下一手已开始）则丢弃，不写公屏也不补台词；赢家选择不说话（未调用 say）时就不说话，不补预设台词；只有调用失败、熔断或被丢弃时才用 `canned(persona,'win')`。
+赢家发言期间置 `winSpeechInFlight = hand`（记录手号，仿 `askId`），自动下一手等待其结束；无论成功、失败、过期或被队列拒绝，都在 `finally` 中仅当 `winSpeechInFlight === 本手号` 时清为 null；`nextHand()` 与离桌时重置为 null。返回时先做过期检查：若 `runId` 或手号已变（只会因玩家手动发下一手或离桌发生）则整体丢弃，不写公屏也不补台词（与 plan 一致）；未过期时，赢家选择不说话（未调用 say）就不说话，不补预设台词；只有调用失败、熔断或被丢弃时才用 `canned(persona,'win')`。
 
 triggerReplies(msg)：对除发言者外在座、未弃桌（`!out`）、非 `thinking`、10 秒内未被触发过的对手，按 `persona.talk` 抽样；抽中者 `queues[pid].run({ fn: opponentChat(mode:'chat', …) })`（8s，非抢占）；结果 say 经 `leak.ts` 过滤后写公屏 `triggers:false`、`kind` 忽略。LLM 不可用或熔断时不触发。
 
@@ -402,7 +428,7 @@ triggerReplies(msg)：对除发言者外在座、未弃桌（`!out`）、非 `th
 
 事件（`window.river.on(event, cb)`）：`table:view`（TableView）、`chat:append`（ChatMessage）、`coach:alert`（`{level,message}|null`）、`coach:delta {requestId,text}`、`coach:done {requestId,ok,error?}`（`error:'interrupted'` 表示被新提问中断）、`review:done {handId,text?,error?}`、`breaker {opponent,coach}`、`bankroll`、`hands:changed`、`agent:last {role,modelId,ms,ok}`。
 
-`table.start`：已有牌桌时先按离桌处理（退回原桌玩家筹码，同原型 `back`），再扣买入（`bb*100`），补位规则同原型（picks 不足时按 PERSONAS 顺序补齐），`tableId` 新 UUID；教学牌局：3 人、10/20、picks `['bai','zen']`、强制 `coachOn=true`、`level='novice'`，首个提醒为原型文案。`table.leave`：`runId++`、abort 所有进行中调用（不计失败）、余额加回玩家筹码。`table.rebuy`：玩家筹码置 `bb*100`，余额扣除。对手筹码为 0 时下一手前自动重新买入（系统消息，与原型一致）。`chat.send`：公屏 `{kind:'msg',from:'hero',triggers:true}` 后 `triggerReplies`。`coach.ask`：规则见上文“教练规则”。退出：`before-quit` 中若有桌则 `event.preventDefault()`，`await leave()`（余额写库完成）后再 `app.quit()`。`lastCall` 取自 T4 的 `onCall` 回调。
+`table.start`：已有牌桌时先按离桌处理（退回原桌玩家筹码，同原型 `back`），再扣买入（`bb*100`），补位规则同原型（picks 不足时按 PERSONAS 顺序补齐），`tableId` 新 UUID；教学牌局：3 人、10/20、picks `['bai','zen']`、强制 `coachOn=true`、`level='novice'`，首个提醒为原型文案。`table.leave`：`runId++`、abort 所有进行中调用（不计失败）、余额加回玩家筹码。`table.rebuy`：玩家筹码置 `bb*100`，余额扣除。对手筹码为 0 时下一手前自动重新买入（系统消息，与原型一致）。`chat.send`：公屏 `{kind:'msg',from:'hero',triggers:true}` 后 `triggerReplies`。`coach.ask`：规则见上文“教练规则”。窗口加载：仅 `!app.isPackaged` 时使用 `ELECTRON_RENDERER_URL`，打包产物只加载本地文件。退出：`before-quit` 中若有桌则 `event.preventDefault()`，`await leave()`（余额写库完成）后再 `app.quit()`。`lastCall` 取自 T4 的 `onCall` 回调。
 
 `TableView`：`title`、`handNo`、`street`、`board`、`pot`（不含本轮下注）、`seats[]`（`name, personaId?, tag, ini, hue, stack, bet, isDealer, folded, out, allin, status, statusTone('muted'|'blue'|'green'), autopilot, thinking, winner, cards?, hasCards, bubble?`；座位状态文案按原型第 697–704 行，托管时状态显示“托管 · {行动}”）、`hero {legal, toCall, isTurn, defaultRaiseTo, presets:[{label, to}]}`、`paused`、`done`、`result {text, sub, heroWon, net}`、`heroBust`、`nums {eq, need, outs, handName, sugg, stale}`、`coachLoading`、`autopilotCount`、`breaker`、`guided`。
 
@@ -419,8 +445,15 @@ triggerReplies(msg)：对除发言者外在座、未弃桌（`!out`）、非 `th
 - 泄牌：假 agent 在 decide/chat/win 中 say 含本人底牌点数 → 公屏不出现该句。
 - 教练：proactive 返回 pause → resume 后同一决策点不再调用教练；教练连续 3 次失败 → breaker；连续两次 ask，第一次 `interrupted`、`askInFlight` 在第二次结束才清除；复盘失败与被拒都收到 `review:done` 带 error。
 - 中途退出：模拟 before-quit，余额加回玩家筹码后才退出。
+- 赢家发言回归：假 agent 赢家发言延迟 6 秒、开启自动下一手 → 发言写入公屏，下一手在发言返回后才开始；发言被队列拒绝时自动下一手仍在 4.5 秒后触发。
 
-结果：（交付阶段记录）
+结果：已完成（2026-09-24）。独立审阅 reviews/T5-1.md（需修改：补测试）→ T5-2.md（通过）。证据 evidence/T5/（含真实主进程冒烟与退出落库验证）。
+- 偏差（已审阅接受）：熔断后的本地决策也标“托管”并计数（落实 plan“本桌剩余时间全部托管”；用户选本地引擎或未配置模型时不标）；教练提醒应用时除 heroKey 不变外还要求当前仍是该玩家决策点；同一决策点只允许一次对手决策在途（避免恢复牌局时重复发起并误托管）；无需跟注时 fold/call 按原型转 check；加注无金额用默认加注额；无桌时 `coach.ask` 返回 `error:'failed'`；复盘未配置或手牌不存在返回 `not_configured`/`not_found`；本地引擎模式也把每手结果写入对手记忆。
+- 契约补充：`TableView.runout`；离桌推送 `table:view` 为 null；`hands.get` 查不到返回 null；`app.bootstrap` 返回后主进程补发当前 `table:view`、`coach:alert`、`breaker`。
+- 给 Renderer（T6/T7/T8）的约定：先用 `window.river.on` 注册监听，再调用 `app.bootstrap`；公屏快照与之后的 `chat:append` 可能重叠，按消息 id 去重；`table.start` 之后事件只追加，入座前自行清空本地公屏与教练对话；教学牌局会改写 settings（`coachOn`、`level`）但不推送，入座后重新读取设置；`coach.ask` 返回 requestId，同 id 事件可能先于返回到达，需缓存。
+- 技术债：`Legal` 在 `src/shared/types.ts` 与引擎各有一份相同定义（修改引擎文件被权限拦下）；待用户允许后改为引擎引用共享类型。
+- 待 T9 观察：退出时不等最后一手落库与对手记忆写入（通常毫秒级）；如 T9 发现最后一手丢失，在离桌后加有上限的等待。
+
 
 ## 任务 T6：应用骨架与非牌桌页面
 
@@ -446,7 +479,12 @@ triggerReplies(msg)：对除发言者外在座、未弃桌（`!out`）、非 `th
 
 验证与完成标准：`pnpm dev` 下逐页与设计稿截图目测对照（大厅、AI 对手、设置、引导 6 页）；添加一个 openai-compatible 提供方后重启应用仍在且 key 只显示末 4 位；删除被引用提供方后对应模型选择清空；窗口宽 880px 无横向滚动。
 
-结果：（交付阶段记录）
+结果：已完成（2026-09-24）。独立审阅 reviews/T6-1.md（通过，3 处小修）→ T6-2.md（通过）。证据 evidence/T6/（6 页截图、880/1280 宽）。
+- 实际目录为 `src/renderer/src/`；`lib/river.ts` 提供全局 store（`useRiver`、`useBootstrap`、`useEvent`）与动作函数，遵守 T5 给 Renderer 的约定；`lib/format.ts` 提供格式化与着色；T7/T8 覆盖 `pages/{Table,Replays,Stats}.tsx`。
+- 偏差（已审阅接受）：根 `tsconfig.json` 加 `paths` 供 shadcn CLI；引导第 6 页按钮为“稍后再说 / 去配置 / 带我打一手”并显示模型配置状态，替代原末页“直接开始”；AI 对手页说明改为四项倾向的文案；“4 秒后自动发牌”沿用原型文案（实际 4.5 秒）；编辑提供方时锁定类型；renderer 产物未压缩；shadcn 在 devDependencies。
+- 待 T9：原生红绿灯位置在打包产物中目测确认；River-dev 开发数据可在 T9 前清理。
+- 已知小问题（不修）：`coach.ask` 本身抛错时 early 缓存要等下一次成功提问才清空。
+
 
 ## 任务 T7：牌桌页
 
@@ -467,7 +505,7 @@ triggerReplies(msg)：对除发言者外在座、未弃桌（`!out`）、非 `th
 - 教练栏：头像“师”、“教练 · {人设} ▾”（点击循环切换）、副标题（主动提醒开启/关闭文案）、开关；讲解深度分段；暂停条；提醒卡（hint 蓝底“教练提醒”，pause 黄底“教练暂停了牌局”）；概率面板（胜率/所需胜率、+EV/−EV 判断、进度条与所需标记、当前牌型/出路/规则建议、“本地计算 · 胜率按对手随机手牌估算[ · 数据来自你上一次决策]”）；硬核模式隐藏概率并显示提示；对话气泡（玩家右黑、教练左灰，流式追加，“已中断”标记）；“教练正在看牌…”；空状态文案；快捷问题（新手/进阶两组，原型第 795 行）；输入框 +“暂停并提问”；硬核模式开关。教练模型未配置时教练栏显示“配置模型后可用”与跳转按钮，概率面板照常。
 - 快捷键：焦点不在输入框时 F/C/R；牌局结束时 N 或空格下一手。
 
-验证与完成标准：`pnpm dev` 用真实或本地引擎打 5 手：座位布局 2–6 人正确；快捷键生效；暂停遮罩与恢复；托管标记在座位与公屏显示（可临时把对手时限设 1ms 验证）；公屏收起/展开；教练提问流式显示；与设计稿截图目测对照。
+验证与完成标准：`pnpm dev` 用真实或本地引擎打 5 手：座位布局 2–6 人正确；快捷键生效；暂停遮罩与恢复；托管标记在座位与公屏显示（开发环境下以环境变量 `RIVER_LIMIT_DECIDE_MS=1` 启动，T5 在 `!app.isPackaged` 时读取它覆盖 `limits.decide`）；公屏收起/展开；教练提问流式显示；与设计稿截图目测对照。
 
 结果：（交付阶段记录）
 
@@ -500,7 +538,8 @@ triggerReplies(msg)：对除发言者外在座、未弃桌（`!out`）、非 `th
 2. 真实联调（用户提供 key 或本机已有的提供方；无 key 时先请用户配置，此步需要用户参与）：6 人常规桌至少 10 手：对手按人设行动与发言；玩家公屏发言引起回应，回应不再引出回应；赢家发言；教练静默/提醒/暂停/提问/复盘；检查 `river.db` 中 `mastra_resources` 的对手与教练 working memory 已写入。
 3. 断网（或填错 key）：对手托管且标记；第 3 次失败后横幅出现；恢复网络点“重试”恢复。
 4. 退出重开：余额、手牌、统计、复盘、角色印象、教练档案仍在；中途退出时玩家筹码按离桌退回。
-5. 打包命令 `pnpm build && pnpm dist` 生成 `River-<version>-arm64.dmg`，在第 2 步之前完成安装。
-6. 在 `.rivo/issues/river-desktop/` 记录验证证据（命令输出、截图路径），交用户验收。
+5. 在第 2 步之前：删除 `~/Applications/River-spike/`；经用户确认后把 `~/Library/Application Support/River` 整个移到备份目录（如 `~/Library/Application Support/River.bak-<日期>`）；保留钥匙串条目 “River Safe Storage”（正式版与 spike 共用，删除会使已存 key 无法解密）。然后 `pnpm build && pnpm dist` 生成 `River-<version>-arm64.dmg`，从 dmg 拖入 `/Applications`（保留下载隔离属性），首次启动走 Gatekeeper 放行路径（系统设置“隐私与安全性”中允许），记录步骤截图。
+6. 验收通过后：只移除 `src/main/spike.ts` 及其入口并重新打包、覆盖安装、启动确认正常；不再改动数据目录与钥匙串。
+7. 在 `.rivo/issues/river-desktop/` 记录验证证据（命令输出、截图路径），交用户验收。
 
 发布：本地 dmg，不签名、不自动更新；回退为安装旧版本（业务表迁移只做加法）。
