@@ -1,43 +1,75 @@
 import type { App, IpcMain } from 'electron'
 import { PROVIDER_REGISTRY } from '@mastra/core/llm'
-import { PERSONAS } from '../shared/personas'
-import type { Commands } from '../shared/types'
-import { resetMemories } from './agents/mastra'
+import type { Commands, Recap } from '../shared/types'
 import {
-  clearHistory, deleteProvider, getBankroll, getHand, getLobby, getOnboarded, getPromptOverrides, getReview, getSettings,
-  listHands, listProviders, resetPrompt, saveProvider, setOnboarded, setPrompt, updateLobby, updateSettings
+  clearHistory, clearMemory, deletePersona, deleteProvider, getBankroll, getHand, getLobby, getOnboarded, getReview, getSettings, listHands,
+  listProviders, personasCache, resetPersona, resetUsage, restorePersona, saveProvider, savePersona, setOnboarded, updateLobby, updateSettings
 } from './db'
+import { usageSummary } from './models/prices'
 import { clearNeedsKey, needsKey, testProvider } from './models/resolve'
 import type { TableRunner } from './table/runner'
 
 type Handlers = { [K in keyof Commands]: (...args: Parameters<Commands[K]>) => ReturnType<Commands[K]> | Promise<ReturnType<Commands[K]>> }
 
-export function commandHandlers(runner: TableRunner): Handlers {
+export interface AppInfo {
+  version: () => string
+  update: () => string | null
+  install: () => void
+}
+
+// 旧版本存的是纯文本复盘，新版本存 JSON
+function parseReview(text: string): Recap | string {
+  try {
+    const r = JSON.parse(text)
+    if (r && typeof r.headline === 'string') return r as Recap
+  } catch {
+    // 纯文本
+  }
+  return text
+}
+
+export function commandHandlers(runner: TableRunner, app: AppInfo = { version: () => '0.0.0', update: () => null, install: () => {} }): Handlers {
+  const personasChanged = () => runner.emit('personas', personasCache)
   return {
-    'app.bootstrap': async () => {
-      const overrides = await getPromptOverrides()
-      const onboarded = await getOnboarded()
-      return {
-        settings: getSettings(),
-        lobby: getLobby(),
-        bankroll: runner.bankroll,
-        onboarded,
-        personas: PERSONAS.map((p) => ({ ...p, ...(overrides[p.id] !== undefined && { promptOverride: overrides[p.id] }) })),
-        providers: listProviders(needsKey),
-        view: runner.view(),
-        lastCall: runner.lastCall,
-        coachThread: runner.coachThread,
-        chat: runner.chat
-      }
-    },
+    'app.bootstrap': async () => ({
+      settings: getSettings(),
+      lobby: getLobby(),
+      bankroll: runner.bankroll,
+      onboarded: await getOnboarded(),
+      personas: personasCache,
+      providers: listProviders(needsKey),
+      view: runner.view(),
+      coachThread: runner.coachThread,
+      chat: runner.chat,
+      version: app.version(),
+      update: app.update()
+    }),
     'settings.update': async (patch) => {
       const s = await updateSettings(patch)
       runner.broadcast()
       return s
     },
     'lobby.update': (patch) => updateLobby(patch),
-    'persona.setPrompt': (id, prompt) => setPrompt(id, prompt),
-    'persona.resetPrompt': (id) => resetPrompt(id),
+    'persona.save': async (input) => {
+      const p = await savePersona(input)
+      personasChanged()
+      return p
+    },
+    'persona.delete': async (id) => {
+      if (personasCache.filter((p) => !p.deleted && p.id !== id).length < 1) throw new Error('至少保留一位对手')
+      await deletePersona(id)
+      const lb = getLobby()
+      if (lb.picks.includes(id)) await updateLobby({ picks: lb.picks.filter((x) => x !== id) })
+      personasChanged()
+    },
+    'persona.restore': async (id) => {
+      await restorePersona(id)
+      personasChanged()
+    },
+    'persona.reset': async (id) => {
+      await resetPersona(id)
+      personasChanged()
+    },
     'provider.save': async (input) => {
       const p = await saveProvider(input)
       if (input.apiKey?.trim()) clearNeedsKey(p.id)
@@ -54,45 +86,45 @@ export function commandHandlers(runner: TableRunner): Handlers {
       ...Object.entries(PROVIDER_REGISTRY).map(([kind, v]) => ({ kind, name: v.name, models: [...v.models] })),
       { kind: 'openai-compatible', name: 'OpenAI 兼容接口', models: [] }
     ],
-    'table.start': async (o) => {
-      await runner.start(o)
-      // 教学牌局会改写 coachOn、level
-      return getSettings()
-    },
+    'table.start': (o) => runner.start(o),
     'table.heroAct': (a) => runner.heroAct(a),
     'table.nextHand': () => runner.nextHand(),
     'table.rebuy': () => runner.rebuy(),
     'table.leave': () => runner.leave(),
-    'table.resume': () => runner.resume(),
-    'table.retryModels': () => runner.retryModels(),
-    'chat.send': (text) => runner.sendChat(text),
-    'coach.ask': (id, text) => runner.ask(id, text),
+    'table.retry': () => runner.retry(),
+    'coach.ask': (text) => runner.ask(text),
+    'coach.skip': () => runner.skip(),
+    'coach.retry': () => runner.retryRecap(),
     'hands.list': () => listHands(),
     'hands.get': async (id) => {
       const record = await getHand(id)
       if (!record) return null
       const review = await getReview(id)
-      return { record, ...(review !== null && { review }) }
+      return { record, ...(review !== null && { review: parseReview(review) }) }
     },
     'hands.review': (id) => void runner.review(id),
+    'usage.summary': () => usageSummary(),
+    'usage.reset': async () => {
+      await resetUsage()
+      runner.emit('usage:changed', undefined)
+    },
     'data.clearHistory': async () => {
       await clearHistory()
       runner.bankroll = await getBankroll()
       runner.emit('bankroll', runner.bankroll)
       runner.emit('hands:changed', undefined)
     },
-    'data.resetMemory': async () => {
-      if (runner.game) throw new Error('请先离桌')
-      // 离桌后剩余的 durable 写入与在途调用结束后再重置，否则会被写回
-      await runner.idleAll()
-      await resetMemories()
-    },
-    'onboarding.done': () => setOnboarded(true)
+    'data.resetMemory': () => clearMemory(),
+    'onboarding.done': () => setOnboarded(true),
+    'update.install': () => {
+      if (runner.table) throw new Error('请先离桌再更新')
+      app.install()
+    }
   }
 }
 
-export function registerIpc(ipc: Pick<IpcMain, 'handle'>, runner: TableRunner) {
-  for (const [channel, fn] of Object.entries(commandHandlers(runner))) {
+export function registerIpc(ipc: Pick<IpcMain, 'handle'>, runner: TableRunner, app?: AppInfo) {
+  for (const [channel, fn] of Object.entries(commandHandlers(runner, app))) {
     ipc.handle(channel, (_e, ...args) => (fn as (...a: unknown[]) => unknown)(...args))
   }
 }
@@ -101,9 +133,9 @@ export function registerIpc(ipc: Pick<IpcMain, 'handle'>, runner: TableRunner) {
 export function guardQuit(app: Pick<App, 'on' | 'quit'>, runner: TableRunner) {
   let leaving = false
   app.on('before-quit', (e) => {
-    // 离桌时 game 已同步置空，但余额可能还没写完：期间再次退出也要拦下
+    // 离桌时 table 已同步置空，但余额可能还没写完：期间再次退出也要拦下
     if (leaving) return e.preventDefault()
-    if (!runner.game) return
+    if (!runner.table) return
     e.preventDefault()
     leaving = true
     void runner.leave().finally(() => {

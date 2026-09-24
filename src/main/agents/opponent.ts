@@ -1,85 +1,51 @@
-import { Agent } from '@mastra/core/agent'
-import type { MastraModelConfig } from '@mastra/core/llm'
-import type { RequestContext } from '@mastra/core/request-context'
-import type { Memory } from '@mastra/memory'
-import { personaOf } from '../../shared/personas'
-import { getPromptOverrides } from '../db'
-import { supportsRequired, type resolveModel } from '../models/resolve'
-import type { IntentCollector } from './intents'
-import { callAgent } from './mastra'
-import { opponentTools } from './tools'
-import type { TableQuery } from './views'
+import { z } from 'zod'
+import { callModel, type CallResult } from './llm'
 
-export const OPPONENT_WM = `# 牌桌印象
-## 玩家「你」
-- 入池倾向：
-- 诈唬倾向：
-- 被我抓过的诈唬 / 诈唬过我的次数：
-- 其他观察：
-## 其他角色
-- （角色名）：
-## 我现在的状态
-- 心情：
-- 最近输赢：
-`
-
-const MODE_TEXT: Record<string, string> = {
-  decide:
-    '先用 view_table 了解局面、用 read_chat 看最近公屏，再调用 act。想说话就调用 say，必须声明 kind：自己起的话题用 free，回应别人用 reply 并带上 reply_to。需要更新对某人的印象或自己的心情时，与 act 在同一步调用 updateWorkingMemory。',
-  chat: '公屏有人说话，你可以回应也可以不说；想回应就调用 say。',
-  win: '你赢了这一手，可以说一句。'
+// schema 放宽：小模型常把 action 写成 bet、把 to 写成字符串，交给 runner 规范化，不因校验失败停下（reviews/design-3.md F3）
+const act = {
+  name: 'act',
+  description: '做出本次行动，同时可以说一句话、记一条印象',
+  schema: z.object({
+    action: z.string().optional().describe('fold / check / call / raise；无人下注时 raise 即下注'),
+    to: z.union([z.number(), z.string()]).optional().describe('raise 时下注或加注到的总额'),
+    say: z.string().optional().describe('想说的一句话，不说留空'),
+    note: z.string().optional().describe('对某位玩家的新观察或自己的心情，没有留空')
+  })
 }
 
-const talkText = (talk: number) => (talk < 0.2 ? '你话很少，大多数时候不说话。' : talk < 0.5 ? '你偶尔说话。' : '你爱说话。')
+export type RawAct = z.infer<typeof act.schema>
 
-async function instructions({ requestContext }: { requestContext: RequestContext }) {
-  const pid = requestContext.get('personaId') as string
-  const p = personaOf(pid)!
-  const prompt = (await getPromptOverrides())[pid] ?? p.prompt
+export interface OpponentInput {
+  name: string
+  prompt: string
+  memory: string[]
+  situation: string
+}
+
+const MS = 45_000
+
+function system(i: OpponentInput) {
   return [
-    `你在一张 PvE 娱乐德州扑克桌上扮演「${p.name}」。按人设决策，但别做明显送钱的离谱决定。`,
-    prompt + talkText(p.talk),
-    '发言不超过 20 字，中文口语；绝不透露或暗示自己的底牌：不得出现牌面点数（A、K、Q、J、数字）、花色或“对子/口袋”等描述自己手牌的词。',
-    MODE_TEXT[requestContext.get('mode') as string]
-  ].join('\n')
+    `你在一张 PvE 娱乐德州扑克桌上扮演「${i.name}」。按人设决策，但别做明显送钱的离谱决定。`,
+    i.prompt,
+    '每次轮到你，只调用一次 act 工具：action 为 fold、check、call 或 raise（无人下注时 raise 就是下注），raise 时 to 为下注或加注到的总额。',
+    '想说话就在 say 里说一句，不超过 20 字，中文口语，符合人设；可以虚张声势、谈论牌面，但不要如实报出自己的底牌；不想说就留空。',
+    '对某位玩家有新的观察、或心情有变化时，在 note 里记一句，不超过 30 字；没有新东西就留空。',
+    i.memory.length ? `你之前记下的印象：\n${i.memory.map((m) => '- ' + m).join('\n')}` : ''
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
-export function createOpponentAgent(memory: Memory, model: MastraModelConfig | typeof resolveModel) {
-  return new Agent({ id: 'opponent', name: 'opponent', instructions, model, tools: opponentTools, memory })
-}
-
-export interface OpponentCtx {
-  tableId: string
-  seat: number
-  personaId: string
-  table: TableQuery
-}
-
-export interface OpponentResult {
-  ok: boolean
-  intents: IntentCollector
-  aborted: boolean
-  error?: string
-}
-
-const CHAT_TOOLS = ['read_chat', 'hand_history', 'say', 'updateWorkingMemory'] as const
-
-async function call(ctx: OpponentCtx, mode: 'decide' | 'chat' | 'win', input: string, signal: AbortSignal): Promise<OpponentResult> {
-  const intents: IntentCollector = {}
-  const decide = mode === 'decide'
-  const r = await callAgent('opponent', mode, input, {
-    context: { tableId: ctx.tableId, seat: ctx.seat, personaId: ctx.personaId, table: ctx.table, intents },
-    memory: { thread: `table:${ctx.tableId}:${ctx.personaId}`, resource: `opponent:${ctx.personaId}` },
-    activeTools: decide ? ['view_table', 'estimate_equity', 'read_chat', 'hand_history', 'say', 'act', 'updateWorkingMemory'] : [...CHAT_TOOLS],
-    toolChoice: decide && supportsRequired('opponent') ? 'required' : 'auto',
-    maxSteps: decide ? 6 : 3,
-    // act 所在的那一步结束即停：同一步里的 say、updateWorkingMemory 会执行完
-    ...(decide && { stopWhen: ({ steps }) => steps.at(-1)?.toolCalls?.some((c) => c.toolName === 'act') ?? false }),
+export function opponentAct(i: OpponentInput, signal: AbortSignal): Promise<CallResult<RawAct>> {
+  return callModel({
+    role: 'opponent',
+    purpose: 'decide',
+    system: system(i),
+    messages: [{ role: 'user', content: i.situation }],
+    tool: act,
+    maxRetries: 2,
+    timeoutMs: MS,
     signal
   })
-  return { ok: r.ok, intents, aborted: r.aborted, ...(r.error && { error: r.error }) }
 }
-
-export const opponentDecide = (ctx: OpponentCtx, signal: AbortSignal) => call(ctx, 'decide', '轮到你行动。', signal)
-
-export const opponentChat = (ctx: OpponentCtx, mode: 'chat' | 'win', input: string, signal: AbortSignal) => call(ctx, mode, input, signal)

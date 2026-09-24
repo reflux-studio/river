@@ -1,613 +1,521 @@
 import { randomUUID } from 'node:crypto'
 import { cardsText, fmt } from '../../shared/format'
-import { BLINDS, PERSONAS, personaOf, STREET } from '../../shared/personas'
-import type { AgentCall, BreakerState, ChatMessage, CoachAlert, CoachEntry, Events, HandRecord, HeroAction, TableStart, TableView } from '../../shared/types'
-import { coachAsk, coachProactive, coachReview } from '../agents/coach'
-import { coachAlert } from '../agents/intents'
-import { filterSay } from '../agents/leak'
-import { appendThreadMessage, MODE_TIMEOUT_MS, rt, type Mode } from '../agents/mastra'
-import { opponentChat, opponentDecide } from '../agents/opponent'
-import { AgentQueue, Dropped } from '../agents/queue'
-import { buildSeatView, publicHandResult, type TableQuery } from '../agents/views'
-import { getBankroll, getHand, getSettings, insertHand, saveReview, setBankroll, updateSettings } from '../db'
+import { BLINDS, STREET } from '../../shared/personas'
+import type { ChatMessage, CoachEntry, CoachState, Events, HandRecord, HeroAction, Mode, Persona, Recap, TableStart, TableView } from '../../shared/types'
+import { coachAsk, coachRecap, coachSpeak } from '../agents/coach'
+import { setUsageListener, type Msg, type Usage } from '../agents/llm'
+import { opponentAct, type RawAct } from '../agents/opponent'
 import {
-  apply, decide, equity, handName, inHand, legal, newGame, outs, pot, runoutStep, startHand,
-  type Action, type Game, type Rng
-} from '../engine/poker'
-import { modelReady, type Role } from '../models/resolve'
-import { canned, pickResponders, type Say } from './chat'
-import { buildTableView, type Nums } from './view'
+  addMemory, getBankroll, getHand, insertHand, insertUsage, memoryOf, personasCache, personaOf, saveReview, setBankroll, settingsCache, type UsageRow
+} from '../db'
+import { equity, handName, outs } from '../engine/eval'
+import { Table, type ActionType } from '../engine/table'
+import { costTotal } from '../models/prices'
+import { modelReady } from '../models/resolve'
+import { handRecord, heroHandSummary, label, logLines, publicHandResult, situation } from './text'
+import { buildTableView, heroLegal, type Nums, type SeatDisplay } from './view'
 
 export interface AgentDeps {
-  modelReady: (role: Role) => boolean
-  opponentDecide: typeof opponentDecide
-  opponentChat: typeof opponentChat
-  coachProactive: typeof coachProactive
+  modelReady: typeof modelReady
+  opponentAct: typeof opponentAct
+  coachSpeak: typeof coachSpeak
   coachAsk: typeof coachAsk
-  coachReview: typeof coachReview
-  appendResult: (personaId: string, threadId: string, text: string) => Promise<void>
+  coachRecap: typeof coachRecap
 }
 
-const realAgents: AgentDeps = {
-  modelReady,
-  opponentDecide,
-  opponentChat,
-  coachProactive,
-  coachAsk,
-  coachReview,
-  appendResult: (pid, threadId, text) => appendThreadMessage(rt().opponentMemory, threadId, `opponent:${pid}`, text)
-}
+const realAgents: AgentDeps = { modelReady, opponentAct, coachSpeak, coachAsk, coachRecap }
 
-export type Limits = Record<Mode, number>
 export type Emit = <K extends keyof Events>(event: K, payload: Events[K]) => void
 
-const THINK_MS = [1500, 900, 400]
-const AUTO_NEXT_MS = 4500
+// 思考速度：调用返回太快时补足到这个最短时长再落子
+const MIN_SHOW_MS = [1500, 900, 400]
+const STREET_MS = 900
 const BUBBLE_MS = 5000
 const MAX_CHAT = 300
-const GUIDED_ALERT: CoachAlert = { level: 'hint', message: '这是一手教学牌局。每次轮到你，我都会先说说局面；有任何不懂的，直接在下面问我。' }
+const ASK_ROUNDS = 6
+const GUIDED_PICKS = ['bai', 'zen']
 
-const freshBreaker = () => ({ opponent: 0, coach: 0, trippedOpponent: false, trippedCoach: false })
+type Rng = () => number
 
-type Outcome<T> = { kind: 'done'; value: T } | { kind: 'timeout' } | { kind: 'dropped' } | { kind: 'error'; error: string }
-
-interface PendingAI {
-  seat: number
-  hand: number
-  logLen: number
-  action: Action
-  say: Say | null
-  autopilot: boolean
-}
+// 模型未配置、鉴权失败、模型不存在：重试无用，横幅给出“去设置”
+const needsSettings = (e: string) => /not configured|API key|401|403|404|unauthori[sz]ed|forbidden|not found|invalid.*key|解密/i.test(e)
 
 export class TableRunner {
   tableId = ''
-  game: Game | null = null
-  runId = 0
-  paused = false
-  pendingAI: PendingAI | null = null
-  heroKey: string | null = null
-  thinking: string | null = null
-  autopilotCount = 0
-  breaker = freshBreaker()
+  table: Table | null = null
+  seats: SeatDisplay[] = []
+  mode: Mode = 'free'
   guided = false
+  runId = 0
   chat: ChatMessage[] = []
-  bubbles = new Map<string, { text: string; until: number }>()
-  askInFlight = false
-  winSpeechInFlight: number | null = null
-  askId: string | null = null
   coachThread: CoachEntry[] = []
-  leaveController = new AbortController()
-  limits: Limits
-  lastCall: AgentCall | null = null
-  nums: Nums | null = null
   bankroll = 0
 
   readonly emit: Emit
   private agents: AgentDeps
   private rng: Rng
-  private alert: CoachAlert | null = null
-  private numsKey: string | null = null
-  private autopilotIds = new Set<string>()
-  private lastStreet = ''
-  private endKey: number | null = null
-  // 同一决策点只允许一次对手决策在途：resume 等再次进入 loop 时若重复发起，新调用会抢占旧调用，旧调用被当作失败托管
+  private started = false
+  private leaveCtrl = new AbortController()
+  private thinking: number | null = null
   private deciding: string | null = null
-  private proactiveKey: string | null = null
-  private autoHand: number | null = null
-  private autoDue = false
+  private stalled: { seat: number; error: string; settings: boolean } | null = null
+  private bubbles = new Map<number, { text: string; until: number }>()
+  private nums: Nums | null = null
+  private numsKey: string | null = null
+  private heroKey: string | null = null
+  // 教练已就这个决策点说完（成功、失败或跳过）
+  private spokenKey: string | null = null
+  private coachBusy: CoachState['busy'] = null
+  private coachCtrl: AbortController | null = null
+  private recap: 'none' | 'pending' | 'running' | 'done' | 'failed' | 'skipped' = 'none'
+  private recapEntry: CoachEntry | null = null
+  private lastRecord: { id: number | null; rec: HandRecord } | null = null
+  private askHistory: Msg[] = []
+  private notes = new Map<string, string>()
+  private results: HandRecord[] = []
+  private endKey: number | null = null
   private stepTimer?: ReturnType<typeof setTimeout>
-  private autoTimer?: ReturnType<typeof setTimeout>
-  private lastTriggered = new Map<string, number>()
-  private queues = new Map<string, AgentQueue>()
-  private coachQueue = new AgentQueue()
-  private reviewQueue = new AgentQueue()
-  private reviewing = new Set<number>()
+  private usage: UsageRow[] = []
 
-  constructor(o: { emit: Emit; agents?: Partial<AgentDeps>; limits?: Partial<Limits>; rng?: Rng }) {
+  constructor(o: { emit: Emit; agents?: Partial<AgentDeps>; rng?: Rng }) {
     this.emit = o.emit
     this.agents = { ...realAgents, ...o.agents }
-    this.limits = { ...MODE_TIMEOUT_MS, ...o.limits }
     this.rng = o.rng ?? Math.random
+    setUsageListener((u) => this.recordUsage(u))
   }
 
   async init() {
     this.bankroll = await getBankroll()
   }
 
-  get leaveSignal() {
-    return this.leaveController.signal
-  }
-
-  queue(pid: string) {
-    let q = this.queues.get(pid)
-    if (!q) this.queues.set(pid, (q = new AgentQueue()))
-    return q
-  }
-
-  async idleAll() {
-    await Promise.all([...PERSONAS.map((p) => this.queue(p.id)), this.coachQueue, this.reviewQueue].map((q) => q.idle()))
-  }
-
-  onCall(e: AgentCall) {
-    this.lastCall = e
-    this.emit('agent:last', e)
-  }
-
+  // ---- 入座与离桌 ----
 
   async start(o: TableStart) {
-    if (this.game) await this.leave()
-    const guided = o.guided
-    if (guided) await updateSettings({ coachOn: true, level: 'novice' })
-    const size = guided ? 3 : o.size
-    const [sb, bb] = BLINDS[guided ? 0 : o.blinds]
+    if (this.table) await this.leave()
+    const mode: Mode = o.guided ? 'coach' : o.mode
+    if (!this.agents.modelReady('opponent')) throw new Error('先在设置里配置对手模型')
+    if (mode === 'coach' && !this.agents.modelReady('coach')) throw new Error('教练局需要先在设置里配置教练模型')
+    const avail = personasCache.filter((p) => !p.deleted)
+    if (!avail.length) throw new Error('没有可用的对手')
+    const want = o.guided ? 3 : o.size
+    const size = Math.min(want, avail.length + 1)
+    const [sb, bb] = BLINDS[o.guided ? 0 : o.blinds]
     const buy = bb * 100
-    const picks = [...new Set(guided ? ['bai', 'zen'] : o.picks)].filter((id) => PERSONAS.some((p) => p.id === id)).slice(0, size - 1)
-    for (const p of PERSONAS) if (picks.length < size - 1 && !picks.includes(p.id)) picks.push(p.id)
-    const players = [
-      { id: 'hero', name: '你', isHero: true, stack: buy },
-      ...picks.map((id) => ({ id, personaId: id, name: personaOf(id)!.name, isHero: false, stack: buy }))
+    const ids = [...new Set(o.guided ? GUIDED_PICKS : o.picks)].filter((id) => avail.some((p) => p.id === id)).slice(0, size - 1)
+    for (const p of avail) if (ids.length < size - 1 && !ids.includes(p.id)) ids.push(p.id)
+    const snap = ids.map((id) => avail.find((p) => p.id === id)!)
+    this.seats = [
+      { id: 'hero', name: '你', tag: '', ini: '你', hue: 255 },
+      ...snap.map((p) => ({ id: p.id, personaId: p.id, name: p.name, tag: p.tag, ini: p.ini, hue: p.hue }))
     ]
-    this.game = newGame({ sb, bb, players }, this.rng)
+    this.snapshots = new Map(snap.map((p) => [p.id, p]))
+    this.table = new Table({ smallBlind: sb, bigBlind: bb }, this.seats.length, this.rng)
+    this.seats.forEach((_, i) => this.table!.sitDown(i, buy))
     this.tableId = randomUUID()
+    this.mode = mode
+    this.guided = o.guided
     this.runId++
-    this.leaveController = new AbortController()
-    this.resetTableState()
-    this.guided = guided
-    this.breaker = freshBreaker()
-    this.autopilotCount = 0
-    this.lastTriggered.clear()
-    this.sys(`入座 · ${sb}/${bb} · ${players.length} 人桌`)
-    this.alert = guided ? GUIDED_ALERT : null
+    this.leaveCtrl = new AbortController()
+    this.resetTable()
+    this.sys(`入座 · ${sb}/${bb} · ${this.seats.length} 人桌 · ${mode === 'coach' ? '教练局' : '自由局'}`)
     this.bankroll -= buy
     this.emit('bankroll', this.bankroll)
     await setBankroll(this.bankroll)
     this.nextHand()
   }
 
+  private snapshots = new Map<string, Persona>()
+
   async leave() {
-    const g = this.game
-    if (!g) return
+    const t = this.table
+    if (!t) return
+    // 模型故障停下时离桌：本手作废，筹码回到本手开始时（discussion §2，Q3）
+    if (this.stalled && t.isHandInProgress()) t.abortHand()
     this.runId++
-    this.leaveController.abort()
-    this.game = null
-    this.resetTableState()
-    this.bankroll += g.players[0].stack
+    this.leaveCtrl.abort()
+    this.coachCtrl?.abort()
+    const back = t.seats()[0]!.stack
+    this.table = null
+    this.resetTable()
+    this.bankroll += back
     this.emit('bankroll', this.bankroll)
     this.emit('table:view', null)
     await setBankroll(this.bankroll)
   }
 
-  private resetHandState() {
-    clearTimeout(this.autoTimer)
-    this.autoHand = null
-    this.paused = false
-    this.pendingAI = null
-    this.heroKey = null
-    this.endKey = null
-    this.winSpeechInFlight = null
-    this.nums = null
-    this.numsKey = null
-    this.autopilotIds.clear()
-  }
-
-  private resetTableState() {
-    this.resetHandState()
+  private resetHand() {
     clearTimeout(this.stepTimer)
     this.thinking = null
-    this.chat = []
-    this.bubbles.clear()
-    this.askInFlight = false
-    this.askId = null
-    this.coachThread = []
     this.deciding = null
-    this.proactiveKey = null
-    this.alert = null
+    this.stalled = null
+    this.nums = null
+    this.numsKey = null
+    this.heroKey = null
+    this.spokenKey = null
+    this.recap = 'none'
+    this.recapEntry = null
+    this.endKey = null
+    this.notes.clear()
+  }
+
+  private resetTable() {
+    this.resetHand()
+    this.started = false
+    this.chat = []
+    this.coachThread = []
+    this.askHistory = []
+    this.bubbles.clear()
+    this.coachBusy = null
+    this.coachCtrl = null
+    this.results = []
+    this.usage = []
+    this.lastRecord = null
+  }
+
+  // ---- 一手 ----
+
+  canNext() {
+    const t = this.table
+    if (!t || !this.started || t.isHandInProgress() || this.coachBusy !== null) return false
+    // 教练局：复盘结束、失败或跳过后才可下一手
+    return this.mode !== 'coach' || this.recap === 'done' || this.recap === 'failed' || this.recap === 'skipped'
+  }
+
+  nextHand() {
+    const t = this.table
+    if (!t || (this.started && !this.canNext())) return
+    const buy = t.stakes().bigBlind * 100
+    t.seats().forEach((s, i) => {
+      if (i > 0 && s && s.stack <= 0) {
+        t.setStack(i, buy)
+        this.sys(`${this.seats[i].name} 重新买入 ${fmt(buy)}`)
+      }
+    })
+    if (t.seats()[0]!.stack <= 0) return this.broadcast()
+    this.resetHand()
+    t.startHand()
+    this.started = true
+    this.sys(`第 ${t.handNumber()} 手 · 翻牌前`)
+    void this.loop()
   }
 
   async rebuy() {
-    const g = this.game
-    if (!g || !g.done || g.players[0].stack > 0) return
-    g.players[0].stack = g.bb * 100
-    this.bankroll -= g.bb * 100
+    const t = this.table
+    if (!t || !this.canNext() || t.seats()[0]!.stack > 0) return
+    const buy = t.stakes().bigBlind * 100
+    t.setStack(0, buy)
+    this.bankroll -= buy
     this.emit('bankroll', this.bankroll)
     await setBankroll(this.bankroll)
     this.nextHand()
   }
 
-  retryModels() {
-    this.breaker = freshBreaker()
-    this.broadcast()
-  }
-
-
-  nextHand() {
-    const g = this.game
-    if (!g || !g.done) return
-    for (const p of g.players) {
-      if (!p.isHero && p.stack <= 0) {
-        p.stack = g.bb * 100
-        this.sys(`${p.name} 重新买入 ${fmt(p.stack)}`)
-      }
-    }
-    if (g.players[0].stack <= 0) return this.broadcast()
-    // 须在破产检查之后：破产时保留 endKey，避免 resume 重入 loop 时重复结算本手
-    this.resetHandState()
-    startHand(g)
-    this.lastStreet = 'preflop'
-    this.sys(`第 ${g.hand} 手 · 翻牌前`)
-    if (!(this.guided && g.hand === 1)) this.alert = null
-    void this.loop()
-  }
-
-  private async loop() {
-    const g = this.game
-    if (!g) return
+  private loop() {
+    const t = this.table
+    if (!t) return
     const rid = this.runId
     this.broadcast()
-    if (g.done) return void this.onHandEnd()
-    if (g.runout) {
+    // 提问期间牌局暂停：在途的对手调用落子后不再推进（discussion §14 F2）
+    if (this.stalled || this.coachBusy === 'ask') return
+    if (!t.isHandInProgress()) return void this.onHandEnd()
+    if (!t.isBettingRoundInProgress()) {
       clearTimeout(this.stepTimer)
       this.stepTimer = setTimeout(() => {
-        if (rid !== this.runId) return
-        runoutStep(g)
-        this.afterAction()
-      }, 900)
+        if (rid !== this.runId || this.table !== t || this.coachBusy === 'ask') return
+        this.endRound(t)
+      }, STREET_MS)
       return
     }
-    const seat = g.toAct
-    if (g.players[seat].isHero) return this.onHeroTurn()
-    if (this.paused) return
-    const key = `${rid}-${g.hand}-${g.log.length}`
+    const seat = t.playerToAct()
+    if (seat === 0) return this.onHeroTurn()
+    void this.opponentTurn(t, seat, rid)
+  }
+
+  private endRound(t: Table) {
+    if (!t.isHandInProgress() || t.isBettingRoundInProgress()) return
+    const before = t.communityCards().length
+    t.endBettingRound()
+    const board = t.communityCards()
+    if (board.length > before) this.sys(STREET[t.roundOfBetting()], board)
+    if (t.areBettingRoundsCompleted()) t.showdown()
+    this.loop()
+  }
+
+  private async opponentTurn(t: Table, seat: number, rid: number) {
+    const hand = t.handNumber()
+    const at = t.handLog().length
+    const key = `${rid}-${hand}-${at}`
     if (this.deciding === key) return
     this.deciding = key
-    try {
-      await this.opponentTurn(g, seat, rid)
-    } finally {
-      if (this.deciding === key) this.deciding = null
-    }
-  }
-
-  private async opponentTurn(g: Game, seat: number, rid: number) {
-    const p = g.players[seat]
-    const persona = personaOf(p.personaId)!
-    const leave = this.leaveSignal
-    this.thinking = persona.id
+    this.thinking = seat
     this.broadcast()
-    await sleep(THINK_MS[getSettings().speed])
-    if (rid !== this.runId) return
-    const hand = g.hand
-    const logLen = g.log.length
-    const useLLM = this.useLLMForOpponents()
-    let action: Action | undefined
-    let say: Say | null = null
-    // 熔断后本桌剩余时间都算托管（plan“超时、托管与熔断”）；用户选本地引擎或未配置模型则不算
-    let autopilot = !useLLM && this.breaker.trippedOpponent && getSettings().engine === 'llm' && this.agents.modelReady('opponent')
-    if (useLLM) {
-      const r = await this.guarded(this.queue(persona.id), this.limits.decide, (s) => this.agents.opponentDecide(this.opponentCtx(g, seat), s), { preempt: true })
-      if (rid !== this.runId || g.hand !== hand || g.log.length !== logLen) return
-      const act = r.kind === 'done' && r.value.ok ? r.value.intents.act : undefined
-      if (act && r.kind === 'done') {
-        this.breaker.opponent = 0
-        action = normalizeAct(act, g, seat)
-        const s = r.value.intents.say
-        say = s ? { ...s, source: 'llm' } : null
-      } else {
-        autopilot = true
-        if (!leave.aborted) this.countFailure('opponent')
-      }
+    const started = Date.now()
+    const pid = this.seats[seat].personaId!
+    const persona = personaOf(pid) ?? this.snapshots.get(pid)!
+    let r: Awaited<ReturnType<AgentDeps['opponentAct']>>
+    if (!this.agents.modelReady('opponent')) r = { ok: false, aborted: false, text: '', error: 'model not configured' }
+    else {
+      const eq = this.equityFor(t, seat, 150)
+      const recent = this.results.slice(-3).map((rec) => publicHandResult(rec, pid))
+      r = await this.agents.opponentAct(
+        {
+          name: persona.name,
+          prompt: persona.prompt,
+          memory: await memoryOf(pid),
+          situation: situation(t, this.seats, seat, {
+            chat: this.chat.filter((m) => m.kind !== 'sys').slice(-8),
+            equity: eq,
+            extra: recent.length ? `本桌最近几手：\n${recent.join('\n')}` : undefined
+          })
+        },
+        this.leaveCtrl.signal
+      )
     }
-    if (!action) {
-      action = decide(g, seat, persona.profile)
-      say = canned(persona, action.type, this.rng)
+    if (rid !== this.runId || this.table !== t || t.handNumber() !== hand || t.handLog().length !== at) return
+    if (!r.ok || !r.args) {
+      this.deciding = null
+      this.thinking = null
+      const error = r.error ?? '模型没有调用 act'
+      this.stalled = { seat, error: error === 'model not configured' ? '还没有配置对手模型，或 API key 无法使用' : error, settings: needsSettings(error) }
+      return this.broadcast()
     }
-    if (this.paused) {
-      this.pendingAI = { seat, hand, logLen, action, say, autopilot }
-      return
-    }
-    this.commitOpponent(seat, action, say, autopilot)
-  }
-
-  private commitOpponent(seat: number, action: Action, say: Say | null, autopilot: boolean) {
-    const g = this.game!
-    const p = g.players[seat]
-    const at = g.log.length
-    const label = apply(g, seat, action)
-    if (autopilot) {
-      g.log[at].autopilot = true
-      this.autopilotCount++
-      this.autopilotIds.add(p.id)
-    } else this.autopilotIds.delete(p.id)
+    const wait = MIN_SHOW_MS[settingsCache.speed] - (Date.now() - started)
+    if (wait > 0) await sleep(wait)
+    if (rid !== this.runId || this.table !== t || t.handLog().length !== at) return
+    const [type, to] = normalize(t, r.args)
+    t.actionTaken(type, to)
+    const e = t.handLog().at(-1)!
+    const act = 'seat' in e ? label(e, t.blindSeats()) : ''
+    const say = r.args.say?.trim().slice(0, 40)
+    const note = r.args.note?.trim().slice(0, 30)
+    if (note) this.notes.set(pid, note)
+    this.push({ kind: say ? 'msg' : 'act', from: pid, act, ...(say && { text: say }) })
+    if (say) this.bubble(seat, say)
     this.thinking = null
-    const text = say && filterSay(say.text, p.hole)
-    const msg = this.push({
-      kind: text ? 'msg' : 'act',
-      from: p.personaId,
-      ...(text && { text }),
-      act: label,
-      ...(autopilot && { autopilot: true }),
-      ...(text && say.replyTo && this.chat.some((m) => m.id === say.replyTo) && { replyTo: say.replyTo }),
-      triggers: !!text && say.source === 'llm' && say.kind === 'free'
-    })
-    if (text) this.bubble(p.personaId!, text)
-    if (msg.triggers) this.triggerReplies(msg)
-    this.afterAction()
+    this.deciding = null
+    this.loop()
   }
 
-  private afterAction() {
-    const g = this.game!
-    if (g.street !== this.lastStreet) {
-      if (g.street !== 'showdown' && g.street !== 'idle') this.sys(`${STREET[g.street]} ${cardsText(g.board)}`)
-      this.lastStreet = g.street
-    }
-    void this.loop()
-  }
-
-  resume() {
-    const g = this.game
-    if (!g) return
-    this.paused = false
-    const pa = this.pendingAI
-    this.pendingAI = null
-    if (pa && g.hand === pa.hand && g.log.length === pa.logLen && g.toAct === pa.seat && !g.done) this.commitOpponent(pa.seat, pa.action, pa.say, pa.autopilot)
-    else void this.loop()
-    this.maybeAutoNext()
+  retry() {
+    if (!this.stalled) return
+    this.stalled = null
+    this.loop()
   }
 
   heroAct(a: HeroAction) {
-    const g = this.game
-    if (!g || g.done || g.runout || g.toAct !== 0 || this.paused) return
-    const L = legal(g, 0)
-    const act: Action = { type: a.type }
-    if (a.type !== 'raise' && L.toCall === 0) act.type = 'check'
+    const t = this.table
+    if (!t || !this.heroCanAct()) return
+    const L = t.legalActions()
+    let type: ActionType
+    let to: number | undefined
     if (a.type === 'raise') {
-      if (!L.canRaise) return
-      act.to = Math.max(L.minTo, Math.min(L.maxTo, a.to))
-    }
-    const label = apply(g, 0, act)
-    this.push({ kind: 'act', from: 'hero', act: label, triggers: false })
-    this.afterAction()
+      if (!L.chipRange) return
+      type = L.actions.includes('bet') ? 'bet' : 'raise'
+      to = Math.max(L.chipRange.min, Math.min(L.chipRange.max, Math.round(a.to)))
+    } else type = L.toCall === 0 ? 'check' : a.type
+    t.actionTaken(type, to)
+    const e = t.handLog().at(-1)!
+    if ('seat' in e) this.push({ kind: 'act', from: 'hero', act: label(e, t.blindSeats()) })
+    this.loop()
   }
 
+  private heroCanAct() {
+    const t = this.table
+    return !!t && !this.stalled && t.isHandInProgress() && t.isBettingRoundInProgress() && t.playerToAct() === 0 && !this.locked()
+  }
 
-  private heroPoint() {
-    const g = this.game
-    return g && !g.done && !g.runout && g.toAct === 0 ? `${g.hand}-${g.log.length}` : null
+  // 教练局：教练对当前决策点说完之前、以及提问回答期间，操作锁定
+  private locked() {
+    if (this.mode !== 'coach') return false
+    return this.coachBusy === 'ask' || (this.heroKey !== null && this.spokenKey !== this.heroKey && this.isHeroPoint())
+  }
+
+  private isHeroPoint() {
+    const t = this.table
+    return !!t && t.isHandInProgress() && t.isBettingRoundInProgress() && t.playerToAct() === 0 && `${t.handNumber()}-${t.handLog().length}` === this.heroKey
   }
 
   private onHeroTurn() {
-    const g = this.game!
-    const key = `${g.hand}-${g.log.length}`
-    // resume 后回到同一决策点：不重复计算，也不再触发教练（原型第 508–510 行）
-    if (key === this.heroKey) return
-    this.heroKey = key
-    this.thinking = null
-    this.nums = this.numsFor(g, 0, 400)
-    this.numsKey = key
+    const t = this.table!
+    const key = `${t.handNumber()}-${t.handLog().length}`
+    if (key !== this.heroKey) {
+      this.heroKey = key
+      this.thinking = null
+      this.nums = this.numsFor(t, 0, 400)
+      this.numsKey = key
+    }
+    if (this.mode === 'coach' && this.spokenKey !== key && this.coachBusy === null) void this.speak(t, key)
     this.broadcast()
-    const st = getSettings()
-    if (st.coachOn && this.agents.modelReady('coach') && !this.breaker.trippedCoach && !this.askInFlight) void this.proactive(key)
   }
 
-  private async proactive(key: string) {
+  // ---- 教练 ----
+
+  private async speak(t: Table, key: string) {
     const rid = this.runId
-    this.proactiveKey = key
+    const entry = this.addCoach({ kind: 'speak', text: '', status: 'pending' })
+    this.coachBusy = 'speak'
+    const ctrl = (this.coachCtrl = new AbortController())
     this.broadcast()
-    const r = await this.guarded(this.coachQueue, this.limits.proactive, (s) => this.agents.coachProactive(this.coachCtx(), s), { preempt: true })
-    if (this.proactiveKey === key) this.proactiveKey = null
+    const r = this.agents.modelReady('coach')
+      ? await this.agents.coachSpeak(
+          { memory: await memoryOf('hero'), guided: this.guided, situation: this.heroSituation(t) },
+          (d) => this.patchCoach(entry, { text: entry.text + d }),
+          AbortSignal.any([ctrl.signal, this.leaveCtrl.signal])
+        )
+      : { ok: false, aborted: false, text: '', error: '教练模型未配置' }
     if (rid !== this.runId) return
-    if (r.kind === 'done' && r.value.ok) {
-      this.breaker.coach = 0
-      const alert = coachAlert(r.value.intents)
-      // 教练晚到：玩家已行动或局面已变，提醒作废
-      if (alert && this.heroKey === key && this.heroPoint() === key) {
-        if (alert.level === 'pause') this.paused = true
-        this.alert = alert
-      }
-    } else if (isFailure(r)) this.countFailure('coach')
+    this.patchCoach(entry, r.ok ? { status: 'done' } : ctrl.signal.aborted ? { status: 'skipped' } : { status: 'failed', error: r.error })
+    this.coachBusy = null
+    this.coachCtrl = null
+    this.spokenKey = key
     this.broadcast()
   }
 
-  ask(requestId: string, text: string) {
-    const g = this.game
-    const reject = (error: 'not_configured' | 'breaker' | 'failed') => this.emit('coach:done', { requestId, ok: false, error })
-    if (!g) return reject('failed')
-    if (!this.agents.modelReady('coach')) return reject('not_configured')
-    if (this.breaker.trippedCoach) return reject('breaker')
-    void this.runAsk(g, requestId, text)
+  ask(text: string) {
+    const t = this.table
+    const q = text.trim()
+    if (!t || this.mode !== 'coach' || this.coachBusy !== null || !q) return
+    void this.runAsk(t, q)
   }
 
-  private async runAsk(g: Game, requestId: string, text: string) {
+  private async runAsk(t: Table, q: string) {
     const rid = this.runId
-    this.askId = requestId
-    if (!g.done) this.paused = true
-    this.askInFlight = true
-    const answer: CoachEntry = { role: 'assistant', text: '', requestId }
-    this.coachThread.push({ role: 'user', text, requestId }, answer)
+    this.addCoach({ kind: 'user', text: q, status: 'done' })
+    const entry = this.addCoach({ kind: 'answer', text: '', status: 'pending' })
+    this.coachBusy = 'ask'
+    const ctrl = (this.coachCtrl = new AbortController())
+    clearTimeout(this.stepTimer)
     this.broadcast()
-    let open = true
-    const onDelta = (d: string) => {
-      if (!open) return
-      answer.text += d
-      this.emit('coach:delta', { requestId, text: d })
-    }
-    const r = await this.guarded(this.coachQueue, this.limits.ask, (s) => this.agents.coachAsk(this.coachCtx(), text, onDelta, s), { preempt: true })
-    open = false
-    let error: 'interrupted' | 'failed' | undefined
-    if (r.kind === 'done' && r.value.ok) {
-      if (rid === this.runId) this.breaker.coach = 0
-    } else if (isFailure(r)) {
-      error = 'failed'
-      if (rid === this.runId) this.countFailure('coach')
+    const r = this.agents.modelReady('coach')
+      ? await this.agents.coachAsk(
+          { memory: await memoryOf('hero'), situation: this.heroSituation(t), history: this.askHistory.slice(-ASK_ROUNDS * 2), question: q },
+          (d) => this.patchCoach(entry, { text: entry.text + d }),
+          AbortSignal.any([ctrl.signal, this.leaveCtrl.signal])
+        )
+      : { ok: false, aborted: false, text: '', error: '教练模型未配置' }
+    if (rid !== this.runId) return
+    this.patchCoach(entry, r.ok ? { status: 'done' } : { status: 'failed', error: r.error ?? '教练暂时没连上' })
+    if (r.ok) this.askHistory.push({ role: 'user', content: q }, { role: 'assistant', content: entry.text })
+    this.coachBusy = null
+    this.coachCtrl = null
+    // 回答期间积压的事：轮到玩家时的讲解、一手结束的复盘，然后继续推进牌局
+    if (this.recap === 'pending') void this.runRecap()
+    this.loop()
+  }
+
+  // 「不等了」「跳过」：中止当前讲解或复盘；提问不可跳过
+  skip() {
+    if (this.coachBusy === 'speak' || this.coachBusy === 'recap') this.coachCtrl?.abort()
+  }
+
+  retryRecap() {
+    if (this.recap === 'failed' && this.coachBusy === null && this.lastRecord) void this.runRecap()
+  }
+
+  private async runRecap() {
+    const last = this.lastRecord
+    if (!last) return
+    const rid = this.runId
+    this.recap = 'running'
+    const entry = this.recapEntry ?? this.addCoach({ kind: 'recap', text: '', status: 'pending' })
+    this.recapEntry = entry
+    this.patchCoach(entry, { status: 'pending', error: undefined })
+    this.coachBusy = 'recap'
+    const ctrl = (this.coachCtrl = new AbortController())
+    this.broadcast()
+    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), summary: heroHandSummary(last.rec) }, AbortSignal.any([ctrl.signal, this.leaveCtrl.signal]))
+    if (rid !== this.runId) return
+    if (r.ok && r.args) {
+      const { note, ...recap } = r.args
+      this.patchCoach(entry, { status: 'done', recap: pickRecap(recap) })
+      this.recap = 'done'
+      if (note?.trim()) await addMemory('hero', note.trim().slice(0, 30))
+      if (last.id !== null) {
+        await saveReview(last.id, JSON.stringify(pickRecap(recap)))
+        this.emit('review:done', { handId: last.id, review: pickRecap(recap) })
+      }
+    } else if (ctrl.signal.aborted) {
+      this.patchCoach(entry, { status: 'skipped' })
+      this.recap = 'skipped'
     } else {
-      error = 'interrupted'
-      answer.interrupted = true
+      this.patchCoach(entry, { status: 'failed', error: r.error ?? '复盘失败' })
+      this.recap = 'failed'
     }
-    this.emit('coach:done', { requestId, ok: !error, ...(error && { error }) })
-    if (this.askId === requestId) {
-      this.askInFlight = false
-      this.maybeAutoNext()
-    }
+    this.coachBusy = null
+    this.coachCtrl = null
     this.broadcast()
   }
 
+  // 回放页“让教练复盘这一手”：不依赖牌桌
   async review(handId: number) {
-    if (this.reviewing.has(handId)) return
-    const done = (x: { text?: string; error?: string }) => this.emit('review:done', { handId, ...x })
+    const done = (x: { review?: Recap; error?: string }) => this.emit('review:done', { handId, ...x })
     if (!this.agents.modelReady('coach')) return done({ error: 'not_configured' })
-    this.reviewing.add(handId)
-    try {
-      const rec = await getHand(handId)
-      if (!rec) return done({ error: 'not_found' })
-      // 复盘与牌桌无关，离桌不中止
-      const r = await this.guarded(this.reviewQueue, this.limits.review, (s) => this.agents.coachReview(handId, rec, s), { preempt: false, leave: false })
-      if (r.kind === 'done' && r.value.ok && r.value.text) {
-        await saveReview(handId, r.value.text)
-        done({ text: r.value.text })
-      } else done({ error: r.kind === 'done' ? (r.value.error ?? 'failed') : r.kind === 'error' ? r.error : r.kind })
-    } catch (e) {
-      done({ error: String(e) })
-    } finally {
-      this.reviewing.delete(handId)
-    }
+    const rec = await getHand(handId)
+    if (!rec) return done({ error: 'not_found' })
+    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), summary: heroHandSummary(rec) }, AbortSignal.timeout(60_000))
+    if (!r.ok || !r.args) return done({ error: r.error ?? 'failed' })
+    const recap = pickRecap(r.args)
+    await saveReview(handId, JSON.stringify(recap))
+    done({ review: recap })
   }
 
+  private addCoach(e: Omit<CoachEntry, 'id' | 'handNo'>): CoachEntry {
+    const entry: CoachEntry = { id: randomUUID(), handNo: this.table?.handNumber() ?? 0, ...e }
+    this.coachThread.push(entry)
+    this.emit('coach:upsert', { ...entry })
+    return entry
+  }
+
+  private patchCoach(entry: CoachEntry, patch: Partial<CoachEntry>) {
+    Object.assign(entry, patch)
+    if (patch.error === undefined && 'error' in patch) delete entry.error
+    this.emit('coach:upsert', { ...entry })
+  }
+
+  private heroSituation(t: Table) {
+    const n = this.nums
+    const extra = n
+      ? `本地计算：胜率约 ${Math.round(n.eq * 100)}%（对在手对手的随机手牌），所需胜率 ${(n.need * 100).toFixed(1)}%，出路 ${n.outs ?? '—'}，当前牌型 ${n.handName}，简单规则建议 ${n.sugg}`
+      : undefined
+    return situation(t, this.seats, 0, { you: false, extra })
+  }
+
+  // ---- 一手结束 ----
 
   private async onHandEnd() {
-    const g = this.game!
-    if (this.endKey === g.hand) return
-    this.endKey = g.hand
-    const rid = this.runId
+    const t = this.table!
+    if (this.endKey === t.handNumber()) return
+    this.endKey = t.handNumber()
     this.thinking = null
-    this.paused = false
-    for (const w of g.winners ?? []) this.sys(`${g.players.find((p) => p.id === w.id)!.name} 赢得 ${fmt(w.amount)}${w.handName ? ' · ' + w.handName : ''}`)
-    const rec = this.record(g)
+    const won = new Map<number, { amount: number; name: string | null }>()
+    for (const w of t.winners()) won.set(w.seat, { amount: (won.get(w.seat)?.amount ?? 0) + w.amount, name: w.handName ?? won.get(w.seat)?.name ?? null })
+    for (const [seat, w] of won) this.sys(`${this.seats[seat].name} 赢得 ${fmt(w.amount)}${w.name ? ' · ' + w.name : ''}`)
+    const { smallBlind: sb, bigBlind: bb } = t.stakes()
+    const board = t.communityCards()
+    const holes = t.holeCards()
+    const rec = handRecord(t, this.seats, this.mode, { sb, bb }, (i) => handName(holes[i]!.concat(board)))
+    this.results.push(rec)
+    if (this.results.length > 3) this.results.shift()
     const tableId = this.tableId
-    insertHand(tableId, rec).then(
-      () => this.emit('hands:changed', undefined),
-      (e) => console.error('insertHand failed', e)
-    )
-    for (const p of rec.players) {
-      const pid = p.personaId
-      if (!pid) continue
-      // durable：下一手决策抢占时也保留，且先于决策执行，保证对手看到本手结果
-      this.queue(pid)
-        .run({ durable: true, fn: () => this.agents.appendResult(pid, `table:${tableId}:${pid}`, publicHandResult(rec, pid)) })
-        .catch((e) => console.error('appendResult failed', e))
-    }
-    if (getSettings().autoNext && g.players[0].stack > 0) {
-      this.autoHand = g.hand
-      this.autoDue = false
-      this.autoTimer = setTimeout(() => {
-        this.autoDue = true
-        this.maybeAutoNext()
-      }, AUTO_NEXT_MS)
-    }
-    this.broadcast()
-    await this.winnerSpeech(g, rid)
-  }
-
-  private async winnerSpeech(g: Game, rid: number) {
-    const w = (g.winners ?? []).filter((x) => x.id !== g.players[0].id).sort((a, b) => b.amount - a.amount)[0]
-    if (!w) return
-    const seat = g.players.findIndex((p) => p.id === w.id)
-    const persona = personaOf(g.players[seat].personaId)!
-    if (!this.useLLMForOpponents()) return this.postSay(seat, canned(persona, 'win', this.rng), false)
-    const hand = g.hand
-    this.winSpeechInFlight = hand
-    try {
-      const r = await this.guarded(this.queue(persona.id), this.limits.win, (s) => this.agents.opponentChat(this.opponentCtx(g, seat), 'win', '你赢了这一手', s))
-      // 下一手已开始（手动发牌或离桌）：整体丢弃，不补台词
-      if (rid !== this.runId || g.hand !== hand) return
-      if (r.kind === 'done' && r.value.ok) {
-        const say = r.value.intents.say
-        if (say) this.postSay(seat, { ...say, source: 'llm' }, true)
-      } else this.postSay(seat, canned(persona, 'win', this.rng), false)
-    } finally {
-      if (this.winSpeechInFlight === hand) {
-        this.winSpeechInFlight = null
-        this.maybeAutoNext()
-      }
-    }
-  }
-
-  private maybeAutoNext() {
-    const g = this.game
-    if (!g || !g.done || !this.autoDue || this.autoHand !== g.hand) return
-    if (this.paused || this.askInFlight || this.winSpeechInFlight !== null) return
-    this.nextHand()
-  }
-
-  private record(g: Game): HandRecord {
-    const h = g.players[0]
-    const nameOf = (id?: string) => g.players.find((p) => p.id === id)?.name ?? ''
-    const pre = g.log.filter((x) => x.street === 'preflop' && x.id === h.id && !/盲/.test(x.label))
-    return {
-      hand: g.hand,
-      sb: g.sb,
-      bb: g.bb,
-      net: h.stack - h.startStack,
-      pot: pot(g),
-      showdown: g.showdown,
-      hero: h.hole.slice(),
-      board: g.board.slice(),
-      players: g.players
-        .filter((p) => !p.out)
-        .map((p) => ({
-          id: p.id,
-          ...(p.personaId && { personaId: p.personaId }),
-          name: p.name,
-          hole: p.isHero || (g.showdown && !p.folded) ? p.hole.slice() : null,
-          folded: p.folded,
-          handName: p.handName || '',
-          won: g.winners?.find((w) => w.id === p.id)?.amount ?? 0,
-          net: p.stack - p.startStack
-        })),
-      log: g.log.map((x) => ({ street: x.street, board: !!x.board, name: x.board ? '' : nameOf(x.id), label: x.label, ...(x.autopilot && { autopilot: true }) })),
-      vpip: pre.some((x) => /跟注|加注|全下|下注/.test(x.label)),
-      pfr: pre.some((x) => /加注|全下/.test(x.label))
-    }
-  }
-
-
-  sendChat(text: string) {
-    const t = text.trim()
-    if (!t || !this.game) return
-    const msg = this.push({ kind: 'msg', from: 'hero', text: t, triggers: true })
-    this.triggerReplies(msg)
-  }
-
-  private triggerReplies(msg: ChatMessage) {
-    const g = this.game
-    if (!g || !this.useLLMForOpponents()) return
-    const now = Date.now()
-    for (const p of pickResponders(g.players, { from: msg.from, thinking: this.thinking, lastTriggered: this.lastTriggered, now, rng: this.rng })) {
-      this.lastTriggered.set(p.personaId!, now)
-      void this.chatReply(g, g.players.indexOf(p), msg)
-    }
-  }
-
-  private async chatReply(g: Game, seat: number, msg: ChatMessage) {
     const rid = this.runId
-    const who = msg.from === 'hero' ? '玩家「你」' : personaOf(msg.from)!.name
-    const input = `公屏上${who}${msg.act ? `（${msg.act}）` : ''}说：「${msg.text}」（消息 id：${msg.id}）`
-    const r = await this.guarded(this.queue(g.players[seat].personaId!), this.limits.chat, (s) => this.agents.opponentChat(this.opponentCtx(g, seat), 'chat', input, s))
-    if (rid !== this.runId || r.kind !== 'done' || !r.value.ok || !r.value.intents.say) return
-    const say = r.value.intents.say
-    this.postSay(seat, { ...say, replyTo: say.replyTo ?? msg.id, source: 'llm' }, false)
+    for (const [pid, note] of this.notes) void addMemory(pid, note).catch((e) => console.error('addMemory failed', e))
+    this.notes.clear()
+    if (this.mode === 'coach') this.recap = 'pending'
+    this.lastRecord = { id: null, rec }
+    this.broadcast()
+    let id: number | null = null
+    try {
+      id = await insertHand(tableId, rec)
+      this.emit('hands:changed', undefined)
+    } catch (e) {
+      console.error('insertHand failed', e)
+    }
+    if (rid !== this.runId) return
+    this.lastRecord = { id, rec }
+    if (this.mode === 'coach' && this.recap === 'pending' && this.coachBusy === null) void this.runRecap()
   }
 
-  // 所有对手发言（decide 之外的 chat、win、预设）都从这里进公屏，统一经泄牌过滤
-  private postSay(seat: number, say: Say | null, triggers: boolean) {
-    const p = this.game!.players[seat]
-    const text = say && filterSay(say.text, p.hole)
-    if (!text) return
-    const replyTo = say.replyTo && this.chat.some((m) => m.id === say.replyTo) ? say.replyTo : undefined
-    const msg = this.push({ kind: 'msg', from: p.personaId, text, ...(replyTo && { replyTo }), triggers })
-    this.bubble(p.personaId!, text)
-    if (triggers) this.triggerReplies(msg)
-    this.broadcast()
-  }
+  // ---- 公屏与视图 ----
 
   private push(m: Omit<ChatMessage, 'id' | 'at'>): ChatMessage {
     const msg = { id: randomUUID(), at: Date.now(), ...m } as ChatMessage
@@ -617,95 +525,44 @@ export class TableRunner {
     return msg
   }
 
-  private sys(text: string) {
-    this.push({ kind: 'sys', text, triggers: false })
+  private sys(text: string, cards?: string[]) {
+    this.push({ kind: 'sys', text, ...(cards && { cards }) })
   }
 
-  private bubble(pid: string, text: string) {
-    this.bubbles.set(pid, { text, until: Date.now() + BUBBLE_MS })
+  private bubble(seat: number, text: string) {
+    this.bubbles.set(seat, { text, until: Date.now() + BUBBLE_MS })
     const rid = this.runId
     setTimeout(() => rid === this.runId && this.broadcast(), BUBBLE_MS)
   }
 
-
-  private useLLMForOpponents() {
-    return getSettings().engine === 'llm' && this.agents.modelReady('opponent') && !this.breaker.trippedOpponent
+  private equityFor(t: Table, seat: number, iters: number) {
+    const h = t.holeCards()[seat]
+    if (!h) return 0
+    const opp = t.seats().filter((s, j) => j !== seat && s && !s.out && !s.folded).length
+    return equity(h, t.communityCards(), opp, iters, this.rng)
   }
 
-  private countFailure(role: Role) {
-    const b = this.breaker
-    b[role]++
-    const key = role === 'opponent' ? 'trippedOpponent' : 'trippedCoach'
-    if (b[role] >= 3 && !b[key]) {
-      b[key] = true
-      this.broadcast()
-    }
-  }
-
-  private breakerState(): BreakerState {
-    return { opponent: this.breaker.trippedOpponent, coach: this.breaker.trippedCoach }
-  }
-
-  // 计时器在 queue.run 之前启动（抢占等待计入时限），并与 run 的结果赛跑：
-  // 排队中的 durable 任务若挂起，fn 永不开始、看不到 abort，只能靠赛跑脱身（T4 结果）
-  private async guarded<T>(q: AgentQueue, ms: number, fn: (s: AbortSignal) => Promise<T>, o: { preempt?: boolean; leave?: boolean } = {}): Promise<Outcome<T>> {
-    const ctrl = new AbortController()
-    let fire!: () => void
-    const expired = new Promise<Outcome<T>>((r) => (fire = () => r({ kind: 'timeout' })))
-    const timer = setTimeout(() => (ctrl.abort(), fire()), ms)
-    const signals = o.leave === false ? [ctrl.signal] : [ctrl.signal, this.leaveSignal]
-    const run = q.run({ preempt: o.preempt, fn: (s) => fn(AbortSignal.any([s, ...signals])) }).then(
-      (v): Outcome<T> => (v === Dropped ? { kind: 'dropped' } : { kind: 'done', value: v as T }),
-      (e): Outcome<T> => ({ kind: 'error', error: String(e) })
-    )
-    try {
-      return await Promise.race([run, expired])
-    } finally {
-      clearTimeout(timer)
-    }
-  }
-
-  private opponentCtx(g: Game, seat: number) {
-    return { tableId: this.tableId, seat, personaId: g.players[seat].personaId!, table: this.queryFor(g) }
-  }
-
-  private coachCtx() {
-    return { tableId: this.tableId, table: this.queryFor(this.game!), guided: this.guided }
-  }
-
-  // 按牌桌固定：离桌或换桌后，旧调用的工具不会读到新桌
-  private queryFor(g: Game): TableQuery {
-    const check = () => {
-      if (this.game !== g) throw new Error('table closed')
-    }
-    return {
-      viewFor: (seat) => {
-        check()
-        return buildSeatView(g, seat)
-      },
-      chat: (limit) => (check(), this.chat.slice(-limit)),
-      equityFor: (seat, iters) => {
-        check()
-        const n = this.numsFor(g, seat, iters) ?? { eq: 0, need: 0, outs: null, handName: '', sugg: '已弃牌' }
-        if (seat === 0) return n
-        const { sugg: _, ...rest } = n
-        return rest
-      }
-    }
-  }
-
-  // 原型 computeNums（第 494–505 行）
-  private numsFor(g: Game, seat: number, iters: number): Nums | null {
-    const p = g.players[seat]
-    if (p.folded || !p.hole.length) return null
-    const opp = g.players.filter((q, j) => j !== seat && inHand(q)).length
-    const eq = equity(p.hole, g.board, opp, iters)
-    const L = legal(g, seat)
-    const total = pot(g)
-    const need = L.toCall > 0 ? L.toCall / (total + L.toCall) : 0
+  // 原型 computeNums
+  private numsFor(t: Table, seat: number, iters: number): Nums | null {
+    const s = t.seats()[seat]!
+    const h = t.holeCards()[seat]
+    if (s.folded || !h) return null
+    const opp = t.seats().filter((q, j) => j !== seat && q && !q.out && !q.folded).length
+    const eq = this.equityFor(t, seat, iters)
+    const L = heroLegal(t)
+    const need = L.toCall > 0 ? L.toCall / (t.totalPot() + L.toCall) : 0
     const fair = 1 / (opp + 1)
     const sugg = L.toCall === 0 ? (eq > fair * 1.6 ? '下注' : '过牌') : eq >= need ? (eq > fair * 2.2 && L.canRaise ? '加注' : '跟注') : '弃牌'
-    return { eq, need, outs: outs(p.hole, g.board), handName: handName(p.hole.concat(g.board)), sugg }
+    return { eq, need, outs: outs(h, t.communityCards()), handName: handName(h.concat(t.communityCards())), sugg }
+  }
+
+  private recordUsage(u: Usage) {
+    const row: UsageRow = { at: Date.now(), tableId: this.table ? this.tableId : null, handNo: this.table?.handNumber() ?? null, ...u }
+    if (this.table) this.usage.push(row)
+    insertUsage(row).then(
+      () => this.emit('usage:changed', undefined),
+      (e) => console.error('insertUsage failed', e)
+    )
   }
 
   broadcast() {
@@ -714,35 +571,55 @@ export class TableRunner {
   }
 
   view(): TableView | null {
-    const g = this.game
-    if (!g) return null
+    const t = this.table
+    if (!t) return null
+    const coach: CoachState | null =
+      this.mode === 'coach' ? { busy: this.coachBusy, locked: this.locked(), canNext: this.canNext() } : null
     return buildTableView({
-      game: g,
+      table: t,
+      seats: this.seats,
+      mode: this.mode,
+      guided: this.guided,
+      started: this.started,
       thinking: this.thinking,
-      paused: this.paused,
       bubbles: this.bubbles,
-      autopilotIds: this.autopilotIds,
       nums: this.nums,
       numsKey: this.numsKey,
-      coachLoading: this.proactiveKey !== null || this.askInFlight,
-      autopilotCount: this.autopilotCount,
-      breaker: this.breakerState(),
-      alert: this.alert,
-      guided: this.guided,
-      autoNext: getSettings().autoNext,
+      heroKey: this.heroKey,
+      stalled: this.stalled,
+      coach,
+      cost: costTotal(this.usage),
       now: Date.now()
     })
+  }
+
+  // 测试与调试用
+  lines() {
+    return this.table ? logLines(this.table, this.seats, 0) : []
+  }
+  board() {
+    return this.table ? cardsText(this.table.communityCards()) : ''
   }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-// 超时、抛错、模型报错算失败；被抢占、被丢弃、被离桌中止不算
-function isFailure<T extends { ok: boolean; aborted: boolean }>(r: Outcome<T>) {
-  return r.kind === 'timeout' || r.kind === 'error' || (r.kind === 'done' && !r.value.ok && !r.value.aborted)
-}
+const pickRecap = (r: Recap): Recap => ({ headline: String(r.headline), good: String(r.good), improve: String(r.improve), tip: String(r.tip) })
 
-// 原型 llmDecide 的纠正：无需跟注时 fold/call 视为 check；其余非法动作由 apply 纠正
-function normalizeAct(a: Action, g: Game, seat: number): Action {
-  return (a.type === 'fold' || a.type === 'call') && legal(g, seat).toCall === 0 ? { type: 'check' } : a
+// 模型给出的动作规范化为引擎一定接受的动作（discussion §2、§14 F3）
+export function normalize(t: Table, a: RawAct): [ActionType, number?] {
+  const L = t.legalActions()
+  const action = String(a.action ?? '').trim().toLowerCase()
+  const passive: [ActionType] = [L.toCall === 0 ? 'check' : 'call']
+  const aggressive = ['bet', 'raise', 'allin', 'all-in', 'all_in', 'all in', 'shove']
+  if (aggressive.includes(action)) {
+    const r = L.chipRange
+    if (!r) return passive
+    const type: ActionType = L.actions.includes('bet') ? 'bet' : 'raise'
+    const n = Number(a.to)
+    const to = action.startsWith('all') || action === 'shove' ? r.max : Number.isFinite(n) ? Math.round(n) : r.min
+    return [type, Math.max(r.min, Math.min(r.max, to))]
+  }
+  if (action === 'fold') return L.toCall === 0 ? passive : ['fold']
+  return passive
 }

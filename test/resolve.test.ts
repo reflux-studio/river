@@ -4,9 +4,8 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { RequestContext } from '@mastra/core/request-context'
 import * as db from '../src/main/db'
-import { clearNeedsKey, modelReady, needsKey, resolveModel, testProvider } from '../src/main/models/resolve'
+import { clearNeedsKey, modelFor, modelReady, needsKey, selectedModel, testProvider } from '../src/main/models/resolve'
 
 let dir: string
 let failDecrypt = false
@@ -30,29 +29,24 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-const rc = (role: string) => {
-  const r = new RequestContext()
-  r.set('role', role)
-  return { requestContext: r }
-}
-
-describe('resolveModel / modelReady', () => {
+describe('modelFor / modelReady', () => {
   it('内置提供方返回 { id, apiKey }，不带 url', async () => {
     await db.saveProvider({ id: 'a', name: 'A', kind: 'anthropic', baseUrl: 'http://ignored', apiKey: 'sk-1' })
     await db.updateSettings({ models: { coach: { providerId: 'a', modelId: 'claude-x' } } })
-    expect(resolveModel(rc('coach'))).toEqual({ id: 'anthropic/claude-x', apiKey: 'sk-1' })
+    expect(modelFor('coach')).toEqual({ id: 'anthropic/claude-x', apiKey: 'sk-1' })
     expect(modelReady('coach')).toBe(true)
+    expect(selectedModel('coach')).toEqual({ kind: 'anthropic', modelId: 'claude-x' })
   })
 
   it('兼容接口返回 { providerId, modelId, url, apiKey }', async () => {
     await db.saveProvider({ id: 'c', name: 'C', kind: 'openai-compatible', baseUrl: 'http://localhost:1234/v1' })
     await db.updateSettings({ models: { opponent: { providerId: 'c', modelId: 'qwen' } } })
-    expect(resolveModel(rc('opponent'))).toEqual({ providerId: 'c', modelId: 'qwen', url: 'http://localhost:1234/v1', apiKey: undefined })
+    expect(modelFor('opponent')).toEqual({ providerId: 'c', modelId: 'qwen', url: 'http://localhost:1234/v1', apiKey: undefined })
   })
 
   it('未配置、提供方不存在时未就绪', async () => {
     expect(modelReady('opponent')).toBe(false)
-    expect(() => resolveModel(rc('opponent'))).toThrow()
+    expect(() => modelFor('opponent')).toThrow()
     await db.saveProvider({ id: 'a', name: 'A', kind: 'openai', apiKey: 'sk-1' })
     await db.updateSettings({ models: { opponent: { providerId: 'a', modelId: 'm' } } })
     expect(modelReady('opponent')).toBe(true)

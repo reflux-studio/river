@@ -163,7 +163,7 @@ export class Table {
       this.push({ street: this.street, seat, type: 'check', amount: 0, allIn: false })
     } else if (action === 'call') {
       const amount = this.put(s, L.toCall)
-      this.push({ street: this.street, seat, type: 'call', amount, allIn: s.allIn })
+      this.push({ street: this.street, seat, type: 'call', amount, to: s.bet, allIn: s.allIn })
     } else {
       const to = betSize ?? NaN
       const { min, max } = L.chipRange!
@@ -314,6 +314,10 @@ export class Table {
 
   handNumber() {
     return this.hand
+  }
+
+  stakes() {
+    return { ...this.blinds }
   }
 
   numSeats() {
