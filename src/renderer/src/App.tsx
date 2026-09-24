@@ -1,5 +1,5 @@
 import { Toaster } from '@/components/ui/sonner'
-import { GuidedDialog, Onboarding } from '@/components/Onboarding'
+import { NeedModelDialog, Onboarding } from '@/components/Onboarding'
 import { TopBar } from '@/components/TopBar'
 import { useRiver, type Page } from '@/lib/river'
 import { Lobby } from '@/pages/Lobby'
@@ -25,7 +25,7 @@ export function App() {
         <main className="flex min-h-0 flex-1 flex-col">{ready && <Page />}</main>
       </div>
       <Onboarding />
-      <GuidedDialog />
+      <NeedModelDialog />
       <Toaster position="top-center" />
     </>
   )

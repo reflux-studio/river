@@ -1,0 +1,28 @@
+$ node s1.cjs  # @pokertools/engine 1.0.20
+pokertools: after incomplete all-in, seat 0 can re-raise? {
+  valid: false,
+  error: 'Betting has not been re-opened to you (incomplete raise or no action)',
+  code: 'CANNOT_RERAISE'
+}
+
+$ node s2.cjs  # poker-ts 1.5.0
+poker-ts after incomplete all-in: seat 0 legal {"actions":["fold","call","raise"],"chipRange":{"min":200,"max":1000}}
+
+$ node s3.cjs  # River 自研引擎（esbuild 打包 s3.ts）
+river engine: seat 0 legal {"toCall":50,"canCheck":false,"minTo":230,"maxTo":1000,"canRaise":true,"bet":100,"stack":900}
+
+$ node s4.cjs
+HU button 0 bets [ [ 0, 10 ], [ 1, 20 ] ] first to act 0 hand [ 'Kd', '2h' ]
+flop FLOP [ 'Jd', 'Ts', 'Td' ] first to act postflop 1
+after all-in call: street SHOWDOWN board [ 'Th', '4d', '2c', 'Ah', '3s' ] winners [{"seat":0,"amount":960,"hand":["5d","4d","2c","Ah","3s"],"handRank":"Straight"},{"seat":0,"amount":60,"hand":["5d","4d","2c","Ah","3s"],"handRank":"Straight"}] actionTo null
+history types RAISE@PREFLOP CALL@PREFLOP FOLD@PREFLOP
+fold win [{"seat":2,"amount":20,"hand":null,"handRank":null}] uncalled? FOLD FOLD UNCALLED_BET_RETURNED stacks [ 500, 490, 510 ]
+
+$ node fuzz2.cjs  # 3000 桌 × ≤20 手随机合法行动
+{
+ "hands": 25730,
+ "ok": 25730,
+ "bad": 0,
+ "stuck": {},
+ "badEx": null
+}

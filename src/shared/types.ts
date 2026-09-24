@@ -1,19 +1,32 @@
+import type { Currency } from './currency'
+
 export type Card = string
 export type Street = 'preflop' | 'flop' | 'turn' | 'river' | 'showdown'
+// 教练局：教练每步先说、一手结束亮全部底牌并复盘；自由局只有概率面板
+export type Mode = 'coach' | 'free'
 
 export interface ModelRef {
   providerId: string
   modelId: string
 }
 
+export type Felt = 'green' | 'blue' | 'wine' | 'graphite' | 'paper' | 'custom'
+export type Back = 'red' | 'blue' | 'black' | 'green'
+export type Fx = 'full' | 'lite' | 'off'
+
 export interface Settings {
-  engine: 'llm' | 'local'
   speed: 0 | 1 | 2
-  coachOn: boolean
   coachPersona: 0 | 1 | 2
   level: 'novice' | 'pro'
   hard: boolean
-  autoNext: boolean
+  felt: Felt
+  feltCustom: string
+  back: Back
+  fx: Fx
+  // 花费显示的货币；价格源（models.dev）是美元，按汇率换算
+  currency: Currency
+  // 手动汇率（1 美元 = fxRate 当前货币）；null 为自动
+  fxRate: number | null
   models: { opponent?: ModelRef; coach?: ModelRef }
 }
 
@@ -21,6 +34,7 @@ export interface Lobby {
   size: 2 | 3 | 4 | 5 | 6
   blinds: 0 | 1 | 2
   picks: string[]
+  mode: Mode
 }
 
 export interface ChatMessage {
@@ -29,13 +43,10 @@ export interface ChatMessage {
   from?: string
   text?: string
   act?: string
-  autopilot?: boolean
-  replyTo?: string
-  triggers: boolean
+  // 系统消息附带的公共牌（翻牌、转牌、河牌）
+  cards?: Card[]
   at: number
 }
-
-export type LineKind = 'raise' | 'call' | 'check' | 'fold' | 'win' | 'chat'
 
 export interface Persona {
   id: string
@@ -44,17 +55,24 @@ export interface Persona {
   ini: string
   hue: number
   desc: string
-  profile: { tight: number; aggr: number; bluff: number; call: number }
-  talk: number
   prompt: string
-  lines: Partial<Record<LineKind, string[]>>
+  builtin: boolean
+  // 内置角色被改过（可“恢复默认”）
+  edited: boolean
+  // 被删除的内置角色（可恢复）；自建角色删除即消失
+  deleted: boolean
 }
+
+export type PersonaInput = Pick<Persona, 'name' | 'tag' | 'ini' | 'hue' | 'desc' | 'prompt'> & { id?: string }
 
 export interface HandPlayer {
   id: string
   personaId?: string
   name: string
+  // 摊牌亮出的牌（玩家本人恒有）；对手读公开结果只看这一项
   hole: Card[] | null
+  // 教练局一手结束时亮出的全部底牌，只给玩家界面、回放与教练
+  holeAfter?: Card[]
   folded: boolean
   handName: string
   won: number
@@ -66,13 +84,21 @@ export interface HandLogEntry {
   board: boolean
   name: string
   label: string
-  autopilot?: boolean
+  cards?: Card[]
+  // 结构化字段（v2 起）：旧记录只有文案
+  seat?: number
+  type?: 'blind' | 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'return'
+  amount?: number
+  to?: number
+  allIn?: boolean
 }
 
 export interface HandRecord {
   hand: number
   sb: number
   bb: number
+  // 旧记录没有，视为自由局
+  mode?: Mode
   net: number
   pot: number
   showdown: boolean
@@ -93,6 +119,13 @@ export interface HandSummary {
   showdown: boolean
   vpip: boolean
   pfr: boolean
+}
+
+export interface Recap {
+  headline: string
+  good: string
+  improve: string
+  tip: string
 }
 
 export interface ProviderInput {
@@ -132,32 +165,34 @@ export interface SeatViewPublic {
   stack: number
   bet: number
   isDealer: boolean
+  isSB: boolean
+  isBB: boolean
   folded: boolean
   out: boolean
   allin: boolean
   status: string
-  statusTone: 'muted' | 'blue' | 'green'
-  autopilot: boolean
+  statusTone: 'muted' | 'blue' | 'green' | 'dark' | 'red'
   thinking: boolean
   winner: boolean
   cards?: Card[]
+  // 教练局一手结束亮出的弃牌者底牌
+  mucked?: boolean
   hasCards: boolean
   bubble?: string
 }
 
-export interface CoachAlert {
-  level: 'hint' | 'pause'
-  message: string
-}
-
-export interface BreakerState {
-  opponent: boolean
-  coach: boolean
-}
-
 export type HeroAction = { type: 'fold' | 'call' } | { type: 'raise'; to: number }
 
+export interface CoachState {
+  busy: 'speak' | 'ask' | 'recap' | null
+  // 轮到玩家但教练还没说完：操作区锁定
+  locked: boolean
+  // 一手结束后可以发下一手（复盘结束、失败或跳过）
+  canNext: boolean
+}
+
 export interface TableView {
+  mode: Mode
   title: string
   bb: number
   handNo: number
@@ -166,31 +201,46 @@ export interface TableView {
   pot: number
   seats: SeatViewPublic[]
   hero: { legal: Legal; toCall: number; isTurn: boolean; defaultRaiseTo: number; presets: { label: string; to: number }[] }
-  paused: boolean
   done: boolean
   runout: boolean
   result: { text: string; sub: string; heroWon: boolean; net: number } | null
   heroBust: boolean
   nums: { eq: number; need: number; outs: number | null; handName: string; sugg: string; stale: boolean } | null
-  coachLoading: boolean
-  autopilotCount: number
-  breaker: BreakerState
-  alert: CoachAlert | null
+  // 对手模型调用失败，牌局停下
+  stalled: { name: string; error: string; settings: boolean } | null
+  coach: CoachState | null
   guided: boolean
+  cost: Cost
+}
+
+export interface Cost {
+  usd: number
+  tokens: number
+  // 没有价格的 token 数（未计入 usd）
+  unpriced: number
 }
 
 export interface CoachEntry {
-  role: 'user' | 'assistant'
+  id: string
+  kind: 'user' | 'answer' | 'speak' | 'recap'
   text: string
-  requestId: string
-  interrupted?: boolean
+  handNo: number
+  recap?: Recap
+  // 复盘卡头部：这一手的输赢、玩家底牌与公共牌
+  hand?: { net: number; hero: Card[]; board: Card[] }
+  status: 'pending' | 'done' | 'failed' | 'skipped'
+  error?: string
 }
 
-export interface AgentCall {
-  role: 'opponent' | 'coach'
-  modelId: string
-  ms: number
-  ok: boolean
+export type Purpose = 'decide' | 'speak' | 'ask' | 'recap'
+
+export interface UsageSummary {
+  since: number
+  purposes: { purpose: Purpose; calls: number; tokens: number; unknown: number; usd: number; unpriced: number }[]
+  // 最近 40 手（按牌桌与手号）的花费
+  hands: { handNo: number; usd: number; tokens: number }[]
+  total: Cost & { calls: number; input: number; output: number; unknown: number }
+  avgPerHand: number | null
 }
 
 export interface Bootstrap {
@@ -198,18 +248,27 @@ export interface Bootstrap {
   lobby: Lobby
   bankroll: number
   onboarded: boolean
-  personas: (Persona & { promptOverride?: string })[]
+  personas: Persona[]
   providers: ProviderPublic[]
   view: TableView | null
-  lastCall: AgentCall | null
   coachThread: CoachEntry[]
   chat: ChatMessage[]
+  version: string
+  update: string | null
+  fx: FxRates | null
+}
+
+// 以美元为基准的汇率（只保留可选币种）
+export interface FxRates {
+  date: string
+  rates: Partial<Record<Currency, number>>
 }
 
 export interface TableStart {
   size: Lobby['size']
   blinds: Lobby['blinds']
   picks: string[]
+  mode: Mode
   guided: boolean
 }
 
@@ -217,40 +276,47 @@ export interface Commands {
   'app.bootstrap': () => Bootstrap
   'settings.update': (patch: Partial<Settings>) => Settings
   'lobby.update': (patch: Partial<Lobby>) => Lobby
-  'persona.setPrompt': (personaId: string, prompt: string) => void
-  'persona.resetPrompt': (personaId: string) => void
+  'persona.save': (input: PersonaInput) => Persona
+  'persona.delete': (id: string) => void
+  'persona.restore': (id: string) => void
+  'persona.reset': (id: string) => void
   'provider.save': (input: ProviderInput) => ProviderPublic
   'provider.delete': (id: string) => Settings
   'provider.test': (input: { providerId: string; modelId: string }) => { ok: boolean; supportsRequired?: boolean; error?: string }
   'provider.registry': () => { kind: string; name: string; models: string[] }[]
-  'table.start': (opts: TableStart) => Settings
+  'table.start': (opts: TableStart) => void
   'table.heroAct': (a: HeroAction) => void
   'table.nextHand': () => void
   'table.rebuy': () => void
   'table.leave': () => void
-  'table.resume': () => void
-  'table.retryModels': () => void
-  'chat.send': (text: string) => void
-  'coach.ask': (requestId: string, text: string) => void
+  'table.retry': () => void
+  'coach.ask': (text: string) => void
+  'coach.skip': () => void
+  'coach.retry': () => void
   'hands.list': () => HandSummary[]
-  'hands.get': (id: number) => { record: HandRecord; review?: string } | null
+  'hands.get': (id: number) => { record: HandRecord; review?: Recap | string; cost?: Cost } | null
   'hands.review': (id: number) => void
+  'usage.summary': () => UsageSummary
+  'usage.reset': () => void
   'data.clearHistory': () => void
   'data.resetMemory': () => void
   'onboarding.done': () => void
+  'update.install': () => void
 }
 
 export interface Events {
   // null：已离桌
   'table:view': TableView | null
   'chat:append': ChatMessage
-  'coach:delta': { requestId: string; text: string }
-  // error：'interrupted' 被新提问中断；'not_configured' | 'breaker' 未发起；'failed' 超时或出错
-  'coach:done': { requestId: string; ok: boolean; error?: 'interrupted' | 'not_configured' | 'breaker' | 'failed' }
-  'review:done': { handId: number; text?: string; error?: string }
+  // 整条教练消息；流式输出时同一 id 反复推送
+  'coach:upsert': CoachEntry
+  'review:done': { handId: number; review?: Recap; error?: string }
   bankroll: number
+  personas: Persona[]
   'hands:changed': void
-  'agent:last': AgentCall
+  'usage:changed': void
+  'update:ready': { version: string }
+  fx: FxRates
 }
 
 // bootstrap 的 chat 快照与之后的 chat:append 可能重叠，Renderer 按消息 id 去重

@@ -1,6 +1,5 @@
 import { Agent } from '@mastra/core/agent'
 import type { MastraModelConfig } from '@mastra/core/llm'
-import type { RequestContext } from '@mastra/core/request-context'
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { getProviderSecret, providersCache, setSupportsRequired, settingsCache, type ProviderRow } from '../db'
@@ -33,13 +32,20 @@ function selected(role: Role) {
   return sel && p ? { sel, p } : undefined
 }
 
-export const resolveModel = ({ requestContext }: { requestContext: RequestContext }): MastraModelConfig => {
-  const s = selected(requestContext.get('role') as Role)
+// 每次调用时读最新设置：牌局停下后去设置页换了模型，重试即用新模型
+export function modelFor(role: Role): MastraModelConfig {
+  const s = selected(role)
   if (!s) throw new Error('model not configured')
   return configFor(s.p, s.sel.modelId, secretOf(s.p))
 }
 
-// 未配置、提供方已删除、解密失败都按“未配置”处理，调用方据此走本地逻辑且不计熔断
+// 用量记账与查价用：提供方类型 + 模型 id
+export function selectedModel(role: Role) {
+  const s = selected(role)
+  return s && { kind: s.p.kind, modelId: s.sel.modelId }
+}
+
+// 未配置、提供方已删除、解密失败都按“未配置”处理：入座前检查，牌局中直接停下并提示去设置
 export function modelReady(role: Role): boolean {
   const s = selected(role)
   if (!s || needsKey.has(s.p.id)) return false

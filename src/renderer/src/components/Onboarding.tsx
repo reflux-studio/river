@@ -9,12 +9,12 @@ import { finishOnboarding, go, modelOf, setState, startGuided, useRiver, type Ri
 import { cn } from '@/lib/utils'
 
 const PAGES = [
-  { t: '欢迎来到 River', b: '桌上只有你和 AI。每位对手都有自己的性格，会在公屏上说话，也会互相调侃。教练站在你这边，只看你能看到的牌，随时可以问。' },
+  { t: '欢迎来到 River', b: '桌上只有你和 AI。每位对手都有自己的性格，轮到自己时会随行动说一句。教练站在你这边，只看你能看到的牌，随时可以问。' },
   { t: '目标：用 5 张牌比大小', b: '每人发 2 张只有自己能看的底牌，桌面陆续翻开 5 张公共牌。用这 7 张里任意 5 张组成最大的牌型；或者靠下注让其他人全部弃牌，也能直接赢下底池。' },
   { t: '牌型大小', b: '从大到小，上面的牌型永远大于下面的：' },
   { t: '一手牌的流程', b: '每手牌由两位玩家先放盲注，然后分四轮下注：' },
-  { t: '教练和概率', b: '右侧会一直显示你的胜率和"所需胜率"（底池赔率）。胜率高于所需，跟注长期来看就是赚的。遇到关键决策，教练可能会主动提醒你，甚至暂停牌局。你也可以随时提问，提问时牌局会暂停。' },
-  { t: '配置模型', b: '对手和教练由大模型驱动。在设置里添加一个模型提供方，再分别为对手和教练选择模型。不配置也能玩：对手改用本地引擎，概率面板照常显示，只是教练不会讲解。' }
+  { t: '教练和概率', b: '右侧会一直显示你的胜率和"所需胜率"（底池赔率）。胜率高于所需，跟注长期来看就是赚的。开桌时选“教练局”，每次轮到你教练都会先说说局面，一手结束还会复盘，并亮出所有人的底牌；你也可以随时提问，提问时牌局会暂停。' },
+  { t: '配置模型', b: '对手和教练由大模型驱动。在设置里添加一个模型提供方，再分别为对手和教练选择模型。自由局需要对手模型，教练局还需要教练模型。' }
 ]
 
 const RANKS = [
@@ -106,7 +106,7 @@ function Pages() {
           <>
             <Button variant="outline" className={pill} onClick={finishOnboarding}>稍后再说</Button>
             <Button variant="outline" className={pill} onClick={() => { void finishOnboarding(); go('settings') }}>去配置</Button>
-            <Button className={cn(pill, 'px-[18px]')} onClick={() => { void finishOnboarding(); startGuided() }}>带我打一手</Button>
+            <Button className={cn(pill, 'px-[18px]')} onClick={() => { void finishOnboarding(); void startGuided() }}>带我打一手</Button>
           </>
         )}
       </div>
@@ -128,23 +128,24 @@ export function Onboarding() {
   )
 }
 
-export function GuidedDialog() {
-  const open = useRiver((s) => s.guidedAsk)
-  const close = () => setState({ guidedAsk: false })
+// 入座被拦下：缺对手模型或教练模型时引导去设置（discussion §9）
+export function NeedModelDialog() {
+  const need = useRiver((s) => s.needModel)
+  const close = () => setState({ needModel: null })
   return (
-    <AlertDialog open={open} onOpenChange={(o) => !o && close()}>
+    <AlertDialog open={need !== null} onOpenChange={(o) => !o && close()}>
       <AlertDialogContent className="rounded-2xl">
         <AlertDialogHeader>
-          <AlertDialogTitle className="font-semibold">教练模型还没有配置</AlertDialogTitle>
+          <AlertDialogTitle className="font-semibold">{need === 'coach' ? '教练模型还没有配置' : '对手模型还没有配置'}</AlertDialogTitle>
           <AlertDialogDescription className="leading-relaxed">
-            教学牌局靠教练一步步讲解。配置教练模型后再开始效果最好；也可以先直接开始，只看胜率和概率面板。
+            {need === 'coach'
+              ? '教练局靠教练每步讲解、每手复盘。先在设置里为教练选一个模型；或者回到大厅改开自由局。'
+              : '对手由大模型驱动。先在设置里添加模型提供方，并为对手选一个模型。'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="rounded-full" onClick={() => void startGuided(true)}>
-            仍然开始（无教练讲解）
-          </AlertDialogCancel>
-          <AlertDialogAction className="rounded-full" onClick={() => go('settings')}>去配置</AlertDialogAction>
+          <AlertDialogCancel className="rounded-full">取消</AlertDialogCancel>
+          <AlertDialogAction className="rounded-full" onClick={() => go('settings')}>去设置</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

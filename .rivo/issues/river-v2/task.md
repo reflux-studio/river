@@ -1,0 +1,75 @@
+# River v2：实施任务
+
+状态：全部完成，已归档（见 `summary.md`）。
+
+依据 `plan.md`。用户 2026-09-24 授权“一口气干完”。每个任务完成后由独立审阅代理审阅（`reviews/T*-*.md`），证据放 `evidence/T*/`。共同约定沿用 river-desktop：牌局状态只在主进程；对手读不到未公开的底牌；注释只写“为什么”；类型契约在 `src/shared/types.ts`。
+
+```
+T1 CI 前置验证 ──────────────────────────────────────────────┐
+T2 引擎 ─┐                                                    │
+T3 数据层 ┼─► T4 智能体 ─► T5 Runner/IPC ─┬─► T6 牌桌页 ──┐   │
+         │                                └─► T7 其他页面 ┼─► T8 自动更新与 CI ─► T9 验收
+```
+
+## T1：CI 前置验证
+
+目标：在 GitHub Actions 上验证 ADR-005 的前提与 models.dev 价格字段。
+修改：`.github/workflows/spike-v2.yml`（验收后删除）。
+验收：自签证书受信任后 electron-builder 能签名；0.0.2 满足 0.0.1 的 designated requirement；ad-hoc 对照不满足；models.dev 有 `cost` 字段。
+结果：通过，见 `evidence/T1/record.md`。
+
+## T2：引擎改写
+
+目标：`Table` 类（plan §模块、discussion §4），三处规则修正。
+修改：`src/main/engine/eval.ts`、`table.ts`；`test/engine.test.ts`。`poker.ts` 在 T5 删除。
+验收：规则用例（不完整加注、累计重开、单挑、边池、未跟注退还、余数、弃牌结束、短码大盲、abortHand、pots/totalPot）与 3000 手随机压测通过；牌型评估与原型对照一致。
+结果：通过。`test/engine.test.ts` 29 条（含 3000 手压测、牌型评估 2000 组与原型对照、`pots()` 合并）。原型的“200 手 legal/apply/摊牌对照”未保留：三处规则修正后与原型本就不同，由规则用例替代。审阅 `reviews/T2-T5-1.md`。
+
+## T3：数据层
+
+目标：迁移 v2 与去掉 Mastra 存储（ADR-004）。
+修改：`src/main/db/index.ts`、`src/main/index.ts`（启动顺序）、`package.json`（删 `@mastra/memory`、`@mastra/libsql`）、`test/db.test.ts`、删 `test/db-mastra.test.ts`。
+内容：Settings/Lobby 新字段与默认值；角色表 CRUD（内置种子合并覆盖、自建、删除/恢复）；记忆（追加、每 owner 保留 10 条、清空）；用量（写入、汇总、按手、清零）；价格缓存；显式 WAL；保留写链。
+验收：迁移测试（v1 库 → v2，旧提示词覆盖保留）；CRUD 与汇总测试。
+结果：通过。`test/db.test.ts` 覆盖 v1→v2 迁移、角色 CRUD、记忆、用量。价格缓存存在 `river_kv` 的 `prices` 键，没有单独建表。
+
+## T4：智能体
+
+目标：`llm.ts`、`opponent.ts`、`coach.ts`、`models/prices.ts`（discussion §2、§3、§6）。
+修改：删 `agents/mastra.ts`、`queue.ts`、`tools.ts`、`intents.ts`、`leak.ts`、`views.ts` 中工具查询部分；`models/resolve.ts` 去掉 Mastra 存储依赖。
+验收：mock 模型测试 `maxRetries` 计次（2 次重试 = 3 次调用）、宽松 `act` 解析、speak/ask 流式与历史、recap 工具、用量回调（含中止）；价格查询（快照 + 缓存）。
+结果：通过。`test/agents.test.ts`、`test/prices.test.ts`。偏差：缓存 token 按 models.dev 的 `cache_read` 价计费（比“按输入价估算”准确）；不同提供方 `inputTokens` 是否含缓存不一致，当前未启用提示缓存，影响可忽略。用量在发起调用时带 `tag`（审阅 F3）。
+
+## T5：Runner、IPC、共享类型
+
+目标：`runner.ts` 重写、`view.ts`、`text.ts`、`ipc.ts`、`shared/types.ts`、`shared/personas.ts`、`preload`、`renderer/lib/river.ts` 的数据层。
+验收：runner 测试覆盖 plan §验证 所列场景；typecheck 通过（界面在 T6/T7 调整，T5 中保证能编译即可）。
+结果：通过。`test/runner.test.ts` 23 条（自由局、失败即停下、教练局、角色、信息隔离、状态机）；审阅 F1–F4 与 L1–L5 已处理，见 `reviews/T2-T5-1.md` 末尾。共享契约新增：`TableView.stalled/coach/cost`、`CoachEntry.status/error/hand`、`Persona.builtin/edited/deleted`、`HandLogEntry` 结构化字段、`Legal` 形状沿用 v1。
+
+## T6：牌桌页
+
+目标：设计稿牌桌区（桌布/牌背/动效、筹码堆、座位样式、盲注徽标、气泡、发牌/翻牌/筹码/加注/全下/弃牌/赢家动效、公屏只读带牌面、操作区全下红色按钮、停下横幅、教练锁定态与「不等了」、结果区复盘中与「跳过」、教练栏按对局类型、复盘卡、桌面外观浮层、顶栏本桌花费）。
+验收：真实应用截图（2/3/6 人、教练局、自由局、stalled、摊牌亮弃牌）；动效三档可切换。
+结果：通过。审阅 `reviews/T6-T7-1.md`（F1–F4、L2–L8 已处理）；截图见 `evidence/T9/shots/`（2/3/6 人、教练局、自由局、停下、亮弃牌、动效三档）。
+
+## T7：其他页面
+
+目标：大厅（对局类型、最近手牌牌面、入座前置检查）、AI 对手（新建/编辑/删除/恢复/恢复默认、头像色）、回放（牌面、每街公共牌、结构化复盘、教练局亮出的底牌）、统计（用量与花费）、设置（删减项、牌桌外观组、思考速度说明）、引导文案。
+验收：截图；typecheck；相关测试。
+结果：通过。审阅同上；截图 00、09–13、15。
+
+## T8：自动更新与 CI 发布
+
+目标：`updater.ts`、更新提示 UI、`electron-builder.yml`（publish、mac zip、删 identity、forceCodeSigning）、`build.yml`（版本注入、价格快照、macOS 钥匙串与证书、非草稿发布、签名断言）、README（证书生成与 Secrets 配置）、删 `spike-v2.yml`。
+验收：workflow 语法与步骤自检；本地 `electron-builder --dir` 可打包（Linux）；证书步骤在未配置 Secret 时给出明确失败信息。
+结果：通过，见 `evidence/T8/record.md`。首次发布前需按 README“发布”一节生成证书并配置 Secrets。
+
+## T9：验收与收尾
+
+目标：全量测试、typecheck、构建；真实应用走一遍主要流程并截图；README 更新；最终独立审阅；推送。
+结果：通过，见 `evidence/T9/record.md`。全量 `vitest` 97/97、typecheck、构建通过；README 已更新。
+
+## 后续：用户验收反馈（2026-09-24）
+
+1. 教练复盘与回放里文字中的小牌面偏低：原先与点数文字的基线对齐再下移 7px。改为按字号缩放的行内牌面，竖直居中、用负外边距不撑高行距；相邻两张牌之间不留空格。
+2. 花费可选常用币种显示（人民币、美元、港币、新台币、欧元、英镑、日元、韩元、新加坡元，默认人民币）。汇率默认自动：启动时从 fawazahmed0/exchange-api 拉取以美元为基准的汇率（主地址 jsDelivr `@fawazahmed0/currency-api@latest`，失败换 `latest.currency-api.pages.dev`），缓存在 `river_kv.fx`，离线沿用缓存，从未拉到时用内置估值；也可切到手动填写，换币种时回到自动。用量仍按美元记录，换算只在显示时做。`test/fx.test.ts` 覆盖备用地址、字段过滤与缓存。

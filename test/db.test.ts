@@ -30,24 +30,44 @@ function hand(n: number, personaIds: string[], net = 10): HandRecord {
 }
 
 describe('迁移', () => {
-  it('重复执行不丢数据，user_version 为 1', async () => {
+  it('重复执行不丢数据，user_version 为 2', async () => {
     await db.setBankroll(1234)
     db.closeDb()
     await db.initDb({ url, ...crypto })
     expect(await db.getBankroll()).toBe(1234)
     const c = createClient({ url })
     const r = await c.execute('PRAGMA user_version')
-    expect(Number(r.rows[0][0])).toBe(1)
+    expect(Number(r.rows[0][0])).toBe(2)
     const t = await c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'river_%' ORDER BY name")
-    expect(t.rows.map((x) => x.name)).toEqual(['river_hands', 'river_kv', 'river_personas', 'river_providers', 'river_reviews'])
+    expect(t.rows.map((x) => x.name)).toEqual(['river_hands', 'river_kv', 'river_memory', 'river_personas', 'river_providers', 'river_reviews', 'river_usage'])
+    expect(String((await c.execute('PRAGMA journal_mode')).rows[0][0])).toBe('wal')
     c.close()
+  })
+
+  it('v1 库升级：旧提示词覆盖保留，旧设置字段不再下发', async () => {
+    db.closeDb()
+    const c = createClient({ url })
+    // 模拟 v1：回退到只有 v1 表结构的库
+    await c.batch([
+      'DROP TABLE river_personas', 'DROP TABLE river_memory', 'DROP TABLE river_usage',
+      'CREATE TABLE river_personas (persona_id TEXT PRIMARY KEY, prompt TEXT NOT NULL)',
+      "INSERT INTO river_personas VALUES ('li', '旧提示词')",
+      `INSERT INTO river_kv VALUES ('settings', '{"engine":"local","coachOn":false,"autoNext":false,"speed":2}')`,
+      'PRAGMA user_version = 1'
+    ], 'write')
+    c.close()
+    await db.initDb({ url, ...crypto })
+    expect(db.getSettings()).toEqual({ ...{ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} }, speed: 2 })
+    const li = db.personaOf('li')!
+    expect(li).toMatchObject({ name: '阿狸', prompt: '旧提示词', builtin: true, edited: true, deleted: false })
+    expect(db.personasCache.filter((p) => p.builtin)).toHaveLength(8)
   })
 })
 
 describe('kv', () => {
   it('默认值', async () => {
-    expect(db.getSettings()).toEqual({ engine: 'llm', speed: 1, coachOn: true, coachPersona: 0, level: 'novice', hard: false, autoNext: true, models: {} })
-    expect(await db.getLobby()).toEqual({ size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'] })
+    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} })
+    expect(await db.getLobby()).toEqual({ size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'coach' })
     expect(await db.getBankroll()).toBe(100000)
     expect(await db.getOnboarded()).toBe(false)
   })
@@ -56,7 +76,7 @@ describe('kv', () => {
     await db.updateSettings({ speed: 2, models: { coach: { providerId: 'p', modelId: 'm' } } })
     await db.updateSettings({ hard: true, models: { opponent: { providerId: 'p', modelId: 'o' } } })
     const want = {
-      engine: 'llm', speed: 2, coachOn: true, coachPersona: 0, level: 'novice', hard: true, autoNext: true,
+      speed: 2, coachPersona: 0, level: 'novice', hard: true, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null,
       models: { coach: { providerId: 'p', modelId: 'm' }, opponent: { providerId: 'p', modelId: 'o' } }
     }
     expect(db.getSettings()).toEqual(want)
@@ -72,24 +92,78 @@ describe('kv', () => {
     db.closeDb()
     await db.initDb({ url, ...crypto })
     expect(db.getSettings()).toMatchObject({ speed: 2, hard: true })
-    expect(db.getLobby()).toEqual({ size: 3, blinds: 2, picks: ['li', 'prof', 'bai', 'k', 'rock'] })
+    expect(db.getLobby()).toEqual({ size: 3, blinds: 2, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'coach' })
   })
 
-  it('lobby / onboarded / 提示词覆盖', async () => {
-    expect(await db.updateLobby({ size: 3 })).toEqual({ size: 3, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'] })
+  it('lobby / onboarded', async () => {
+    expect(await db.updateLobby({ size: 3, mode: 'free' })).toEqual({ size: 3, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'free' })
     await db.setOnboarded(true)
     expect(await db.getOnboarded()).toBe(true)
-    await db.setPrompt('li', 'A')
-    await db.setPrompt('li', 'B')
-    await db.setPrompt('k', 'C')
-    expect(await db.getPromptOverrides()).toEqual({ li: 'B', k: 'C' })
-    await db.resetPrompt('li')
-    expect(await db.getPromptOverrides()).toEqual({ k: 'C' })
+  })
+})
+
+describe('角色', () => {
+  it('内置角色：只存差异，恢复默认后回到种子', async () => {
+    expect(db.personaOf('li')).toMatchObject({ name: '阿狸', builtin: true, edited: false })
+    const li = db.personaOf('li')!
+    await db.savePersona({ ...li, prompt: '新提示词', hue: 99 })
+    expect(db.personaOf('li')).toMatchObject({ name: '阿狸', prompt: '新提示词', hue: 99, edited: true })
+    await db.savePersona({ ...li })
+    expect(db.personaOf('li')!.edited).toBe(false)
+    await db.savePersona({ ...li, name: '狸猫' })
+    await db.resetPersona('li')
+    expect(db.personaOf('li')).toMatchObject({ name: '阿狸', edited: false })
+  })
+
+  it('删除内置角色可恢复；自建角色新建、修改、删除；记忆随角色删除', async () => {
+    await db.deletePersona('k')
+    expect(db.personaOf('k')!.deleted).toBe(true)
+    await db.restorePersona('k')
+    expect(db.personaOf('k')!.deleted).toBe(false)
+    const c = await db.savePersona({ name: '新对手', tag: '自定义', ini: '新', hue: 25, desc: '', prompt: '你是……' })
+    expect(c.id).toMatch(/^c/)
+    expect(c).toMatchObject({ builtin: false, deleted: false })
+    expect(db.personasCache[0].id).toBe(c.id)
+    await db.savePersona({ ...c, name: '改名' })
+    expect(db.personaOf(c.id)!.name).toBe('改名')
+    await db.addMemory(c.id, '印象')
+    await db.deletePersona(c.id)
+    expect(db.personaOf(c.id)).toBeUndefined()
+    expect(await db.memoryOf(c.id)).toEqual([])
+    db.closeDb()
+    await db.initDb({ url, ...crypto })
+    expect(db.personaOf('k')!.deleted).toBe(false)
+  })
+})
+
+describe('记忆与用量', () => {
+  it('每个 owner 只留最近 10 条，按时间顺序返回', async () => {
+    for (let i = 0; i < 12; i++) await db.addMemory('li', 'm' + i)
+    await db.addMemory('hero', 'h')
+    expect(await db.memoryOf('li')).toEqual(Array.from({ length: 10 }, (_, i) => 'm' + (i + 2)))
+    await db.clearMemory()
+    expect(await db.memoryOf('hero')).toEqual([])
+  })
+
+  it('用量写入、列出、清零', async () => {
+    const row = { at: 1, tableId: 't', handNo: 3, purpose: 'decide' as const, providerKind: 'anthropic', modelId: 'm', input: 10, output: 2, cached: null }
+    await db.insertUsage(row)
+    await db.insertUsage({ ...row, purpose: 'recap', input: null, output: null })
+    expect(await db.listUsage()).toEqual([row, { ...row, purpose: 'recap', input: null, output: null }])
+    await db.resetUsage()
+    expect(await db.listUsage()).toEqual([])
+    expect(await db.getUsageSince()).toBeGreaterThan(0)
+  })
+
+  it('价格缓存', async () => {
+    expect(await db.getPriceCache()).toBeNull()
+    await db.setPriceCache({ at: 1 })
+    expect(await db.getPriceCache()).toEqual({ at: 1 })
   })
 })
 
 describe('手牌', () => {
-  it('插入与倒序列表、getHand、recentHands', async () => {
+  it('插入与倒序列表、getHand', async () => {
     const a = await db.insertHand('t1', hand(1, ['li']))
     const b = await db.insertHand('t1', hand(2, ['k'], -50))
     const list = await db.listHands()
@@ -98,17 +172,6 @@ describe('手牌', () => {
     expect(typeof list[0].playedAt).toBe('number')
     expect(await db.getHand(a)).toEqual(hand(1, ['li']))
     expect(await db.getHand(999)).toBeNull()
-    expect((await db.recentHands(1)).map((h) => h.hand)).toEqual([2])
-  })
-
-  it('handsForPersona 只返回含该角色的最近 n 手', async () => {
-    await db.insertHand('t', hand(1, ['li', 'k']))
-    await db.insertHand('t', hand(2, ['k']))
-    await db.insertHand('t', hand(3, ['li']))
-    await db.insertHand('t', hand(4, ['li']))
-    expect((await db.handsForPersona('li', 2)).map((h) => h.hand)).toEqual([4, 3])
-    expect((await db.handsForPersona('k', 10)).map((h) => h.hand)).toEqual([2, 1])
-    expect(await db.handsForPersona('zen', 10)).toEqual([])
   })
 
   it('clearHistory 后余额 100000，reviews 一并删除', async () => {
@@ -275,7 +338,7 @@ describe('写锁冲突', () => {
     // 等锁不能在主线程同步阻塞
     expect(maxGap).toBeLessThan(100)
     expect(results.every((r) => r.status === 'rejected' && /SQLITE_BUSY/.test(String(r.reason)))).toBe(true)
-    expect(db.getSettings()).toEqual({ engine: 'llm', speed: 1, coachOn: true, coachPersona: 0, level: 'novice', hard: false, autoNext: true, models: {} })
+    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} })
     expect(db.getLobby().size).toBe(4)
     expect(db.listProviders().map((x) => x.name)).toEqual(['A'])
   }, 15000)

@@ -10,7 +10,7 @@ type Options = { tools?: { name: string }[]; toolChoice?: unknown; abortSignal?:
 const usage = { inputTokens: 1, outputTokens: 1, totalTokens: 2 }
 
 export function scriptModel(steps: Step[]) {
-  const calls: { tools: string[]; toolChoice: unknown; system: string }[] = []
+  const calls: { tools: string[]; toolChoice: unknown; system: string; messages: number }[] = []
   let i = 0
   const model = {
     specificationVersion: 'v2',
@@ -40,7 +40,8 @@ export function scriptModel(steps: Step[]) {
     calls.push({
       tools: (options.tools ?? []).map((t) => t.name),
       toolChoice: options.toolChoice,
-      system: (options.prompt ?? []).filter((m) => m.role === 'system').map((m) => String(m.content)).join('\n')
+      system: (options.prompt ?? []).filter((m) => m.role === 'system').map((m) => String(m.content)).join('\n'),
+      messages: (options.prompt ?? []).filter((m) => m.role !== 'system').length
     })
     const step = steps[i++] ?? { text: 'ok' }
     if (step.delayMs) {

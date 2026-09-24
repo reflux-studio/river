@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { createClient, type Client } from '@libsql/client'
-import type { HandRecord, HandSummary, Lobby, ProviderInput, ProviderPublic, Settings } from '../../shared/types'
+import { PERSONAS } from '../../shared/personas'
+import { CURRENCIES, type Currency } from '../../shared/currency'
+import type { FxRates, HandRecord, HandSummary, Lobby, Persona, PersonaInput, ProviderInput, ProviderPublic, Purpose, Settings } from '../../shared/types'
 
 export interface ProviderRow {
   id: string
@@ -12,8 +14,11 @@ export interface ProviderRow {
   supportsRequired: boolean | null
 }
 
-const DEFAULT_SETTINGS: Settings = { engine: 'llm', speed: 1, coachOn: true, coachPersona: 0, level: 'novice', hard: false, autoNext: true, models: {} }
-const DEFAULT_LOBBY: Lobby = { size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'] }
+const DEFAULT_SETTINGS: Settings = {
+  speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}
+}
+const DEFAULT_LOBBY: Lobby = { size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'coach' }
+const MEMORY_KEEP = 10
 const DEFAULT_BANKROLL = 100000
 
 const MIGRATIONS = [
@@ -25,6 +30,20 @@ const MIGRATIONS = [
     'CREATE TABLE river_reviews (hand_id INTEGER PRIMARY KEY REFERENCES river_hands(id) ON DELETE CASCADE, text TEXT NOT NULL)',
     `CREATE TABLE river_providers (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL,
       base_url TEXT, api_key_enc BLOB, supports_required INTEGER)`
+  ],
+  // v2：角色表扩为完整角色（内置角色的列为 NULL 表示沿用种子；prompt 为空串同理）、记忆、用量
+  [
+    'ALTER TABLE river_personas ADD COLUMN name TEXT',
+    'ALTER TABLE river_personas ADD COLUMN tag TEXT',
+    'ALTER TABLE river_personas ADD COLUMN ini TEXT',
+    'ALTER TABLE river_personas ADD COLUMN hue INTEGER',
+    'ALTER TABLE river_personas ADD COLUMN description TEXT',
+    'ALTER TABLE river_personas ADD COLUMN builtin INTEGER NOT NULL DEFAULT 1',
+    'ALTER TABLE river_personas ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE river_personas ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0',
+    'CREATE TABLE river_memory (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_id TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL)',
+    `CREATE TABLE river_usage (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, table_id TEXT, hand_no INTEGER,
+      purpose TEXT NOT NULL, provider_kind TEXT, model_id TEXT, input INTEGER, output INTEGER, cached INTEGER)`
   ]
 ]
 
@@ -35,6 +54,7 @@ let decrypt: (enc: Buffer) => string
 
 export let settingsCache: Settings = DEFAULT_SETTINGS
 export const providersCache = new Map<string, ProviderRow>()
+export let personasCache: Persona[] = []
 let lobbyCache: Lobby = DEFAULT_LOBBY
 
 function db(): Client {
@@ -47,11 +67,10 @@ const isBusy = (e: unknown) => {
   return /^SQLITE_(BUSY|LOCKED)/.test(code ?? '') || /database (table )?is locked/i.test(message ?? '')
 }
 
-// Mastra 的交互式写事务跨 await 持锁，业务写会撞上 SQLITE_BUSY。客户端不设 busy_timeout：
-// 它在主线程同步等待，持锁的 Mastra 事务无法推进。改为异步退避重试（同 @mastra/libsql：5 次，100ms 起翻倍）。
+// 本模块是 river.db 唯一的写入方（ADR-004），但 libsql 客户端是连接池，读写连接之间仍可能 SQLITE_BUSY。
+// 客户端不设 busy_timeout：它在主线程同步等待。改为异步退避重试（5 次，100ms 起翻倍）。
 // 每次 BUSY 后必须换掉整个 client：libsql 0.18 出错的语句不会被重置，那条连接此后的写入只停留在
 // 未提交的隐式事务里——调用成功、别的连接却读不到，并一直持锁（evidence/T3/r3-busy.md）。
-// 因此 Mastra 也不能与本模块共用 client：共用时无法丢弃被污染的连接。
 // 旧 client 推迟到下一个宏任务再关：同一轮微任务里已拿到旧引用的读能做完，不会 CLIENT_CLOSED；
 // 下一次写至少在 100ms 退避之后且重新取 db()，所以被污染的连接不会再接到写入。
 // generation 在 initDb/closeDb 时递增：退避中的旧写入发现库已关闭或换库就放弃，不写进新库。
@@ -105,13 +124,14 @@ function write<T>(fn: (c: Client) => Promise<T>): Promise<T> {
   return p
 }
 
-// Mastra 的 LibSQLStore 用同一个 url 自建 client，不要共用本模块的 client（原因见 withRetry）
 export async function initDb(opts: { url: string; encrypt: (text: string) => Buffer; decrypt: (enc: Buffer) => string }) {
   encrypt = opts.encrypt
   decrypt = opts.decrypt
   closeDb()
   url = opts.url
   client = createClient({ url })
+  // 此前由 Mastra 的 LibSQLStore 设置；WAL 写在库文件里，新老库一致
+  await client.execute('PRAGMA journal_mode = WAL')
   const version = Number((await client.execute('PRAGMA user_version')).rows[0][0])
   for (let v = version; v < MIGRATIONS.length; v++) {
     // PRAGMA 与建表同在一个事务里，失败时版本号不会前移
@@ -120,9 +140,16 @@ export async function initDb(opts: { url: string; encrypt: (text: string) => Buf
   await loadCaches()
 }
 
+// 旧版本存下的字段（engine、coachOn、autoNext 等）不再下发
+const pick = <T extends object>(base: T, v: T): T => Object.fromEntries(Object.keys(base).map((k) => [k, v[k as keyof T]])) as T
+
 async function loadCaches() {
-  settingsCache = await getKv('settings', DEFAULT_SETTINGS)
-  lobbyCache = await getKv('lobby', DEFAULT_LOBBY)
+  settingsCache = pick(DEFAULT_SETTINGS, await getKv('settings', DEFAULT_SETTINGS))
+  // 不认识的币种（含早期存的大写代码）回到可识别的值
+  const cur = String(settingsCache.currency).toLowerCase()
+  settingsCache.currency = CURRENCIES.some((c) => c.code === cur) ? (cur as Currency) : DEFAULT_SETTINGS.currency
+  lobbyCache = pick(DEFAULT_LOBBY, await getKv('lobby', DEFAULT_LOBBY))
+  personasCache = await loadPersonas()
   const tails = await db().execute("SELECT key, value FROM river_kv WHERE key LIKE 'provider_tail:%'")
   const tailOf = new Map(tails.rows.map((r) => [String(r.key).slice('provider_tail:'.length), JSON.parse(String(r.value)) as string]))
   const rows = (await db().execute('SELECT * FROM river_providers')).rows
@@ -154,7 +181,7 @@ async function getKv<T>(key: string, fallback: T): Promise<T> {
   const r = await db().execute({ sql: 'SELECT value FROM river_kv WHERE key = ?', args: [key] })
   const value = r.rows.length ? JSON.parse(String(r.rows[0].value)) : undefined
   // 对象与默认值合并：旧数据在新增字段后仍完整，调用方也拿不到默认值本身的引用
-  if (typeof fallback === 'object') return { ...fallback, ...value }
+  if (fallback && typeof fallback === 'object') return { ...fallback, ...value }
   return value ?? fallback
 }
 
@@ -194,21 +221,157 @@ export const setBankroll = (n: number) => setKv('bankroll', n)
 export const getOnboarded = () => getKv('onboarded', false)
 export const setOnboarded = (v: boolean) => setKv('onboarded', v)
 
-export async function getPromptOverrides(): Promise<Record<string, string>> {
-  const r = await db().execute('SELECT persona_id, prompt FROM river_personas')
-  return Object.fromEntries(r.rows.map((x) => [String(x.persona_id), String(x.prompt)]))
+// ---- 角色 ----
+
+interface PersonaRow {
+  persona_id: string
+  prompt: string
+  name: string | null
+  tag: string | null
+  ini: string | null
+  hue: number | null
+  description: string | null
+  builtin: number
+  deleted: number
+  created_at: number
 }
 
-export async function setPrompt(personaId: string, prompt: string) {
+async function loadPersonas(): Promise<Persona[]> {
+  const rows = (await db().execute('SELECT * FROM river_personas ORDER BY created_at DESC')).rows as unknown as PersonaRow[]
+  const byId = new Map(rows.map((r) => [String(r.persona_id), r]))
+  const builtins = PERSONAS.map((seed): Persona => {
+    const r = byId.get(seed.id)
+    const merged = {
+      ...seed,
+      ...(r?.name != null && { name: String(r.name) }),
+      ...(r?.tag != null && { tag: String(r.tag) }),
+      ...(r?.ini != null && { ini: String(r.ini) }),
+      ...(r?.hue != null && { hue: Number(r.hue) }),
+      ...(r?.description != null && { desc: String(r.description) }),
+      ...(r?.prompt && { prompt: String(r.prompt) })
+    }
+    const edited = (['name', 'tag', 'ini', 'hue', 'desc', 'prompt'] as const).some((k) => merged[k] !== seed[k])
+    return { ...merged, builtin: true, edited, deleted: !!r?.deleted }
+  })
+  const customs = rows
+    .filter((r) => !Number(r.builtin))
+    .map((r): Persona => ({
+      id: String(r.persona_id), name: String(r.name ?? ''), tag: String(r.tag ?? ''), ini: String(r.ini ?? ''), hue: Number(r.hue ?? 0),
+      desc: String(r.description ?? ''), prompt: String(r.prompt), builtin: false, edited: false, deleted: false
+    }))
+  return [...customs, ...builtins]
+}
+
+export const personaOf = (id?: string) => personasCache.find((p) => p.id === id)
+
+async function reloadPersonas() {
+  personasCache = await loadPersonas()
+  return personasCache
+}
+
+// 内置角色只存与种子不同的字段；自建角色存全部字段
+export async function savePersona(input: PersonaInput): Promise<Persona> {
+  const seed = PERSONAS.find((p) => p.id === input.id)
+  const id = input.id && (seed || personaOf(input.id)) ? input.id : 'c' + randomUUID().slice(0, 8)
+  const diff = <K extends keyof PersonaInput>(k: K) => (seed && input[k] === seed[k as keyof typeof seed] ? null : input[k])
+  const prev = personaOf(id)
   await write((c) => c.execute({
-    sql: 'INSERT INTO river_personas (persona_id, prompt) VALUES (?, ?) ON CONFLICT(persona_id) DO UPDATE SET prompt = excluded.prompt',
-    args: [personaId, prompt]
+    sql: `INSERT INTO river_personas (persona_id, prompt, name, tag, ini, hue, description, builtin, deleted, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(persona_id) DO UPDATE SET prompt = excluded.prompt, name = excluded.name, tag = excluded.tag, ini = excluded.ini,
+            hue = excluded.hue, description = excluded.description`,
+    args: [id, (diff('prompt') as string | null) ?? '', diff('name'), diff('tag'), diff('ini'), diff('hue'), diff('desc'), seed ? 1 : 0, prev?.deleted ? 1 : 0, Date.now()]
+  }))
+  await reloadPersonas()
+  return personaOf(id)!
+}
+
+export async function deletePersona(id: string) {
+  const builtin = PERSONAS.some((p) => p.id === id)
+  await write((c) => c.batch([
+    builtin
+      ? { sql: `INSERT INTO river_personas (persona_id, prompt, deleted) VALUES (?, '', 1) ON CONFLICT(persona_id) DO UPDATE SET deleted = 1`, args: [id] }
+      : { sql: 'DELETE FROM river_personas WHERE persona_id = ?', args: [id] },
+    { sql: 'DELETE FROM river_memory WHERE owner_id = ?', args: [id] }
+  ], 'write'))
+  await reloadPersonas()
+}
+
+export async function restorePersona(id: string) {
+  await write((c) => c.execute({ sql: 'UPDATE river_personas SET deleted = 0 WHERE persona_id = ?', args: [id] }))
+  await reloadPersonas()
+}
+
+// 内置角色恢复种子内容（保留删除状态）
+export async function resetPersona(id: string) {
+  await write((c) => c.execute({
+    sql: "UPDATE river_personas SET prompt = '', name = NULL, tag = NULL, ini = NULL, hue = NULL, description = NULL WHERE persona_id = ? AND builtin = 1",
+    args: [id]
+  }))
+  await reloadPersonas()
+}
+
+// ---- 记忆（ADR-004：代码维护的短文档，每个 owner 只留最近 10 条） ----
+
+export async function addMemory(ownerId: string, text: string) {
+  await write((c) => c.batch([
+    { sql: 'INSERT INTO river_memory (owner_id, text, at) VALUES (?, ?, ?)', args: [ownerId, text, Date.now()] },
+    {
+      sql: 'DELETE FROM river_memory WHERE owner_id = ? AND id NOT IN (SELECT id FROM river_memory WHERE owner_id = ? ORDER BY id DESC LIMIT ?)',
+      args: [ownerId, ownerId, MEMORY_KEEP]
+    }
+  ], 'write'))
+}
+
+export async function memoryOf(ownerId: string): Promise<string[]> {
+  const r = await db().execute({ sql: 'SELECT text FROM river_memory WHERE owner_id = ? ORDER BY id DESC LIMIT ?', args: [ownerId, MEMORY_KEEP] })
+  return r.rows.map((x) => String(x.text)).reverse()
+}
+
+export async function clearMemory() {
+  await write((c) => c.execute('DELETE FROM river_memory'))
+}
+
+// ---- 用量 ----
+
+export interface UsageRow {
+  at: number
+  tableId: string | null
+  handNo: number | null
+  purpose: Purpose
+  providerKind: string | null
+  modelId: string | null
+  input: number | null
+  output: number | null
+  cached: number | null
+}
+
+export async function insertUsage(u: UsageRow) {
+  await write((c) => c.execute({
+    sql: 'INSERT INTO river_usage (at, table_id, hand_no, purpose, provider_kind, model_id, input, output, cached) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [u.at, u.tableId, u.handNo, u.purpose, u.providerKind, u.modelId, u.input, u.output, u.cached]
   }))
 }
 
-export async function resetPrompt(personaId: string) {
-  await write((c) => c.execute({ sql: 'DELETE FROM river_personas WHERE persona_id = ?', args: [personaId] }))
+export async function listUsage(): Promise<UsageRow[]> {
+  const r = await db().execute('SELECT * FROM river_usage ORDER BY id')
+  const num = (v: unknown) => (v == null ? null : Number(v))
+  const str = (v: unknown) => (v == null ? null : String(v))
+  return r.rows.map((x) => ({
+    at: Number(x.at), tableId: str(x.table_id), handNo: num(x.hand_no), purpose: String(x.purpose) as Purpose,
+    providerKind: str(x.provider_kind), modelId: str(x.model_id), input: num(x.input), output: num(x.output), cached: num(x.cached)
+  }))
 }
+
+export const getUsageSince = () => getKv('usage_since', 0)
+
+export async function resetUsage() {
+  await write((c) => c.batch(['DELETE FROM river_usage', kvUpsert('usage_since', Date.now())], 'write'))
+}
+
+export const getFxCache = () => getKv<FxRates | null>('fx', null)
+export const setFxCache = (v: FxRates) => setKv('fx', v)
+export const getPriceCache = () => getKv<unknown>('prices', null)
+export const setPriceCache = (v: unknown) => setKv('prices', v)
 
 export async function insertHand(tableId: string, record: HandRecord): Promise<number> {
   const r = await write((c) => c.execute({
@@ -216,6 +379,11 @@ export async function insertHand(tableId: string, record: HandRecord): Promise<n
     args: [tableId, record.hand, Date.now(), record.net, JSON.stringify(record)]
   }))
   return Number(r.lastInsertRowid)
+}
+
+export async function handKeys(): Promise<Set<string>> {
+  const r = await db().execute('SELECT table_id, hand_no FROM river_hands')
+  return new Set(r.rows.map((x) => `${x.table_id}:${x.hand_no}`))
 }
 
 export async function listHands(): Promise<HandSummary[]> {
@@ -226,24 +394,14 @@ export async function listHands(): Promise<HandSummary[]> {
   })
 }
 
+export async function handKeyOf(id: number): Promise<{ tableId: string; handNo: number } | null> {
+  const r = await db().execute({ sql: 'SELECT table_id, hand_no FROM river_hands WHERE id = ?', args: [id] })
+  return r.rows.length ? { tableId: String(r.rows[0].table_id), handNo: Number(r.rows[0].hand_no) } : null
+}
+
 export async function getHand(id: number): Promise<HandRecord | null> {
   const r = await db().execute({ sql: 'SELECT record FROM river_hands WHERE id = ?', args: [id] })
   return r.rows.length ? JSON.parse(String(r.rows[0].record)) : null
-}
-
-export async function recentHands(n: number): Promise<HandRecord[]> {
-  const r = await db().execute({ sql: 'SELECT record FROM river_hands ORDER BY id DESC LIMIT ?', args: [n] })
-  return r.rows.map((x) => JSON.parse(String(x.record)))
-}
-
-export async function handsForPersona(personaId: string, n: number): Promise<HandRecord[]> {
-  const r = await db().execute({
-    sql: `SELECT record FROM river_hands
-          WHERE EXISTS (SELECT 1 FROM json_each(record, '$.players') WHERE json_extract(value, '$.personaId') = ?)
-          ORDER BY id DESC LIMIT ?`,
-    args: [personaId, n]
-  })
-  return r.rows.map((x) => JSON.parse(String(x.record)))
 }
 
 export async function saveReview(handId: number, text: string) {

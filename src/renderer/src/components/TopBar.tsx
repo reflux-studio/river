@@ -1,4 +1,4 @@
-import { fmt } from '@/lib/format'
+import { costText, fmt, useMoney } from '@/lib/format'
 import { go, invoke, toastError, useRiver, type Page } from '@/lib/river'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +14,8 @@ const NAV: [Page, string][] = [
 export function TopBar({ page }: { page: Page }) {
   const view = useRiver((s) => s.view)
   const bankroll = useRiver((s) => s.bankroll)
+  const update = useRiver((s) => s.update)
+  const m = useMoney()
   const onTable = page === 'table'
 
   return (
@@ -42,6 +44,17 @@ export function TopBar({ page }: { page: Page }) {
         <div className="flex items-center gap-3.5 [-webkit-app-region:no-drag]">
           <div className="hidden text-sm font-medium whitespace-nowrap min-[1200px]:block">{view?.title}</div>
           <div className="text-sm whitespace-nowrap text-muted-foreground">第 {view?.handNo ?? 0} 手</div>
+          {view && (
+            <button
+              onClick={() => go('stats')}
+              title="本桌 LLM 用量，点击查看明细"
+              className="flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-[5px] text-[13px] whitespace-nowrap"
+            >
+              <span className="size-1.5 rounded-full bg-[oklch(0.7_0.14_70)]" />
+              <span className="text-muted-foreground">本桌</span>
+              <span className="font-semibold">{costText(view.cost, m)}</span>
+            </button>
+          )}
           <button
             onClick={() => invoke('table.leave').catch(toastError)}
             className="rounded-[9px] border border-input bg-white px-[13px] py-1.5 text-sm whitespace-nowrap hover:bg-accent"
@@ -50,9 +63,20 @@ export function TopBar({ page }: { page: Page }) {
           </button>
         </div>
       ) : (
-        <div className="flex items-baseline gap-1.5 text-sm whitespace-nowrap">
-          <span className="text-muted-foreground">筹码</span>
-          <span className="font-semibold">{fmt(bankroll)}</span>
+        <div className="flex items-center gap-3.5 [-webkit-app-region:no-drag]">
+          {update && !view && (
+            <button
+              onClick={() => invoke('update.install').catch(toastError)}
+              className="flex items-center gap-1.5 rounded-full bg-foreground px-3 py-[5px] text-[13px] whitespace-nowrap text-white"
+            >
+              <span className="size-1.5 rounded-full bg-[oklch(0.75_0.15_150)]" />
+              新版本 {update} 已就绪 · 重启更新
+            </button>
+          )}
+          <div className="flex items-baseline gap-1.5 text-sm whitespace-nowrap">
+            <span className="text-muted-foreground">筹码</span>
+            <span className="font-semibold">{fmt(bankroll)}</span>
+          </div>
         </div>
       )}
     </header>

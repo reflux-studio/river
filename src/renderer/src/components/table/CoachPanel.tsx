@@ -1,22 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
+import { MiniCards, RichText } from '@/components/PlayingCard'
 import { Segmented } from '@/components/Segmented'
 import { Switch } from '@/components/ui/switch'
-import { askCoach, configured, go, invoke, toastError, updateSettings, useRiver, type CoachItem } from '@/lib/river'
+import { netColor, signed } from '@/lib/format'
+import { askCoach, invoke, toastError, updateSettings, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import { COACHES } from '../../../../shared/personas'
-import type { Settings, TableView } from '../../../../shared/types'
+import type { CoachEntry, Recap, Settings, TableView } from '../../../../shared/types'
 
 const QUICK = {
   novice: ['现在该怎么打？', '对手可能有什么牌？', '什么是底池赔率？'],
   pro: ['对手的范围？', '加注还是平跟？', '河牌怎么计划？']
 }
-const FAIL: Record<string, string> = {
-  failed: '教练暂时没连上，稍后再问',
-  not_configured: '还没有配置教练模型',
-  breaker: '教练模型连续失败，已停用'
-}
 
-function ProbPanel({ nums }: { nums: NonNullable<TableView['nums']> }) {
+export function ProbPanel({ nums }: { nums: NonNullable<TableView['nums']> }) {
   // 所需胜率为 0 当且仅当无需跟注
   const free = nums.need === 0
   const good = free || nums.eq >= nums.need
@@ -50,47 +47,124 @@ function ProbPanel({ nums }: { nums: NonNullable<TableView['nums']> }) {
   )
 }
 
-function Bubble({ c }: { c: CoachItem }) {
-  const user = c.role === 'user'
-  const failed = c.error && c.error !== 'interrupted'
-  const text = c.text || (failed ? FAIL[c.error!] : '')
-  if (!text) return null
+const DOT = { good: 'oklch(0.55 0.14 155)', improve: 'oklch(0.72 0.14 70)', tip: 'oklch(0.6 0.17 255)' }
+
+export function RecapRows({ r, big }: { r: Recap; big?: boolean }) {
+  const rows: [string, string, string][] = [['做得好', DOT.good, r.good], ['可改进', DOT.improve, r.improve], ['下次记住', DOT.tip, r.tip]]
   return (
-    <div className={cn('flex max-w-[90%] flex-col gap-1', user ? 'items-end self-end' : 'items-start self-start')}>
-      <div
-        className={cn(
-          'rounded-xl px-3 py-[9px] text-sm leading-[1.6] whitespace-pre-wrap [text-wrap:pretty]',
-          user ? 'bg-foreground text-white' : 'bg-[#f3f3f1]',
-          failed && !c.text && 'text-muted-foreground'
-        )}
-      >
-        {text}
+    <div className="flex flex-col gap-2.5">
+      <div className={cn('leading-normal font-semibold [text-wrap:pretty]', big ? 'text-base' : 'text-sm')}>
+        <RichText text={r.headline} />
       </div>
-      {c.interrupted && <span className="text-[11px] text-muted-foreground">已中断</span>}
-      {failed && c.text && <span className="text-[11px] text-muted-foreground">{FAIL[c.error!]}</span>}
+      {rows.map(([l, dot, t]) => (
+        <div key={l} className={cn('flex gap-2', big ? 'text-sm leading-[1.65]' : 'text-[13px] leading-[1.6]')}>
+          <span className={cn('flex shrink-0 items-center gap-[5px] font-medium text-subtle', big ? 'h-[23px] w-[76px]' : 'h-[21px] w-[68px]')}>
+            <span className="size-1.5 rounded-full" style={{ background: dot }} />
+            {l}
+          </span>
+          <span className="min-w-0 flex-1 [text-wrap:pretty]"><RichText text={t} /></span>
+        </div>
+      ))}
     </div>
+  )
+}
+
+function RecapCard({ e }: { e: CoachEntry }) {
+  const coachName = useRiver((s) => COACHES[s.settings.coachPersona].n)
+  // 只能重试最近一手的复盘
+  const current = useRiver((s) => s.view?.handNo === e.handNo)
+  return (
+    <div className="shrink-0 overflow-hidden rounded-[14px] border bg-white">
+      <div className="flex flex-col gap-2 bg-topbar px-3 py-2.5">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[13px] font-semibold">第 {e.handNo} 手复盘</span>
+          <div className="flex-1" />
+          {e.hand && <span className={cn('text-[13px] font-semibold', netColor(e.hand.net))}>{signed(e.hand.net)}</span>}
+        </div>
+        {e.hand && (
+          <div className="flex items-center gap-2">
+            <MiniCards cards={e.hand.hero} w={20} h={28} />
+            {e.hand.board.length > 0 && (
+              <>
+                <span className="h-[18px] w-px bg-input" />
+                <MiniCards cards={e.hand.board} w={20} h={28} />
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="p-3">
+        {e.status === 'pending' && <span className="text-[13px] text-muted-foreground">教练正在复盘这一手…</span>}
+        {e.status === 'skipped' && <span className="text-[13px] text-muted-foreground">已跳过这一手的复盘，可在手牌回放里再让教练复盘。</span>}
+        {e.status === 'failed' && (
+          <div className="flex items-center gap-2 text-[13px] text-lose">
+            <span className="flex-1">复盘失败：{e.error}</span>
+            {current && <button onClick={() => invoke('coach.retry').catch(toastError)} className="rounded-full border border-input bg-white px-2.5 py-0.5 text-foreground hover:bg-accent">重试</button>}
+          </div>
+        )}
+        {e.status === 'done' && e.recap && (
+          <div className="flex flex-col gap-2.5">
+            <RecapRows r={e.recap} />
+            <span className="text-[11px] text-[#a1a1a6]">{coachName}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Entry({ e }: { e: CoachEntry }) {
+  if (e.kind === 'recap') return <RecapCard e={e} />
+  if (e.kind === 'user')
+    return <div className="max-w-[90%] self-end rounded-xl bg-foreground px-3 py-[9px] text-sm leading-[1.7] whitespace-pre-wrap text-white">{e.text}</div>
+  const failed = e.status === 'failed'
+  const text = e.text || (e.status === 'pending' ? (e.kind === 'speak' ? '教练正在看牌…' : '…') : '')
+  return (
+    <div className={cn('flex flex-col gap-1.5 rounded-xl px-3.5 py-3', e.kind === 'speak' ? 'bg-[oklch(0.97_0.015_255)]' : 'max-w-[90%] self-start bg-[#f3f3f1]')}>
+      {e.kind === 'speak' && <div className="text-xs font-semibold text-[oklch(0.5_0.15_255)]">第 {e.handNo} 手 · 教练</div>}
+      {text && <div className={cn('text-sm leading-[1.7] whitespace-pre-wrap [text-wrap:pretty]', !e.text && 'text-muted-foreground')}><RichText text={text} /></div>}
+      {e.status === 'skipped' && <span className="text-[11px] text-muted-foreground">已跳过</span>}
+      {failed && <span className="text-[12px] text-muted-foreground">{e.kind === 'speak' ? '教练这次没连上' : `教练暂时没连上：${e.error ?? ''}`}</span>}
+    </div>
+  )
+}
+
+function useAutoScroll(dep: unknown) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [dep])
+  return ref
+}
+
+// 自由局：只有概率面板（A3）
+function FreePanel({ view: v }: { view: TableView }) {
+  return (
+    <aside className="flex min-h-0 w-[264px] shrink-0 flex-col border-l min-[1100px]:w-[296px]">
+      <div className="border-b border-[#f0f0ee] px-4 py-3 text-[15px] font-semibold">概率</div>
+      <div className="flex flex-col gap-3.5 overflow-auto px-4 py-3.5">
+        {v.nums ? <ProbPanel nums={v.nums} /> : <div className="text-[13px] text-muted-foreground">轮到你时显示胜率与所需胜率。</div>}
+        <div className="text-xs leading-[1.6] text-muted-foreground">自由局没有教练。想要每步讲解与每手复盘，下次开桌选“教练局”。</div>
+      </div>
+    </aside>
   )
 }
 
 export function CoachPanel({ view: v }: { view: TableView }) {
   const st = useRiver((s) => s.settings)
   const coach = useRiver((s) => s.coach)
-  const alert = v.alert
-  const ready = useRiver((s) => configured(s, 'coach'))
   const [input, setInput] = useState('')
-  const threadRef = useRef<HTMLDivElement>(null)
-  const loading = v.coachLoading && !coach.some((c) => c.pending && c.text)
-  useEffect(() => {
-    const el = threadRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [coach, loading, alert?.message])
+  const threadRef = useAutoScroll(coach)
+  if (v.mode === 'free') return <FreePanel view={v} />
 
+  const busy = v.coach?.busy ?? null
   const set = (patch: Partial<Settings>) => void updateSettings(patch)
   const ask = (text: string) => {
     const t = text.trim()
-    if (!t) return
+    if (!t || busy) return
     setInput('')
-    askCoach(t).catch(toastError)
+    void askCoach(t)
   }
 
   return (
@@ -102,11 +176,8 @@ export function CoachPanel({ view: v }: { view: TableView }) {
           className="flex min-w-0 flex-1 flex-col text-left"
         >
           <span className="text-sm font-semibold whitespace-nowrap">教练 · {COACHES[st.coachPersona].n} ▾</span>
-          <span className="text-xs whitespace-nowrap text-muted-foreground">
-            {st.coachOn ? '主动提醒已开启 · 点名字切换人设' : '主动提醒已关闭 · 仍可随时提问'}
-          </span>
+          <span className="text-xs whitespace-nowrap text-muted-foreground">{v.guided ? '教学牌局 · 每步详细讲解' : '每步先讲解 · 每手自动复盘'}</span>
         </button>
-        <Switch checked={st.coachOn} onCheckedChange={(coachOn) => set({ coachOn })} />
       </div>
       <div className="px-4 pt-2.5">
         <Segmented
@@ -116,61 +187,43 @@ export function CoachPanel({ view: v }: { view: TableView }) {
           onChange={(level) => set({ level })}
         />
       </div>
+      {/* 概率面板固定在讲解区外：教练每步都说，放进滚动区会被顶出视野 */}
+      {v.nums && (
+        <div className="px-4 pt-3">
+          {st.hard ? (
+            <div className="rounded-[10px] border border-dashed border-input px-3 py-2.5 text-[13px] text-muted-foreground">硬核模式：概率信息已隐藏。</div>
+          ) : (
+            <ProbPanel nums={v.nums} />
+          )}
+        </div>
+      )}
       <div ref={threadRef} className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto px-4 py-3.5">
-        {v.paused && (
-          <div className="flex items-center gap-2.5 rounded-[10px] bg-foreground px-3 py-2.5 text-[13px] text-white">
-            <span className="size-[7px] shrink-0 rounded-full bg-[oklch(0.8_0.15_80)]" />
-            <span className="flex-1">牌局已暂停</span>
-            <button onClick={() => invoke('table.resume').catch(toastError)} className="rounded-full bg-white px-2.5 py-[3px] whitespace-nowrap text-foreground">继续</button>
+        {coach.map((e) => <Entry key={e.id} e={e} />)}
+        {!coach.length && (
+          <div className="text-[13px] leading-[1.6] text-muted-foreground">
+            轮到你时，教练会先说说局面和建议；每手结束后自动复盘。你也可以随时提问，提问时牌局会暂停。
           </div>
-        )}
-        {alert && (
-          <div className={cn('flex flex-col gap-1.5 rounded-xl px-3.5 py-3', alert.level === 'pause' ? 'bg-[oklch(0.96_0.03_80)]' : 'bg-[oklch(0.97_0.015_255)]')}>
-            <div className={cn('text-xs font-semibold', alert.level === 'pause' ? 'text-[oklch(0.5_0.12_70)]' : 'text-[oklch(0.5_0.15_255)]')}>
-              {alert.level === 'pause' ? '教练暂停了牌局' : '教练提醒'}
-            </div>
-            <div className="text-sm leading-[1.6] [text-wrap:pretty]">{alert.message}</div>
-          </div>
-        )}
-        {v.nums && !st.hard && <ProbPanel nums={v.nums} />}
-        {v.nums && st.hard && (
-          <div className="rounded-[10px] border border-dashed border-input px-3 py-2.5 text-[13px] text-muted-foreground">硬核模式：概率信息已隐藏。</div>
-        )}
-        {coach.map((c, i) => <Bubble key={`${c.requestId}-${c.role}-${i}`} c={c} />)}
-        {loading && <div className="self-start rounded-xl bg-[#f3f3f1] px-3 py-2 text-[13px] text-muted-foreground">教练正在看牌…</div>}
-        {!ready ? (
-          <div className="flex flex-col items-start gap-2.5 rounded-xl border border-dashed border-input px-3.5 py-3 text-[13px] leading-[1.6] text-muted-foreground">
-            教练模型未配置，配置模型后可用。概率面板照常显示。
-            <button onClick={() => go('settings')} className="rounded-full border border-input bg-white px-3 py-1 text-[13px] text-foreground hover:bg-accent">去配置</button>
-          </div>
-        ) : (
-          !alert && !coach.length && !loading && (
-            <div className="text-[13px] leading-[1.6] text-muted-foreground">
-              轮到你时，教练会自己判断：保持沉默、提醒你，还是暂停牌局。你也可以随时提问，提问时牌局会暂停。
-            </div>
-          )
         )}
       </div>
       <div className="flex flex-col gap-2.5 border-t px-4 pt-3 pb-4">
-        {ready && (
-          <>
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK[st.level].map((q) => (
-                <button key={q} onClick={() => ask(q)} className="rounded-full border px-2.5 py-1 text-xs text-label hover:bg-accent">{q}</button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && ask(input)}
-                placeholder="问问教练…"
-                className="min-w-0 flex-1 rounded-[10px] border border-input px-3 py-[9px] text-sm outline-none"
-              />
-              <button onClick={() => ask(input)} className="rounded-[10px] bg-foreground px-3 py-[9px] text-sm whitespace-nowrap text-white">暂停并提问</button>
-            </div>
-          </>
-        )}
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK[st.level].map((q) => (
+            <button key={q} disabled={!!busy} onClick={() => ask(q)} className="rounded-full border px-2.5 py-1 text-xs text-label hover:bg-accent disabled:opacity-40">{q}</button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            // 输入法组合中的回车是选词，不是发送
+            onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && ask(input)}
+            placeholder={busy ? '教练说完后可以提问…' : '问问教练…'}
+            className="min-w-0 flex-1 rounded-[10px] border border-input px-3 py-[9px] text-sm outline-none"
+          />
+          <button onClick={() => ask(input)} disabled={!!busy} className="rounded-[10px] bg-foreground px-3 py-[9px] text-sm whitespace-nowrap text-white disabled:opacity-40">
+            暂停并提问
+          </button>
+        </div>
         <div className="flex items-center gap-2 text-[13px] text-label">
           <span className="flex-1">硬核模式 · 隐藏概率</span>
           <Switch checked={st.hard} onCheckedChange={(hard) => set({ hard })} />

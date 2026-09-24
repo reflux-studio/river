@@ -1,20 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { Avatar } from '@/components/Avatar'
-import { PlayingCard } from '@/components/PlayingCard'
-import { cardsText, fmt, netColor, signed } from '@/lib/format'
+import { MiniCards, PlayingCard } from '@/components/PlayingCard'
+import { RecapRows } from '@/components/table/CoachPanel'
+import { costText, fmt, netColor, signed, useMoney } from '@/lib/format'
 import { configured, go, invoke, toastError, useEvent, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import { STREET } from '../../../shared/personas'
-import type { HandRecord, HandSummary } from '../../../shared/types'
+import type { Card, Cost, HandRecord, HandSummary, Recap } from '../../../shared/types'
 
-type Detail = { id: number; record: HandRecord; review?: string }
+type Detail = { id: number; record: HandRecord; review?: Recap | string; cost?: Cost }
 
 const card = 'rounded-[14px] border bg-white'
 
 function streetsOf(log: HandRecord['log']) {
-  const out: { name: string; board: string; items: HandRecord['log'] }[] = []
+  const out: { name: string; board: string; cards?: Card[]; items: HandRecord['log'] }[] = []
   for (const x of log) {
-    if (x.board || !out.length) out.push({ name: STREET[x.street], board: x.board ? x.label : '', items: [] })
+    if (x.board || !out.length) out.push({ name: STREET[x.street], board: x.board ? x.label : '', cards: x.cards, items: [] })
     if (!x.board) out[out.length - 1].items.push(x)
   }
   return out
@@ -47,13 +48,15 @@ function Review({ d, loading, failed, onReview }: { d: Detail; loading: boolean;
       )}
       {loading && <span className="text-[13px] text-muted-foreground">教练正在回看这一手…</span>}
       {failed && !loading && !d.review && <span className="text-[13px] text-lose">复盘失败，稍后再试</span>}
-      {d.review && <div className="text-sm leading-[1.7] text-pretty whitespace-pre-wrap">{d.review}</div>}
+      {typeof d.review === 'string' && <div className="text-sm leading-[1.7] text-pretty whitespace-pre-wrap">{d.review}</div>}
+      {d.review && typeof d.review === 'object' && <RecapRows r={d.review} big />}
     </div>
   )
 }
 
 function HandDetail({ d, ...review }: { d: Detail } & Omit<Parameters<typeof Review>[0], 'd'>) {
   const personas = useRiver((s) => s.personas)
+  const m = useMoney()
   const r = d.record
   return (
     <div className="mx-auto flex max-w-[820px] flex-col gap-5 p-8">
@@ -64,12 +67,14 @@ function HandDetail({ d, ...review }: { d: Detail } & Omit<Parameters<typeof Rev
         <span className="text-[13px] text-muted-foreground">
           盲注 {r.sb}/{r.bb} · 底池 {fmt(r.pot)}
           {r.showdown && ' · 摊牌'}
+          {r.mode === 'coach' && ' · 教练局'}
+          {d.cost && ` · ${costText(d.cost, m)}`}
         </span>
       </div>
       {r.board.length > 0 && (
         <div className="flex gap-1.5">
           {r.board.map((c) => (
-            <PlayingCard key={c} card={c} w={50} h={70} />
+            <PlayingCard key={c} card={c} w={50} h={70} className="border border-input shadow-[0_2px_6px_rgba(0,0,0,0.06)]" />
           ))}
         </div>
       )}
@@ -78,9 +83,12 @@ function HandDetail({ d, ...review }: { d: Detail } & Omit<Parameters<typeof Rev
           const persona = personas.find((x) => x.id === p.personaId)
           return (
             <div key={p.id} className="flex items-center gap-3 border-b border-divider py-2.5 text-sm last:border-b-0">
-              <Avatar ini={persona?.ini ?? '你'} hue={persona?.hue} />
+              <Avatar ini={p.id === 'hero' ? '你' : (persona?.ini ?? p.name.slice(0, 1))} hue={persona?.hue} />
               <span className="w-[70px] font-semibold">{p.name}</span>
-              <span className="flex-1 font-medium">{p.hole ? cardsText(p.hole) : p.folded ? '已弃牌' : '未亮牌'}</span>
+              <span className="flex flex-1 items-center gap-2">
+                {p.hole || p.holeAfter ? <MiniCards cards={(p.hole ?? p.holeAfter)!} w={20} h={28} /> : null}
+                {(p.folded || !(p.hole || p.holeAfter)) && <span className="text-[13px] text-[#a1a1a6]">{p.folded ? '已弃牌' : '未亮牌'}</span>}
+              </span>
               <span className={cn('text-[13px]', p.won ? 'text-win' : 'text-muted-foreground')}>
                 {p.won ? `赢得 ${fmt(p.won)}${p.handName ? ' · ' + p.handName : ''}` : p.hole && p.handName ? p.handName : ''}
               </span>
@@ -91,15 +99,14 @@ function HandDetail({ d, ...review }: { d: Detail } & Omit<Parameters<typeof Rev
       <div className="flex flex-col gap-3.5">
         {streetsOf(r.log).map((st, i) => (
           <div key={i} className="flex gap-4">
-            <div className="flex w-20 shrink-0 flex-col gap-0.5">
+            <div className="flex w-[110px] shrink-0 flex-col gap-[5px]">
               <span className="text-[13px] font-semibold">{st.name}</span>
-              <span className="text-xs text-muted-foreground">{st.board}</span>
+              {st.cards ? <MiniCards cards={st.cards} /> : <span className="text-xs text-muted-foreground">{st.board}</span>}
             </div>
             <div className="flex flex-1 flex-wrap content-start items-start gap-1.5">
               {st.items.map((it, j) => (
                 <span key={j} className="rounded-full border bg-white px-2.5 py-1 text-[13px] whitespace-nowrap">
                   <b className="font-semibold">{it.name}</b> {it.label}
-                  {it.autopilot && <span className="ml-1.5 rounded bg-muted px-1 py-px text-[11px] text-muted-foreground">托管</span>}
                 </span>
               ))}
             </div>
@@ -142,9 +149,9 @@ export function Replays() {
   const mark = (id: number, st?: 'loading' | 'failed') =>
     setReviews(({ [id]: _, ...rest }) => (st ? { ...rest, [id]: st } : rest))
 
-  useEvent('review:done', ({ handId, text, error }) => {
+  useEvent('review:done', ({ handId, review, error }) => {
     mark(handId, error ? 'failed' : undefined)
-    if (text) setDetail((d) => (d?.id === handId ? { ...d, review: text } : d))
+    if (review) setDetail((d) => (d?.id === handId ? { ...d, review } : d))
   })
 
   const review = (id: number) => {
@@ -178,7 +185,7 @@ export function Replays() {
                 <span className="text-[13px]">#{h.handNo}</span>
                 <span className="text-[11px]">{new Date(h.playedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
               </span>
-              <span className="flex-1 font-medium">{cardsText(h.hero)}</span>
+              <span className="flex-1"><MiniCards cards={h.hero} w={20} h={28} /></span>
               <span className={cn('font-semibold', netColor(h.net))}>{signed(h.net)}</span>
             </button>
           ))}
