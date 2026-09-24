@@ -18,7 +18,6 @@ export interface ViewState {
   paused: boolean
   bubbles: Map<string, { text: string; until: number }>
   autopilotIds: Set<string>
-  defaultRaiseTo: number
   nums: Nums | null
   numsKey: string | null
   coachLoading: boolean
@@ -89,6 +88,7 @@ export function buildTableView(s: ViewState): TableView {
   const presets = (
     [['⅓ 池', 0.33], ['½ 池', 0.5], ['¾ 池', 0.75], ['满池', 1], ['全下', null]] as const
   ).map(([label, f]) => ({ label, to: f === null ? L.maxTo : clamp(g.currentBet + r((total + L.toCall) * f)) }))
+  const defaultRaiseTo = L.canRaise ? clamp(g.currentBet === 0 ? r(total * 0.5) : r(g.currentBet * 2.5)) : 0
   const hw = g.done ? g.winners?.find((w) => w.id === hero.id) : undefined
   const net = hero.stack - hero.startStack
   const nameOf = (id: string) => g.players.find((p) => p.id === id)?.name ?? ''
@@ -100,7 +100,7 @@ export function buildTableView(s: ViewState): TableView {
     board: g.board.slice(),
     pot: total - bets,
     seats,
-    hero: { legal: L, toCall: L.toCall, isTurn: heroTurn, defaultRaiseTo: s.defaultRaiseTo, presets },
+    hero: { legal: L, toCall: L.toCall, isTurn: heroTurn, defaultRaiseTo, presets },
     paused: s.paused,
     done: g.done,
     runout: g.runout,

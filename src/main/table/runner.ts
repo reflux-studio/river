@@ -86,7 +86,6 @@ export class TableRunner {
   private rng: Rng
   private alert: CoachAlert | null = null
   private numsKey: string | null = null
-  private defaultRaiseTo = 0
   private autopilotIds = new Set<string>()
   private lastStreet = ''
   private endKey: number | null = null
@@ -365,7 +364,7 @@ export class TableRunner {
     if (a.type !== 'raise' && L.toCall === 0) act.type = 'check'
     if (a.type === 'raise') {
       if (!L.canRaise) return
-      act.to = Math.max(L.minTo, Math.min(L.maxTo, a.to ?? this.defaultRaiseTo))
+      act.to = Math.max(L.minTo, Math.min(L.maxTo, a.to ?? L.minTo))
     }
     const label = apply(g, 0, act)
     this.push({ kind: 'act', from: 'hero', act: label, triggers: false })
@@ -385,10 +384,6 @@ export class TableRunner {
     if (key === this.heroKey) return
     this.heroKey = key
     this.thinking = null
-    const L = legal(g, 0)
-    const total = pot(g)
-    const r = (x: number) => Math.round(x / g.bb) * g.bb
-    this.defaultRaiseTo = L.canRaise ? Math.max(L.minTo, Math.min(L.maxTo, g.currentBet === 0 ? r(total * 0.5) : r(g.currentBet * 2.5))) : 0
     this.nums = this.numsFor(g, 0, 400)
     this.numsKey = key
     this.broadcast()
@@ -729,7 +724,6 @@ export class TableRunner {
       paused: this.paused,
       bubbles: this.bubbles,
       autopilotIds: this.autopilotIds,
-      defaultRaiseTo: this.defaultRaiseTo,
       nums: this.nums,
       numsKey: this.numsKey,
       coachLoading: this.proactiveKey !== null || this.askInFlight,
