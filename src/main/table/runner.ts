@@ -47,6 +47,8 @@ const BUBBLE_MS = 5000
 const MAX_CHAT = 300
 const GUIDED_ALERT: CoachAlert = { level: 'hint', message: '这是一手教学牌局。每次轮到你，我都会先说说局面；有任何不懂的，直接在下面问我。' }
 
+const freshBreaker = () => ({ opponent: 0, coach: 0, trippedOpponent: false, trippedCoach: false })
+
 type Outcome<T> = { kind: 'done'; value: T } | { kind: 'timeout' } | { kind: 'dropped' } | { kind: 'error'; error: string }
 
 interface PendingAI {
@@ -67,7 +69,7 @@ export class TableRunner {
   heroKey: string | null = null
   thinking: string | null = null
   autopilotCount = 0
-  breaker = { opponent: 0, coach: 0, trippedOpponent: false, trippedCoach: false }
+  breaker = freshBreaker()
   guided = false
   chat: ChatMessage[] = []
   bubbles = new Map<string, { text: string; until: number }>()
@@ -152,7 +154,7 @@ export class TableRunner {
     this.leaveController = new AbortController()
     this.resetTableState()
     this.guided = guided
-    this.breaker = { opponent: 0, coach: 0, trippedOpponent: false, trippedCoach: false }
+    this.breaker = freshBreaker()
     this.autopilotCount = 0
     this.lastTriggered.clear()
     this.sys(`入座 · ${sb}/${bb} · ${players.length} 人桌`)
@@ -176,26 +178,30 @@ export class TableRunner {
     await setBankroll(this.bankroll)
   }
 
-  private resetTableState() {
-    clearTimeout(this.stepTimer)
+  private resetHandState() {
     clearTimeout(this.autoTimer)
+    this.autoHand = null
     this.paused = false
     this.pendingAI = null
     this.heroKey = null
+    this.endKey = null
+    this.winSpeechInFlight = null
+    this.nums = null
+    this.numsKey = null
+    this.autopilotIds.clear()
+  }
+
+  private resetTableState() {
+    this.resetHandState()
+    clearTimeout(this.stepTimer)
     this.thinking = null
     this.chat = []
     this.bubbles.clear()
     this.askInFlight = false
     this.askId = null
-    this.winSpeechInFlight = null
     this.coachThread = []
-    this.nums = null
-    this.numsKey = null
-    this.autopilotIds.clear()
-    this.endKey = null
     this.deciding = null
     this.proactiveKey = null
-    this.autoHand = null
     this.alert = null
   }
 
@@ -210,7 +216,7 @@ export class TableRunner {
   }
 
   retryModels() {
-    this.breaker = { opponent: 0, coach: 0, trippedOpponent: false, trippedCoach: false }
+    this.breaker = freshBreaker()
     this.broadcast()
   }
 
@@ -218,8 +224,6 @@ export class TableRunner {
   nextHand() {
     const g = this.game
     if (!g || !g.done) return
-    clearTimeout(this.autoTimer)
-    this.autoHand = null
     for (const p of g.players) {
       if (!p.isHero && p.stack <= 0) {
         p.stack = g.bb * 100
@@ -227,16 +231,10 @@ export class TableRunner {
       }
     }
     if (g.players[0].stack <= 0) return this.broadcast()
+    // 须在破产检查之后：破产时保留 endKey，避免 resume 重入 loop 时重复结算本手
+    this.resetHandState()
     startHand(g)
     this.lastStreet = 'preflop'
-    this.heroKey = null
-    this.endKey = null
-    this.winSpeechInFlight = null
-    this.pendingAI = null
-    this.autopilotIds.clear()
-    this.nums = null
-    this.numsKey = null
-    this.paused = false
     this.sys(`第 ${g.hand} 手 · 翻牌前`)
     if (!(this.guided && g.hand === 1)) this.alert = null
     void this.loop()
