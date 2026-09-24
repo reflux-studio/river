@@ -1,6 +1,6 @@
 # River v2：技术方案
 
-状态：依据 `discussion.md` 第 5 轮（审阅 1–3 见 `reviews/design-1..3.md`，第 5 轮已处理审阅 3 的全部发现）。用户 2026-09-24 批准方向并授权“其余由 AI 决定、一口气做完”。决策记录 `adr/004`（去掉 Mastra 存储）、`adr/005`（自签证书 + electron-updater）。
+状态：已完成并归档（见 `summary.md`）。依据 `discussion.md` 第 5 轮（审阅 1–3 见 `reviews/design-1..3.md`，第 5 轮已处理审阅 3 的全部发现）。用户 2026-09-24 批准方向并授权“其余由 AI 决定、一口气做完”。决策记录 `adr/004`（去掉 Mastra 存储）、`adr/005`（自签证书 + electron-updater）。
 
 ## 目标
 

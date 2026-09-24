@@ -1,5 +1,7 @@
 # River v2：实施任务
 
+状态：全部完成，已归档（见 `summary.md`）。
+
 依据 `plan.md`。用户 2026-09-24 授权“一口气干完”。每个任务完成后由独立审阅代理审阅（`reviews/T*-*.md`），证据放 `evidence/T*/`。共同约定沿用 river-desktop：牌局状态只在主进程；对手读不到未公开的底牌；注释只写“为什么”；类型契约在 `src/shared/types.ts`。
 
 ```
