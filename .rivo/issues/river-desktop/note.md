@@ -71,6 +71,11 @@ T4 实测结论（2026-09-24，@mastra/core 1.69.0，证据 evidence/T4/、revie
 - resource 作用域下 `memory.updateWorkingMemory` 不要求 thread 存在，`threadId` 可为占位值。
 - Mastra 1.69 会拒绝执行不在 `activeTools` 中的已注册工具，但项目不应依赖这一点做信息隔离：对手与教练 agent 分别注册各自的工具，工具内再校验调用者角色。
 
+T9 打包结论（2026-09-24，electron-builder 26，macOS arm64）：
+- `mac.identity: null` 会留下残缺的链接器签名；带下载隔离标记时 macOS 直接提示“已损坏，应移到废纸篓”，系统设置中没有放行入口。
+- 改为 ad-hoc 签名（`identity: '-'`）后，未公证的应用走“无法验证开发者”流程，可在“隐私与安全性”中手动允许。
+- ad-hoc 签名同时开启 hardened runtime 时，库校验会拦下 libsql 的 `.node`；hardened runtime 只在公证时需要，因此关闭（`hardenedRuntime: false`）。
+
 ## 业务数据存储
 
 Mastra storage 只提供自身领域的表（thread、message、resource、workflow 快照等），不提供通用业务表。手牌历史、设置、筹码、提供方配置需在同一 SQLite 文件中另建 `river_*` 表，使用 `@libsql/client` 直接读写。API key 不以明文入库，使用 Electron `safeStorage` 加密后存储。

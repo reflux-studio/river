@@ -13,6 +13,9 @@ mac:
   target:
     - target: dmg
       arch: arm64
-  identity: null
+  # 不签名（null）会留下残缺的链接器签名，带下载隔离标记时 macOS 直接判为“已损坏”；ad-hoc 签名则走可放行的“未验证开发者”流程
+  identity: '-'
+  # hardened runtime 只在公证时需要；ad-hoc 签名下开启它会让库校验拦下 libsql 的 .node
+  hardenedRuntime: false
   artifactName: ${productName}-${version}-${arch}.${ext}
 npmRebuild: false
