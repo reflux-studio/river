@@ -73,7 +73,7 @@ River 自研引擎（移植自原型 `poker.js`，`src/main/engine/poker.ts` 278
 
 ## 第 3 轮补充核实（2026-09-24，依据用户答复）
 
-- Mastra 模型调用自带重试：`retries: modelSettings?.maxRetries ?? 2`，1 秒起、因子 2 的退避，遵守 `Retry-After`；`isRetryableModelError` 对 `APICallError` 按其 `isRetryable`（401/404 等为否）判断，Mastra 自身的超时不重试，外部 `abortSignal` 中止即停。依据：`@mastra/core/dist/agent-DwtTO5Px.js` 第 24943–24968、25135–25150 行。“模型没调用工具”不是错误，不会触发重试。
+- Mastra 模型调用的重试（审阅 2 F1 更正）：执行层是 `retries: modelSettings?.maxRetries ?? 2`，但 Agent 构造时 `this.maxRetries = config.maxRetries ?? 0`（第 34812 行），单模型时逐步设置取它（第 38720、26681 行），所以不显式设置 `maxRetries` 时默认 0 次、不重试；设置后，1 秒起、因子 2 的退避，遵守 `Retry-After`；`isRetryableModelError` 对 `APICallError` 按其 `isRetryable`（401/404 等为否）判断，Mastra 自身的超时不重试，外部 `abortSignal` 中止即停。依据：`@mastra/core/dist/agent-DwtTO5Px.js` 第 24943–24968、25135–25150 行。“模型没调用工具”不是错误，不会触发重试。
 - Mastra 记忆的开箱方案：working memory 由 agent 调用 `updateWorkingMemory` 工具更新（或交给 Observational Memory 的 Observer 抽取）；Observational Memory 由后台 Observer/Reflector 额外调用模型，默认 `observation.messageTokens` 3 万 token 才开始观察，resource 作用域标注为实验性。依据：`@mastra/memory/dist/docs/references/docs-memory-overview.md`、`docs-memory-observational-memory.md`、`reference-memory-observational-memory.md` 第 32–124 行。
 - 设置页的模型列表来源：IPC `provider.registry` 返回 `PROVIDER_REGISTRY`（`src/main/ipc.ts` 第 47–50 行），即 Mastra 包内静态文件 `provider-registry.json`（`gateway: "models.dev"`），只含提供方、端点与模型名，没有价格；不连供应商接口。
 - models.dev 的 `api.json` 是否含价格：本会话网络策略拒绝连接 `models.dev:443`，未实测；需在实施首个任务时在可联网环境核实字段。
