@@ -1,21 +1,16 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { afterEach, expect, it } from 'vitest'
 import { createClient } from '@libsql/client'
 import { LibSQLStore } from '@mastra/libsql'
 import * as db from '../src/main/db'
 import type { HandRecord } from '../src/shared/types'
+import { dropTempDb, plainCrypto, tempDb } from './table-helpers'
 
-const crypto = { encrypt: (t: string) => Buffer.from(t), decrypt: (b: Buffer) => b.toString() }
-let dir: string
 let store: LibSQLStore
 
 afterEach(async () => {
   await store.close()
-  db.closeDb()
-  rmSync(dir, { recursive: true, force: true })
+  dropTempDb()
 })
 
 const record = (n: number): HandRecord => ({
@@ -24,9 +19,7 @@ const record = (n: number): HandRecord => ({
 })
 
 it('与同文件的 LibSQLStore 并发写入时，业务写与 Mastra 写都落库', async () => {
-  dir = mkdtempSync(join(tmpdir(), 'river-mastra-'))
-  const url = 'file:' + join(dir, 'river.db')
-  await db.initDb({ url, ...crypto })
+  const { url } = await tempDb()
   store = new LibSQLStore({ id: 'river', url })
   await store.init()
   const mem = (await store.getStore('memory'))!
@@ -63,6 +56,6 @@ it('与同文件的 LibSQLStore 并发写入时，业务写与 Mastra 写都落�
   fresh.close()
   const cached = db.getSettings()
   db.closeDb()
-  await db.initDb({ url, ...crypto })
+  await db.initDb({ url, ...plainCrypto })
   expect(db.getSettings()).toEqual(cached)
 }, 30000)

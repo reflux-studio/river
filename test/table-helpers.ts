@@ -45,11 +45,24 @@ export interface Harness {
   of<K extends keyof Events>(event: K): Events[K][]
 }
 
+export const plainCrypto = { encrypt: (t: string) => Buffer.from(t), decrypt: (b: Buffer) => b.toString() }
+
 let dir = ''
 
+export async function tempDb(crypto = plainCrypto) {
+  dir = mkdtempSync(join(tmpdir(), 'river-'))
+  const url = 'file:' + join(dir, 'river.db')
+  await db.initDb({ url, ...crypto })
+  return { url, dir }
+}
+
+export function dropTempDb() {
+  db.closeDb()
+  rmSync(dir, { recursive: true, force: true })
+}
+
 export async function setup(settings: Partial<Settings> = {}) {
-  dir = mkdtempSync(join(tmpdir(), 'river-runner-'))
-  await db.initDb({ url: 'file:' + join(dir, 'river.db'), encrypt: (t) => Buffer.from(t), decrypt: (b) => b.toString() })
+  await tempDb()
   await db.updateSettings({ speed: 2, coachOn: false, autoNext: false, engine: 'llm', ...settings })
   // setImmediate 保留真实实现：coach:done 的“下一轮事件循环”语义要靠它
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
@@ -57,8 +70,7 @@ export async function setup(settings: Partial<Settings> = {}) {
 
 export function teardown() {
   vi.useRealTimers()
-  db.closeDb()
-  rmSync(dir, { recursive: true, force: true })
+  dropTempDb()
 }
 
 export async function harness(o: { agents?: Partial<AgentDeps>; limits?: Partial<Limits>; rng?: () => number; onEmit?: (h: Harness, event: keyof Events, payload: unknown) => void } = {}): Promise<Harness> {

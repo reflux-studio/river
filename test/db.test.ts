@@ -1,10 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createClient } from '@libsql/client'
 import * as db from '../src/main/db'
 import type { HandRecord } from '../src/shared/types'
+import { dropTempDb, tempDb } from './table-helpers'
 
 const crypto = {
   encrypt: (t: string) => Buffer.from('enc:' + t),
@@ -14,16 +13,8 @@ const crypto = {
 let dir: string
 let url: string
 
-beforeEach(async () => {
-  dir = mkdtempSync(join(tmpdir(), 'river-db-'))
-  url = 'file:' + join(dir, 'river.db')
-  await db.initDb({ url, ...crypto })
-})
-
-afterEach(() => {
-  db.closeDb()
-  rmSync(dir, { recursive: true, force: true })
-})
+beforeEach(async () => void ({ url, dir } = await tempDb(crypto)))
+afterEach(dropTempDb)
 
 function hand(n: number, personaIds: string[], net = 10): HandRecord {
   return {

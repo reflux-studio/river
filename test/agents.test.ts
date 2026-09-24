@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createClient } from '@libsql/client'
 import { RequestContext } from '@mastra/core/request-context'
@@ -14,20 +11,14 @@ import { buildSeatView, type TableQuery } from '../src/main/agents/views'
 import { newGame, startHand } from '../src/main/engine/poker'
 import type { HandRecord } from '../src/shared/types'
 import { scriptModel, type Step } from './mock-model'
+import { dropTempDb, seeded, tempDb } from './table-helpers'
 
-const crypto = { encrypt: (t: string) => Buffer.from(t), decrypt: (b: Buffer) => b.toString() }
-
-let dir: string
 let url: string
 let model: ReturnType<typeof scriptModel>
 const calls: { role: string; ok: boolean }[] = []
 const script = (steps: Step[]) => (model = scriptModel(steps))
 
 // 固定种子的真实牌局，座位 0 为玩家，1 为阿狸
-function seeded(seed: number) {
-  let s = seed
-  return () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648)
-}
 function makeTable() {
   const g = newGame(
     { sb: 50, bb: 100, players: [{ id: 'hero', name: '你', isHero: true, stack: 10000 }, { id: 'li', personaId: 'li', name: '阿狸', isHero: false, stack: 10000 }, { id: 'k', personaId: 'k', name: '老K', isHero: false, stack: 10000 }] },
@@ -44,9 +35,7 @@ function makeTable() {
 }
 
 beforeEach(async () => {
-  dir = mkdtempSync(join(tmpdir(), 'river-agents-'))
-  url = 'file:' + join(dir, 'river.db')
-  await db.initDb({ url, ...crypto })
+  ({ url } = await tempDb())
   calls.length = 0
   script([])
   await initMastra({ url, model: (() => model) as never, onCall: (e) => calls.push(e) })
@@ -54,8 +43,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await closeMastra()
-  db.closeDb()
-  rmSync(dir, { recursive: true, force: true })
+  dropTempDb()
 })
 
 const liCtx = (table: TableQuery) => ({ tableId: 't1', seat: 1, personaId: 'li', table })
