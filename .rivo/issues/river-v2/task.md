@@ -14,13 +14,14 @@ T3 数据层 ┼─► T4 智能体 ─► T5 Runner/IPC ─┬─► T6 牌桌�
 目标：在 GitHub Actions 上验证 ADR-005 的前提与 models.dev 价格字段。
 修改：`.github/workflows/spike-v2.yml`（验收后删除）。
 验收：自签证书受信任后 electron-builder 能签名；0.0.2 满足 0.0.1 的 designated requirement；ad-hoc 对照不满足；models.dev 有 `cost` 字段。
-结果：见下。
+结果：通过，见 `evidence/T1/record.md`。
 
 ## T2：引擎改写
 
 目标：`Table` 类（plan §模块、discussion §4），三处规则修正。
 修改：`src/main/engine/eval.ts`、`table.ts`；`test/engine.test.ts`。`poker.ts` 在 T5 删除。
 验收：规则用例（不完整加注、累计重开、单挑、边池、未跟注退还、余数、弃牌结束、短码大盲、abortHand、pots/totalPot）与 3000 手随机压测通过；牌型评估与原型对照一致。
+结果：通过。`test/engine.test.ts` 29 条（含 3000 手压测、牌型评估 2000 组与原型对照、`pots()` 合并）。原型的“200 手 legal/apply/摊牌对照”未保留：三处规则修正后与原型本就不同，由规则用例替代。审阅 `reviews/T2-T5-1.md`。
 
 ## T3：数据层
 
@@ -28,17 +29,20 @@ T3 数据层 ┼─► T4 智能体 ─► T5 Runner/IPC ─┬─► T6 牌桌�
 修改：`src/main/db/index.ts`、`src/main/index.ts`（启动顺序）、`package.json`（删 `@mastra/memory`、`@mastra/libsql`）、`test/db.test.ts`、删 `test/db-mastra.test.ts`。
 内容：Settings/Lobby 新字段与默认值；角色表 CRUD（内置种子合并覆盖、自建、删除/恢复）；记忆（追加、每 owner 保留 10 条、清空）；用量（写入、汇总、按手、清零）；价格缓存；显式 WAL；保留写链。
 验收：迁移测试（v1 库 → v2，旧提示词覆盖保留）；CRUD 与汇总测试。
+结果：通过。`test/db.test.ts` 覆盖 v1→v2 迁移、角色 CRUD、记忆、用量。价格缓存存在 `river_kv` 的 `prices` 键，没有单独建表。
 
 ## T4：智能体
 
 目标：`llm.ts`、`opponent.ts`、`coach.ts`、`models/prices.ts`（discussion §2、§3、§6）。
 修改：删 `agents/mastra.ts`、`queue.ts`、`tools.ts`、`intents.ts`、`leak.ts`、`views.ts` 中工具查询部分；`models/resolve.ts` 去掉 Mastra 存储依赖。
 验收：mock 模型测试 `maxRetries` 计次（2 次重试 = 3 次调用）、宽松 `act` 解析、speak/ask 流式与历史、recap 工具、用量回调（含中止）；价格查询（快照 + 缓存）。
+结果：通过。`test/agents.test.ts`、`test/prices.test.ts`。偏差：缓存 token 按 models.dev 的 `cache_read` 价计费（比“按输入价估算”准确）；不同提供方 `inputTokens` 是否含缓存不一致，当前未启用提示缓存，影响可忽略。用量在发起调用时带 `tag`（审阅 F3）。
 
 ## T5：Runner、IPC、共享类型
 
 目标：`runner.ts` 重写、`view.ts`、`text.ts`、`ipc.ts`、`shared/types.ts`、`shared/personas.ts`、`preload`、`renderer/lib/river.ts` 的数据层。
 验收：runner 测试覆盖 plan §验证 所列场景；typecheck 通过（界面在 T6/T7 调整，T5 中保证能编译即可）。
+结果：通过。`test/runner.test.ts` 23 条（自由局、失败即停下、教练局、角色、信息隔离、状态机）；审阅 F1–F4 与 L1–L5 已处理，见 `reviews/T2-T5-1.md` 末尾。共享契约新增：`TableView.stalled/coach/cost`、`CoachEntry.status/error/hand`、`Persona.builtin/edited/deleted`、`HandLogEntry` 结构化字段、`Legal` 形状沿用 v1。
 
 ## T6：牌桌页
 
@@ -54,6 +58,7 @@ T3 数据层 ┼─► T4 智能体 ─► T5 Runner/IPC ─┬─► T6 牌桌�
 
 目标：`updater.ts`、更新提示 UI、`electron-builder.yml`（publish、mac zip、删 identity、forceCodeSigning）、`build.yml`（版本注入、价格快照、macOS 钥匙串与证书、非草稿发布、签名断言）、README（证书生成与 Secrets 配置）、删 `spike-v2.yml`。
 验收：workflow 语法与步骤自检；本地 `electron-builder --dir` 可打包（Linux）；证书步骤在未配置 Secret 时给出明确失败信息。
+结果：通过，见 `evidence/T8/record.md`。首次发布前需按 README“发布”一节生成证书并配置 Secrets。
 
 ## T9：验收与收尾
 
