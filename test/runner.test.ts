@@ -222,7 +222,7 @@ describe('教练', () => {
     await drive(h, () => calls > 0, () => null)
     await tick(0)
     expect(h.runner.paused).toBe(true)
-    expect(h.of('coach:alert').at(-1)).toEqual({ level: 'pause', message: '想清楚' })
+    expect(h.views.at(-1)!.alert).toEqual({ level: 'pause', message: '想清楚' })
     h.runner.resume()
     await tick(1000)
     expect(h.runner.paused).toBe(false)
@@ -244,7 +244,7 @@ describe('教练', () => {
     h.runner.heroAct({ type: 'call' })
     await tick(2500)
     expect(calls).toBe(1)
-    expect(h.of('coach:alert').filter((a) => a?.level === 'pause')).toEqual([])
+    expect(h.views.filter((v) => v.alert?.level === 'pause')).toEqual([])
     expect(h.runner.paused).toBe(false)
   })
 
@@ -473,7 +473,7 @@ describe('离桌与退出', () => {
     expect(g.players.map((p) => p.personaId ?? p.id)).toEqual(['hero', 'bai', 'zen'])
     expect([g.sb, g.bb]).toEqual([10, 20])
     expect(db.getSettings()).toMatchObject({ coachOn: true, level: 'novice' })
-    expect(h.of('coach:alert').at(-1)?.message).toMatch(/教学牌局/)
+    expect(h.views.at(-1)!.alert?.message).toMatch(/教学牌局/)
     g.players[0].stack = 0
     g.done = true
     await h.runner.rebuy()
@@ -500,7 +500,7 @@ describe('IPC', () => {
     const json = JSON.stringify(boot)
     expect(json).not.toMatch(/sk-/)
     expect(boot.providers[0].keyTail).toBe('5678')
-    expect(boot.hasTable).toBe(true)
+    expect(boot.view?.handNo).toBe(1)
     const g = h.runner.game!
     for (const q of g.players.slice(1)) for (const c of q.hole) expect(json).not.toContain(`"${c}"`)
     expect((await cmd['provider.registry']()).at(-1)!.kind).toBe('openai-compatible')

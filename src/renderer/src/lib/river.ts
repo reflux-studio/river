@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 import type {
-  AgentCall, Bootstrap, ChatMessage, CoachAlert, CoachEntry, Commands, Events, Lobby, ProviderInput,
+  AgentCall, Bootstrap, ChatMessage, CoachEntry, Commands, Events, Lobby, ProviderInput,
   ProviderPublic, RiverApi, Settings, TableStart, TableView
 } from '../../../shared/types'
 
@@ -29,11 +29,9 @@ export interface RiverState {
   onboarded: boolean
   personas: Bootstrap['personas']
   providers: ProviderPublic[]
-  hasTable: boolean
   view: TableView | null
   chat: ChatMessage[]
   coach: CoachItem[]
-  alert: CoachAlert | null
   lastCall: AgentCall | null
   rulesOpen: boolean
   guidedAsk: boolean
@@ -48,11 +46,9 @@ let state: RiverState = {
   onboarded: true,
   personas: [],
   providers: [],
-  hasTable: false,
   view: null,
   chat: [],
   coach: [],
-  alert: null,
   lastCall: null,
   rulesOpen: false,
   guidedAsk: false
@@ -105,10 +101,9 @@ const applyDone = (c: CoachItem, d: Events['coach:done']): CoachItem => ({
 
 function listen() {
   river.on('table:view', (v) =>
-    setState((s) => ({ view: v, hasTable: !!v, ...(!v && s.page === 'table' && { page: 'lobby' as Page }) }))
+    setState((s) => ({ view: v, ...(!v && s.page === 'table' && { page: 'lobby' as Page }) }))
   )
   river.on('chat:append', (m) => setState((s) => (s.chat.some((x) => x.id === m.id) ? {} : { chat: [...s.chat, m] })))
-  river.on('coach:alert', (alert) => setState({ alert }))
   river.on('bankroll', (bankroll) => setState({ bankroll }))
   river.on('agent:last', (lastCall) => setState({ lastCall }))
   river.on('coach:delta', ({ requestId, text }) => patchCoach(requestId, (c) => ({ ...c, text: c.text + text })))
@@ -126,7 +121,7 @@ export async function init() {
     onboarded: b.onboarded,
     personas: b.personas,
     providers: b.providers,
-    hasTable: b.hasTable,
+    view: b.view,
     lastCall: b.lastCall,
     chat: b.chat,
     // 重载时的在途回答没有 pending 标记可恢复，后续 delta/done 仍会按 requestId 接上
@@ -159,7 +154,7 @@ export async function updateLobby(patch: Partial<Lobby>) {
 
 export async function startTable(opts: TableStart) {
   // table.start 之后事件只追加，旧桌的公屏与教练对话要在入座前清掉
-  setState({ chat: [], coach: [], alert: null })
+  setState({ chat: [], coach: [] })
   try {
     await invoke('table.start', opts)
   } catch (e) {

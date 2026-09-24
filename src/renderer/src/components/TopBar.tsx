@@ -12,7 +12,6 @@ const NAV: [Page, string][] = [
 ]
 
 export function TopBar({ page }: { page: Page }) {
-  const hasTable = useRiver((s) => s.hasTable)
   const view = useRiver((s) => s.view)
   const bankroll = useRiver((s) => s.bankroll)
   const onTable = page === 'table'
@@ -22,7 +21,7 @@ export function TopBar({ page }: { page: Page }) {
     <header className="flex h-[52px] shrink-0 items-center gap-3 border-b bg-topbar pr-4 pl-[88px] [-webkit-app-region:drag]">
       <div className="text-base font-semibold">River</div>
       <nav className="ml-1.5 flex min-w-0 gap-0.5 overflow-hidden [-webkit-app-region:no-drag]">
-        {NAV.filter(([k]) => k !== 'table' || hasTable).map(([k, l]) => (
+        {NAV.filter(([k]) => k !== 'table' || view).map(([k, l]) => (
           <button
             key={k}
             onClick={() => go(k)}

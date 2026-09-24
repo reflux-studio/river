@@ -46,7 +46,6 @@ export function Table() {
       // 存不下只影响下次打开时的默认值
     }
   }
-  // bootstrap 之后主进程才补发 table:view
   if (!view) return <div className="flex-1" />
 
   const n = view.seats.length

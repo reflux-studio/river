@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { BLINDS, PERSONAS, STREET } from '../../shared/personas'
-import type { AgentCall, BreakerState, ChatMessage, CoachAlert, CoachEntry, Events, HandRecord, TableStart } from '../../shared/types'
+import type { AgentCall, BreakerState, ChatMessage, CoachAlert, CoachEntry, Events, HandRecord, TableStart, TableView } from '../../shared/types'
 import { coachAsk, coachProactive, coachReview } from '../agents/coach'
 import { coachAlert } from '../agents/intents'
 import { filterSay } from '../agents/leak'
@@ -156,7 +156,7 @@ export class TableRunner {
     this.autopilotCount = 0
     this.lastTriggered.clear()
     this.sys(`入座 · ${sb}/${bb} · ${players.length} 人桌`)
-    this.setAlert(guided ? GUIDED_ALERT : null)
+    this.alert = guided ? GUIDED_ALERT : null
     this.bankroll -= buy
     this.emit('bankroll', this.bankroll)
     await setBankroll(this.bankroll)
@@ -170,7 +170,6 @@ export class TableRunner {
     this.leaveController.abort()
     this.game = null
     this.resetTableState()
-    this.setAlert(null)
     this.bankroll += g.players[0].stack
     this.emit('bankroll', this.bankroll)
     this.emit('table:view', null)
@@ -197,6 +196,7 @@ export class TableRunner {
     this.deciding = null
     this.proactiveKey = null
     this.autoHand = null
+    this.alert = null
   }
 
   async rebuy() {
@@ -238,7 +238,7 @@ export class TableRunner {
     this.numsKey = null
     this.paused = false
     this.sys(`第 ${g.hand} 手 · 翻牌前`)
-    if (!(this.guided && g.hand === 1)) this.setAlert(null)
+    if (!(this.guided && g.hand === 1)) this.alert = null
     void this.loop()
   }
 
@@ -408,7 +408,7 @@ export class TableRunner {
       // 教练晚到：玩家已行动或局面已变，提醒作废
       if (alert && this.heroKey === key && this.heroPoint() === key) {
         if (alert.level === 'pause') this.paused = true
-        this.setAlert(alert)
+        this.alert = alert
       }
     } else if (isFailure(r)) this.countFailure('coach')
     this.broadcast()
@@ -652,12 +652,6 @@ export class TableRunner {
     return { opponent: this.breaker.trippedOpponent, coach: this.breaker.trippedCoach }
   }
 
-  private setAlert(a: CoachAlert | null) {
-    if (a === this.alert) return
-    this.alert = a
-    this.emit('coach:alert', a)
-  }
-
   // 计时器在 queue.run 之前启动（抢占等待计入时限），并与 run 的结果赛跑：
   // 排队中的 durable 任务若挂起，fn 永不开始、看不到 abort，只能靠赛跑脱身（T4 结果）
   private async guarded<T>(q: AgentQueue, ms: number, fn: (s: AbortSignal) => Promise<T>, o: { preempt?: boolean; leave?: boolean } = {}): Promise<Outcome<T>> {
@@ -721,33 +715,30 @@ export class TableRunner {
   }
 
   broadcast() {
-    const g = this.game
-    if (!g) return
-    this.emit(
-      'table:view',
-      buildTableView({
-        game: g,
-        thinking: this.thinking,
-        paused: this.paused,
-        bubbles: this.bubbles,
-        autopilotIds: this.autopilotIds,
-        defaultRaiseTo: this.defaultRaiseTo,
-        nums: this.nums,
-        numsKey: this.numsKey,
-        coachLoading: this.proactiveKey !== null || this.askInFlight,
-        autopilotCount: this.autopilotCount,
-        breaker: this.breakerState(),
-        guided: this.guided,
-        autoNext: getSettings().autoNext,
-        now: Date.now()
-      })
-    )
+    const v = this.view()
+    if (v) this.emit('table:view', v)
   }
 
-  // Renderer 重载后恢复：bootstrap 之后补发当前视图与提醒
-  replay() {
-    this.broadcast()
-    this.emit('coach:alert', this.alert)
+  view(): TableView | null {
+    const g = this.game
+    if (!g) return null
+    return buildTableView({
+      game: g,
+      thinking: this.thinking,
+      paused: this.paused,
+      bubbles: this.bubbles,
+      autopilotIds: this.autopilotIds,
+      defaultRaiseTo: this.defaultRaiseTo,
+      nums: this.nums,
+      numsKey: this.numsKey,
+      coachLoading: this.proactiveKey !== null || this.askInFlight,
+      autopilotCount: this.autopilotCount,
+      breaker: this.breakerState(),
+      alert: this.alert,
+      guided: this.guided,
+      autoNext: getSettings().autoNext,
+      now: Date.now()
+    })
   }
 }
 

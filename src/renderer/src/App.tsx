@@ -13,7 +13,7 @@ const PAGES: Record<Page, React.ComponentType> = { lobby: Lobby, table: Table, o
 
 export function App() {
   const ready = useRiver((s) => s.ready)
-  const hasTable = useRiver((s) => s.hasTable)
+  const hasTable = useRiver((s) => s.view !== null)
   const want = useRiver((s) => s.page)
   const page = want === 'table' && !hasTable ? 'lobby' : want
   const Page = PAGES[page]

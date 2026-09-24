@@ -17,8 +17,6 @@ export function commandHandlers(runner: TableRunner): Handlers {
     'app.bootstrap': async () => {
       const overrides = await getPromptOverrides()
       const onboarded = await getOnboarded()
-      // 补发排在最后一个 await 之后：命令先返回，事件随后到达（Renderer 须先注册监听再调用 bootstrap）
-      setImmediate(() => runner.replay())
       return {
         settings: getSettings(),
         lobby: getLobby(),
@@ -26,7 +24,7 @@ export function commandHandlers(runner: TableRunner): Handlers {
         onboarded,
         personas: PERSONAS.map((p) => ({ ...p, ...(overrides[p.id] !== undefined && { promptOverride: overrides[p.id] }) })),
         providers: listProviders(needsKey),
-        hasTable: !!runner.game,
+        view: runner.view(),
         lastCall: runner.lastCall,
         coachThread: runner.coachThread,
         chat: runner.chat

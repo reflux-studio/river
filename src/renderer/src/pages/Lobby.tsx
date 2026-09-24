@@ -50,7 +50,6 @@ export function Lobby() {
   const lb = useRiver((s) => s.lobby)
   const personas = useRiver((s) => s.personas)
   const settings = useRiver((s) => s.settings)
-  const hasTable = useRiver((s) => s.hasTable)
   const view = useRiver((s) => s.view)
   const need = lb.size - 1
   const buy = fmt(BLINDS[lb.blinds][1] * 100)
@@ -150,10 +149,10 @@ export function Lobby() {
         </div>
 
         <div className="flex flex-col gap-4 pt-[70px]">
-          {hasTable && (
+          {view && (
             <button onClick={() => go('table')} className="flex flex-col gap-1 rounded-[14px] bg-foreground px-[18px] py-4 text-left text-white">
               <span className="text-[15px] font-semibold">回到牌桌 →</span>
-              <span className="text-[13px] text-[#a1a1a6]">{view ? `${view.title} · 第 ${view.handNo} 手` : ''}</span>
+              <span className="text-[13px] text-[#a1a1a6]">{view.title} · 第 {view.handNo} 手</span>
             </button>
           )}
           <div className={cn(card, 'flex flex-col gap-2.5 p-[18px]')}>

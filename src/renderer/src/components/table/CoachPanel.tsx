@@ -75,7 +75,7 @@ function Bubble({ c }: { c: CoachItem }) {
 export function CoachPanel({ view: v }: { view: TableView }) {
   const st = useRiver((s) => s.settings)
   const coach = useRiver((s) => s.coach)
-  const alert = useRiver((s) => s.alert)
+  const alert = v.alert
   const ready = useRiver(coachConfigured)
   const [input, setInput] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
@@ -83,7 +83,7 @@ export function CoachPanel({ view: v }: { view: TableView }) {
   useEffect(() => {
     const el = threadRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [coach, loading, alert])
+  }, [coach, loading, alert?.message])
 
   const set = (patch: Partial<Settings>) => void updateSettings(patch)
   const ask = (text: string) => {

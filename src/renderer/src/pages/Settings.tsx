@@ -239,7 +239,6 @@ function Engine() {
 function Data() {
   const lastCall = useRiver((s) => s.lastCall)
   const view = useRiver((s) => s.view)
-  const hasTable = useRiver((s) => s.hasTable)
   const run = (cmd: 'data.clearHistory' | 'data.resetMemory', ok: string) =>
     invoke(cmd).then(() => toast.success(ok), toastError)
 
@@ -256,7 +255,7 @@ function Data() {
         </span>
       </Row>
       <Row label="本桌托管次数" desc="对手模型超时或出错时，由本地引擎代打并标“托管”。">
-        <span className="text-sm font-semibold">{hasTable && view ? `${view.autopilotCount} 次` : '未入座'}</span>
+        <span className="text-sm font-semibold">{view ? `${view.autopilotCount} 次` : '未入座'}</span>
       </Row>
       <Row label="规则介绍" desc="重新看一遍首次进入时的规则卡片。">
         <button className={pillBtn} onClick={openRules}>打开</button>
@@ -273,7 +272,7 @@ function Data() {
       </Row>
       <Row
         label="重置 AI 记忆"
-        desc={hasTable ? '请先离桌，再重置 AI 记忆。' : '清除对手对你的印象和教练的学员档案。'}
+        desc={view ? '请先离桌，再重置 AI 记忆。' : '清除对手对你的印象和教练的学员档案。'}
       >
         <Confirm
           title="重置 AI 记忆？"
@@ -281,7 +280,7 @@ function Data() {
           action="重置"
           onConfirm={() => run('data.resetMemory', '已重置 AI 记忆')}
         >
-          <button className={pillBtn} disabled={hasTable}>重置</button>
+          <button className={pillBtn} disabled={!!view}>重置</button>
         </Confirm>
       </Row>
     </Group>

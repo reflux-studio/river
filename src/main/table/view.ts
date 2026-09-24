@@ -1,6 +1,6 @@
 // Renderer 能看到的一切都经这里裁剪：未摊牌的对手底牌不得离开主进程。
 import { PERSONAS } from '../../shared/personas'
-import type { BreakerState, TableView } from '../../shared/types'
+import type { BreakerState, CoachAlert, TableView } from '../../shared/types'
 import { fmt, legal, pot, type Game } from '../engine/poker'
 
 export interface Nums {
@@ -23,6 +23,7 @@ export interface ViewState {
   coachLoading: boolean
   autopilotCount: number
   breaker: BreakerState
+  alert: CoachAlert | null
   guided: boolean
   autoNext: boolean
   now: number
@@ -117,6 +118,7 @@ export function buildTableView(s: ViewState): TableView {
     coachLoading: s.coachLoading,
     autopilotCount: s.autopilotCount,
     breaker: s.breaker,
+    alert: s.alert,
     guided: s.guided
   }
 }
