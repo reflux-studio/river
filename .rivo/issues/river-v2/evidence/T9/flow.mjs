@@ -1,5 +1,5 @@
-// 真实应用验收：教练局 6 人（锁定 → 讲解 → 行动 → 一手结束亮牌 → 复盘卡 → 下一手）、提问暂停、模型故障停下与重试、
-// 停下离桌作废、自由局 2 人、对手编辑、回放、统计、设置。需先启动 mock-llm.mjs 与应用（见 record.md）。
+// 真实应用验收：大厅；教练局 6 人（锁定 → 讲解 → 行动 → 一手结束亮牌 → 复盘卡 → 下一手）、提问暂停、模型故障停下与重试、
+// 停下离桌作废；教练局 3 人（亮弃牌、401 停下带「去设置」）与教练局回放；自由局 2 人、外观与动效三档；对手编辑、回放、统计、设置。需先启动 mock-llm.mjs 与应用（见 record.md）。
 import fs from 'node:fs'
 import { connect } from './cdp.mjs'
 const out = process.env.OUT
@@ -23,8 +23,14 @@ async function playToEnd(pick = () => 'call') {
   throw new Error('hand did not end')
 }
 
-// 1 教练局 6 人
+const post = (path, body) => fetch('http://127.0.0.1:8787' + path, { method: 'POST', body })
+
+// 0 大厅
 await c.click('大厅')
+await c.sleep(600)
+await c.shot(`${out}/00-lobby.png`)
+
+// 1 教练局 6 人
 await c.click('常规桌')
 await c.click('教练局')
 await c.click('入座')
@@ -47,7 +53,8 @@ await c.click('下一手')
 await c.until(async () => (await c.view()).seats.some((s) => s.thinking), 30000)
 await c.ev(`window.river.invoke('coach.ask', '什么是底池赔率？')`)
 const len0 = (await c.view()).seats.map((s) => s.status).join()
-await c.sleep(800)
+await c.until(async () => (await c.view()).coach.busy === 'ask', 5000)
+await c.sleep(1200)
 await c.shot(`${out}/04-ask-paused.png`)
 step('ask', { busy: (await c.view()).coach.busy })
 await c.until(async () => (await c.view()).coach.busy !== 'ask', 30000)
@@ -81,7 +88,38 @@ const bankAfter = await c.ev(`window.river.invoke('app.bootstrap').then((b) => b
 step('leave-stalled', { bankBefore, bankAfter, stackAtStart })
 await fetch('http://127.0.0.1:8787/__fail', { method: 'POST', body: '0' })
 
+// 4b 教练局 3 人：对手全弃牌 → 一手结束亮出弃牌
+await post('/__fold', '1')
+await c.click('新手桌')
+await c.click('教练局')
+await c.click('入座')
+await c.until(async () => !!(await c.view()), 30000)
+v = await playToEnd(() => 'raise')
+await c.sleep(600)
+await c.shot(`${out}/14-coach-3p-mucked.png`)
+step('coach-3p-mucked', { seats: v.seats.length, mucked: v.seats.filter((s) => s.mucked).length, revealed: v.seats.filter((s) => s.cards).length })
+await c.until(async () => (await c.view()).coach.canNext, 30000)
+await post('/__fold', '0')
+// 401：停下横幅带「去设置」
+await post('/__fail', '401')
+await c.click('下一手')
+// 轮到玩家先行动时先跟注，直到某位对手调用失败
+await c.until(async () => ((await heroTurn()) && (await act('call')), !!(await c.view()).stalled), 60000)
+await c.sleep(300)
+await c.shot(`${out}/16-stalled-settings.png`)
+step('stalled-401', { stalled: (await c.view()).stalled, hasSettingsBtn: await c.ev(`[...document.querySelectorAll('button')].some((b) => b.innerText.trim() === '去设置')`) })
+await c.click('离桌')
+await c.sleep(800)
+await post('/__fail', '0')
+// 回放：最近一手是教练局手牌，带结构化复盘
+await c.click('手牌回放')
+await c.sleep(1500)
+await c.shot(`${out}/15-replay-coach.png`)
+step('replay-coach', { text: (await c.text()).includes('做得好') })
+
 // 5 自由局单挑
+await c.click('大厅')
+await c.sleep(300)
 await c.click('单挑')
 await c.click('自由局')
 await c.click('入座')
@@ -99,6 +137,16 @@ await c.ev(`document.querySelector('button[title="深海蓝"]').click()`)
 await c.sleep(300)
 await c.shot(`${out}/08-appearance.png`)
 await c.click('桌面外观')
+// 动效三档：精简、关闭各打一手
+for (const fx of ['lite', 'off']) {
+  await c.invoke('settings.update', { fx })
+  await c.click('下一手')
+  await c.sleep(700)
+  await c.shot(`${out}/${fx === 'lite' ? '17-fx-lite' : '18-fx-off'}.png`)
+  await playToEnd()
+  step('fx', { fx })
+}
+await c.invoke('settings.update', { fx: 'full' })
 await c.click('离桌')
 await c.sleep(600)
 

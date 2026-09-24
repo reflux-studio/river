@@ -14,7 +14,12 @@ const PURPOSE: Record<Purpose, [string, string]> = {
 
 function Usage() {
   const [u, setU] = useState<UsageSummary | null>(null)
-  const load = () => void invoke('usage.summary').then(setU, toastError)
+  const seq = useRef(0)
+  // 牌局在后台进行时 usage:changed 很密：只采用最新一次请求的结果
+  const load = () => {
+    const n = ++seq.current
+    void invoke('usage.summary').then((x) => n === seq.current && setU(x), toastError)
+  }
   useEffect(load, [])
   useEvent('usage:changed', load)
   if (!u) return null
@@ -62,7 +67,7 @@ function Usage() {
             <div className="relative h-1.5 rounded-full bg-[#f0f0ee]"><div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${share(c) * 100}%`, background: PURPOSE[c.purpose][1] }} /></div>
             <span className="text-right text-label">{c.calls}</span>
             <span className="text-right text-label">{tokens(c.tokens)}</span>
-            <span className="text-right font-semibold">{c.tokens || c.calls ? costText(c) : '—'}</span>
+            <span className="text-right font-semibold">{c.tokens > c.unpriced ? costText(c) : '—'}</span>
           </div>
         ))}
       </div>

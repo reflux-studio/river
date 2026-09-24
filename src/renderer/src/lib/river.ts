@@ -85,9 +85,12 @@ export async function invoke<K extends keyof Commands>(cmd: K, ...args: Paramete
 export const go = (page: Page) => setState({ page })
 export const openRules = () => setState({ rulesOpen: true })
 
+// 与主进程公屏上限一致
+const MAX_CHAT = 300
+
 function listen() {
   river.on('table:view', (v) => setState((s) => ({ view: v, ...(!v && s.page === 'table' && { page: 'lobby' as Page }) })))
-  river.on('chat:append', (m) => setState((s) => (s.chat.some((x) => x.id === m.id) ? {} : { chat: [...s.chat, m] })))
+  river.on('chat:append', (m) => setState((s) => (s.chat.some((x) => x.id === m.id) ? {} : { chat: [...s.chat, m].slice(-MAX_CHAT) })))
   river.on('coach:upsert', (e) =>
     setState((s) => ({ coach: s.coach.some((x) => x.id === e.id) ? s.coach.map((x) => (x.id === e.id ? e : x)) : [...s.coach, e] }))
   )

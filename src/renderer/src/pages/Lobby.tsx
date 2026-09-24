@@ -71,13 +71,15 @@ export function Lobby() {
           </div>
           <div className="grid grid-cols-3 gap-3">
             {PRESETS.map((o) => {
-              const on = o.cfg.size === lb.size && o.cfg.blinds === lb.blinds && o.cfg.picks.join() === lb.picks.slice(0, need).join()
+              // 预设里被删除的角色不写入已选，开桌时随机补位
+              const picks = o.cfg.picks.filter((id) => personas.some((p) => p.id === id))
+              const on = o.cfg.size === lb.size && o.cfg.blinds === lb.blinds && picks.join() === lb.picks.slice(0, need).join()
               const disabled = o.cfg.size - 1 > personas.length
               return (
                 <button
                   key={o.t}
                   disabled={disabled}
-                  onClick={() => updateLobby(o.cfg)}
+                  onClick={() => updateLobby({ ...o.cfg, picks })}
                   className={cn(
                     'flex flex-col gap-1.5 rounded-[14px] bg-white p-4 text-left disabled:opacity-40',
                     on ? 'border-[1.5px] border-foreground' : 'border'

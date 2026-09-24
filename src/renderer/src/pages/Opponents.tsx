@@ -22,7 +22,7 @@ function PromptBox({ p }: { p: Persona }) {
       rows={4}
       value={text}
       onChange={(e) => setText(e.target.value)}
-      onBlur={() => text.trim() && text !== p.prompt && void savePersona({ ...p, prompt: text.trim() })}
+      onBlur={() => (text.trim() ? text !== p.prompt && void savePersona({ ...p, prompt: text.trim() }) : setText(p.prompt))}
       className="min-h-0 resize-y rounded-[10px] border-input px-3 py-2.5 text-[13px] leading-[1.55] text-[#3a3a3c] shadow-none"
     />
   )
@@ -43,14 +43,15 @@ function Editor({ p, onDone, confirm, onAsk }: { p: Persona; onDone: () => void;
   const [d, setD] = useState(p)
   const set = (patch: Partial<Persona>) => setD((x) => ({ ...x, ...patch }))
   const done = async () => {
-    await savePersona({ ...d, name: d.name.trim() || p.name, ini: d.ini.trim() || d.name.trim().slice(0, 1) || p.ini, prompt: d.prompt.trim() || p.prompt })
-    onDone()
+    const saved = await savePersona({ ...d, name: d.name.trim() || p.name, ini: [...(d.ini.trim() || d.name.trim().slice(0, 1) || p.ini)].slice(0, 2).join(''), prompt: d.prompt.trim() || p.prompt })
+    // 保存失败时留在编辑态，改动不丢
+    if (saved) onDone()
   }
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2.5">
-        <Avatar ini={d.ini} hue={d.hue} size={44} />
-        <Input value={d.ini} maxLength={2} placeholder="字" onChange={(e) => set({ ini: e.target.value.slice(0, 2) })} className={cn(field, 'w-11 px-1.5 text-center')} />
+        <Avatar ini={[...d.ini].slice(0, 2).join('')} hue={d.hue} size={44} />
+        <Input value={d.ini} placeholder="字" onChange={(e) => set({ ini: e.target.value })} className={cn(field, 'w-11 px-1.5 text-center')} />
         <Input value={d.name} placeholder="名字" onChange={(e) => set({ name: e.target.value })} className={cn(field, 'min-w-0 flex-1 font-semibold')} />
         <Input value={d.tag} placeholder="标签" onChange={(e) => set({ tag: e.target.value })} className={cn(field, 'w-[76px] text-[13px]')} />
       </div>

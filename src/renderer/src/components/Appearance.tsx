@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Segmented } from '@/components/Segmented'
 import { BACKS, backPattern, FELTS, RAINBOW } from '@/lib/felt'
 import { updateSettings, useRiver } from '@/lib/river'
@@ -6,9 +7,19 @@ import type { Fx } from '../../../shared/types'
 const ON = '0 0 0 2px #fff, 0 0 0 4px #1d1d1f'
 const OFF = '0 0 0 1px rgba(0,0,0,0.14)'
 
+// 拖动取色时每帧都会触发 change：合并成一次写入
+let colorTimer: ReturnType<typeof setTimeout> | undefined
+const pickColor = (c: string) => {
+  clearTimeout(colorTimer)
+  colorTimer = setTimeout(() => void updateSettings({ felt: 'custom', feltCustom: c }), 150)
+}
+
 export function FeltSwatches({ size = 26 }: { size?: number }) {
   const felt = useRiver((s) => s.settings.felt)
-  const custom = useRiver((s) => s.settings.feltCustom)
+  const saved = useRiver((s) => s.settings.feltCustom)
+  const [draft, setDraft] = useState<string | null>(null)
+  const custom = draft ?? saved
+  useEffect(() => setDraft(null), [saved])
   return (
     <div className="flex flex-wrap gap-2">
       {FELTS.map((f) => (
@@ -18,7 +29,7 @@ export function FeltSwatches({ size = 26 }: { size?: number }) {
         <input
           type="color"
           value={custom}
-          onChange={(e) => updateSettings({ felt: 'custom', feltCustom: e.target.value })}
+          onChange={(e) => (setDraft(e.target.value), pickColor(e.target.value))}
           className="absolute inset-0 size-full cursor-pointer border-0 p-0 opacity-0"
         />
       </label>

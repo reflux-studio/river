@@ -71,6 +71,8 @@ export function RecapRows({ r, big }: { r: Recap; big?: boolean }) {
 
 function RecapCard({ e }: { e: CoachEntry }) {
   const coachName = useRiver((s) => COACHES[s.settings.coachPersona].n)
+  // 只能重试最近一手的复盘
+  const current = useRiver((s) => s.view?.handNo === e.handNo)
   return (
     <div className="shrink-0 overflow-hidden rounded-[14px] border bg-white">
       <div className="flex flex-col gap-2 bg-topbar px-3 py-2.5">
@@ -97,7 +99,7 @@ function RecapCard({ e }: { e: CoachEntry }) {
         {e.status === 'failed' && (
           <div className="flex items-center gap-2 text-[13px] text-lose">
             <span className="flex-1">复盘失败：{e.error}</span>
-            <button onClick={() => invoke('coach.retry').catch(toastError)} className="rounded-full border border-input bg-white px-2.5 py-0.5 text-foreground hover:bg-accent">重试</button>
+            {current && <button onClick={() => invoke('coach.retry').catch(toastError)} className="rounded-full border border-input bg-white px-2.5 py-0.5 text-foreground hover:bg-accent">重试</button>}
           </div>
         )}
         {e.status === 'done' && e.recap && (
@@ -185,11 +187,17 @@ export function CoachPanel({ view: v }: { view: TableView }) {
           onChange={(level) => set({ level })}
         />
       </div>
+      {/* 概率面板固定在讲解区外：教练每步都说，放进滚动区会被顶出视野 */}
+      {v.nums && (
+        <div className="px-4 pt-3">
+          {st.hard ? (
+            <div className="rounded-[10px] border border-dashed border-input px-3 py-2.5 text-[13px] text-muted-foreground">硬核模式：概率信息已隐藏。</div>
+          ) : (
+            <ProbPanel nums={v.nums} />
+          )}
+        </div>
+      )}
       <div ref={threadRef} className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto px-4 py-3.5">
-        {v.nums && !st.hard && <ProbPanel nums={v.nums} />}
-        {v.nums && st.hard && (
-          <div className="rounded-[10px] border border-dashed border-input px-3 py-2.5 text-[13px] text-muted-foreground">硬核模式：概率信息已隐藏。</div>
-        )}
         {coach.map((e) => <Entry key={e.id} e={e} />)}
         {!coach.length && (
           <div className="text-[13px] leading-[1.6] text-muted-foreground">

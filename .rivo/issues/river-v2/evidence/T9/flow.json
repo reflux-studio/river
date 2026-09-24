@@ -1,0 +1,87 @@
+[
+  {
+    "name": "coach-hero-turn",
+    "coach": {
+      "busy": "speak",
+      "locked": true,
+      "canNext": false
+    }
+  },
+  {
+    "name": "coach-hand-end",
+    "mucked": 1,
+    "revealed": 6,
+    "canNext": false
+  },
+  {
+    "name": "recap-done",
+    "thread": [
+      "speak:done",
+      "speak:done",
+      "speak:done",
+      "speak:done",
+      "speak:done",
+      "speak:done",
+      "recap:done"
+    ]
+  },
+  {
+    "name": "ask",
+    "busy": "ask"
+  },
+  {
+    "name": "stalled",
+    "stalled": {
+      "name": "老K",
+      "error": "mock upstream error",
+      "settings": false
+    }
+  },
+  {
+    "name": "retried",
+    "stalled": null
+  },
+  {
+    "name": "leave-stalled",
+    "bankBefore": 89330,
+    "bankAfter": 100330,
+    "stackAtStart": 11000
+  },
+  {
+    "name": "coach-3p-mucked",
+    "seats": 3,
+    "mucked": 2,
+    "revealed": 3
+  },
+  {
+    "name": "stalled-401",
+    "stalled": {
+      "name": "小白",
+      "error": "Incorrect API key provided",
+      "settings": true
+    },
+    "hasSettingsBtn": true
+  },
+  {
+    "name": "replay-coach",
+    "text": true
+  },
+  {
+    "name": "free-hand-end",
+    "coach": null,
+    "oppCards": 1,
+    "street": "showdown"
+  },
+  {
+    "name": "fx",
+    "fx": "lite"
+  },
+  {
+    "name": "fx",
+    "fx": "off"
+  },
+  {
+    "name": "errors",
+    "errors": []
+  }
+]

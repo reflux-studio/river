@@ -6,9 +6,12 @@ import type { ChatMessage } from '../../../../shared/types'
 
 export function useSpeaker() {
   const personas = useRiver((s) => s.personas)
+  const seats = useRiver((s) => s.view?.seats)
+  // 先按本桌入座快照解析：牌局中删除的对手照常显示
   return (from?: string) => {
-    const p = personas.find((x) => x.id === from)
-    return p ? { name: p.name, ini: p.ini, hue: p.hue as number | undefined } : { name: '你', ini: '你', hue: undefined }
+    if (!from || from === 'hero') return { name: '你', ini: '你', hue: undefined as number | undefined }
+    const p = seats?.find((x) => x.personaId === from) ?? personas.find((x) => x.id === from)
+    return p ? { name: p.name, ini: p.ini, hue: p.hue as number | undefined } : { name: '？', ini: '？', hue: undefined }
   }
 }
 

@@ -82,11 +82,11 @@ function HandDetail({ d, ...review }: { d: Detail } & Omit<Parameters<typeof Rev
           const persona = personas.find((x) => x.id === p.personaId)
           return (
             <div key={p.id} className="flex items-center gap-3 border-b border-divider py-2.5 text-sm last:border-b-0">
-              <Avatar ini={persona?.ini ?? '你'} hue={persona?.hue} />
+              <Avatar ini={p.id === 'hero' ? '你' : (persona?.ini ?? p.name.slice(0, 1))} hue={persona?.hue} />
               <span className="w-[70px] font-semibold">{p.name}</span>
               <span className="flex flex-1 items-center gap-2">
                 {p.hole || p.holeAfter ? <MiniCards cards={(p.hole ?? p.holeAfter)!} w={20} h={28} /> : null}
-                {(!p.hole || (p.folded && p.holeAfter)) && <span className="text-[13px] text-[#a1a1a6]">{p.folded ? '已弃牌' : '未亮牌'}</span>}
+                {(p.folded || !(p.hole || p.holeAfter)) && <span className="text-[13px] text-[#a1a1a6]">{p.folded ? '已弃牌' : '未亮牌'}</span>}
               </span>
               <span className={cn('text-[13px]', p.won ? 'text-win' : 'text-muted-foreground')}>
                 {p.won ? `赢得 ${fmt(p.won)}${p.handName ? ' · ' + p.handName : ''}` : p.hole && p.handName ? p.handName : ''}
