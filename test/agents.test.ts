@@ -15,7 +15,7 @@ const { coachAsk, coachRecap, coachSpeak } = await import('../src/main/agents/co
 const use = (steps: Step[]) => (model = scriptModel(steps))
 const signal = () => new AbortController().signal
 const usage: unknown[] = []
-const input = { name: '阿狸', prompt: '你是阿狸', memory: ['老K 很紧'], situation: '轮到你' }
+const input = { name: '阿狸', prompt: '你是阿狸', memory: ['老K 很紧'], situation: '轮到你', tag: { tableId: 't1', handNo: 3 } }
 
 beforeEach(() => {
   usage.length = 0
@@ -33,7 +33,7 @@ describe('对手 act', () => {
     expect(model.calls[0].tools).toEqual(['act'])
     expect(model.calls[0].toolChoice).toEqual({ type: 'required' })
     expect(model.calls[0].system).toContain('老K 很紧')
-    expect(usage).toEqual([{ purpose: 'decide', providerKind: 'anthropic', modelId: 'm', input: 1, output: 1, cached: null }])
+    expect(usage).toEqual([{ purpose: 'decide', providerKind: 'anthropic', modelId: 'm', input: 1, output: 1, cached: null, tableId: 't1', handNo: 3 }])
   })
 
   it('schema 宽松：action 写成 bet、to 写成字符串也能拿到参数', async () => {
@@ -79,7 +79,7 @@ describe('教练', () => {
   it('speak 流式输出，不带工具', async () => {
     use([{ text: '先看底池赔率' }])
     const deltas: string[] = []
-    const r = await coachSpeak({ memory: [], guided: false, situation: '局面' }, (d) => void deltas.push(d), signal())
+    const r = await coachSpeak({ memory: [], tag: null, guided: false, situation: '局面' }, (d) => void deltas.push(d), signal())
     expect(r.ok).toBe(true)
     expect(deltas.join('')).toBe('先看底池赔率')
     expect(model.calls[0].tools).toEqual([])
@@ -89,7 +89,7 @@ describe('教练', () => {
   it('ask 带本桌历史', async () => {
     use([{ text: '因为赔率' }])
     const r = await coachAsk(
-      { memory: [], situation: '局面', history: [{ role: 'user', content: '为什么弃牌' }, { role: 'assistant', content: '胜率低' }], question: '那跟注呢' },
+      { memory: [], tag: null, situation: '局面', history: [{ role: 'user', content: '为什么弃牌' }, { role: 'assistant', content: '胜率低' }], question: '那跟注呢' },
       () => {},
       signal()
     )
@@ -99,10 +99,10 @@ describe('教练', () => {
 
   it('recap 调用工具给出四段；不调用工具算失败', async () => {
     use([{ tools: [{ name: 'recap', input: { headline: 'h', good: 'g', improve: 'i', tip: 't', note: '爱跟注' } }] }])
-    const r = await coachRecap({ memory: [], summary: '第 1 手' }, signal())
+    const r = await coachRecap({ memory: [], tag: null, summary: '第 1 手' }, signal())
     expect(r.ok).toBe(true)
     expect(r.args).toMatchObject({ headline: 'h', note: '爱跟注' })
     use([{ text: '这手打得不错' }])
-    expect((await coachRecap({ memory: [], summary: '第 1 手' }, signal())).ok).toBe(false)
+    expect((await coachRecap({ memory: [], tag: null, summary: '第 1 手' }, signal())).ok).toBe(false)
   })
 })

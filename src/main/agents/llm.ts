@@ -13,10 +13,17 @@ export interface Usage {
   input: number | null
   output: number | null
   cached: number | null
+  tableId: string | null
+  handNo: number | null
 }
+
+// 用量归属在发起调用时确定：回放页复盘、离桌时被中止的调用都不会记到当前牌桌（reviews/T2-T5-1.md F3）
+export type UsageTag = { tableId: string; handNo: number } | null
 
 let onUsage: (u: Usage) => void = () => {}
 export const setUsageListener = (fn: (u: Usage) => void) => void (onUsage = fn)
+// 测试替身模拟一次调用产生的用量
+export const reportUsage = (u: Usage) => onUsage(u)
 
 export interface Msg {
   role: 'user' | 'assistant'
@@ -40,6 +47,7 @@ export interface CallOpts<S extends z.ZodTypeAny> {
   maxRetries: number
   timeoutMs: number
   signal: AbortSignal
+  tag: UsageTag
 }
 
 export interface CallResult<T> {
@@ -109,7 +117,9 @@ export async function callModel<S extends z.ZodTypeAny>(o: CallOpts<S>): Promise
     // 中止时 Mastra 可能给出 0：按未知处理
     input: aborted ? null : (usage?.inputTokens ?? null),
     output: aborted ? null : (usage?.outputTokens ?? null),
-    cached: aborted ? null : (usage?.cachedInputTokens ?? null)
+    cached: aborted ? null : (usage?.cachedInputTokens ?? null),
+    tableId: o.tag?.tableId ?? null,
+    handNo: o.tag?.handNo ?? null
   })
   const ok = !aborted && !error
   const msg = timedOut ? '调用超时' : error != null ? errorText(error) : undefined

@@ -2,11 +2,12 @@ import { z } from 'zod'
 import { COACHES } from '../../shared/personas'
 import type { Recap } from '../../shared/types'
 import { settingsCache } from '../db'
-import { callModel, type CallResult, type Msg } from './llm'
+import { callModel, type CallResult, type Msg, type UsageTag } from './llm'
 
 export interface CoachBase {
   // 学员档案：复盘时记下的要点
   memory: string[]
+  tag: UsageTag
 }
 
 // 文案沿用原型 coachSystem()
@@ -38,7 +39,8 @@ export function coachSpeak(o: CoachBase & { situation: string; guided: boolean }
     onDelta,
     maxRetries: 1,
     timeoutMs: 20_000,
-    signal
+    signal,
+    tag: o.tag
   })
 }
 
@@ -52,7 +54,8 @@ export function coachAsk(o: CoachBase & { situation: string; history: Msg[]; que
     onDelta,
     maxRetries: 2,
     timeoutMs: 45_000,
-    signal
+    signal,
+    tag: o.tag
   })
 }
 
@@ -77,7 +80,8 @@ export async function coachRecap(o: CoachBase & { summary: string }, signal: Abo
     tool: recap,
     maxRetries: 2,
     timeoutMs: 45_000,
-    signal
+    signal,
+    tag: o.tag
   })
   // 没调用工具等同失败：复盘卡需要四段内容
   return r.ok && !r.args ? { ...r, ok: false, error: '教练没有给出复盘' } : r

@@ -79,6 +79,12 @@ export interface HandLogEntry {
   name: string
   label: string
   cards?: Card[]
+  // 结构化字段（v2 起）：旧记录只有文案
+  seat?: number
+  type?: 'blind' | 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'return'
+  amount?: number
+  to?: number
+  allIn?: boolean
 }
 
 export interface HandRecord {

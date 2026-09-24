@@ -293,7 +293,9 @@ export class Table {
       const size = collected.reduce((a, x) => a + Math.max(0, Math.min(x.amt, lvl) - prev), 0)
       const eligible = collected.filter((x) => x.amt >= lvl && !this.seat(x.i).folded).map((x) => x.i)
       prev = lvl
-      if (!eligible.length && out.length) out[out.length - 1].size += size
+      const last = out.at(-1)
+      // 与 showdown 一致：资格相同的相邻层合并，全弃牌的层并入上一层
+      if (last && (!eligible.length || last.eligible.join() === eligible.join())) last.size += size
       else out.push({ size, eligible })
     }
     return out
@@ -318,10 +320,6 @@ export class Table {
 
   stakes() {
     return { ...this.blinds }
-  }
-
-  numSeats() {
-    return this.seatsArr.length
   }
 
   // ---- 内部 ----

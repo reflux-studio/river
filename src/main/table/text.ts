@@ -140,7 +140,7 @@ export function handRecord(t: Table, seats: SeatInfo[], mode: Mode, stakes: { sb
   const entries: HandLogEntry[] = log.map((e) =>
     'board' in e
       ? { street: e.street, board: true, name: '', label: cards(e.board), cards: e.board }
-      : { street: e.street, board: false, name: seats[e.seat].name, label: label(e, bl) }
+      : { street: e.street, board: false, name: seats[e.seat].name, label: label(e, bl), seat: e.seat, type: e.type, amount: e.amount, ...(e.to !== undefined && { to: e.to }), allIn: e.allIn }
   )
   const pre = log.filter((e): e is Extract<LogEntry, { seat: number }> => 'seat' in e && e.seat === 0 && e.street === 'preflop')
   const hero = st[0]!

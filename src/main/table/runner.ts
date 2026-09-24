@@ -3,10 +3,10 @@ import { cardsText, fmt } from '../../shared/format'
 import { BLINDS, STREET } from '../../shared/personas'
 import type { ChatMessage, CoachEntry, CoachState, Events, HandRecord, HeroAction, Mode, Persona, Recap, TableStart, TableView } from '../../shared/types'
 import { coachAsk, coachRecap, coachSpeak } from '../agents/coach'
-import { setUsageListener, type Msg, type Usage } from '../agents/llm'
+import { setUsageListener, type Msg, type Usage, type UsageTag } from '../agents/llm'
 import { opponentAct, type RawAct } from '../agents/opponent'
 import {
-  addMemory, getBankroll, getHand, insertHand, insertUsage, memoryOf, personasCache, personaOf, saveReview, setBankroll, settingsCache, type UsageRow
+  addMemory, getBankroll, getHand, handKeyOf, insertHand, insertUsage, memoryOf, personasCache, personaOf, saveReview, setBankroll, settingsCache, type UsageRow
 } from '../db'
 import { equity, handName, outs } from '../engine/eval'
 import { Table, type ActionType } from '../engine/table'
@@ -76,6 +76,8 @@ export class TableRunner {
   private endKey: number | null = null
   private stepTimer?: ReturnType<typeof setTimeout>
   private usage: UsageRow[] = []
+  // 入座时的角色快照：牌局中途删除自建角色也能继续
+  private snapshots = new Map<string, Persona>()
 
   constructor(o: { emit: Emit; agents?: Partial<AgentDeps>; rng?: Rng }) {
     this.emit = o.emit
@@ -123,8 +125,6 @@ export class TableRunner {
     await setBankroll(this.bankroll)
     this.nextHand()
   }
-
-  private snapshots = new Map<string, Persona>()
 
   async leave() {
     const t = this.table
@@ -262,6 +262,7 @@ export class TableRunner {
           name: persona.name,
           prompt: persona.prompt,
           memory: await memoryOf(pid),
+          tag: this.tag(t),
           situation: situation(t, this.seats, seat, {
             chat: this.chat.filter((m) => m.kind !== 'sys').slice(-8),
             equity: eq,
@@ -358,8 +359,8 @@ export class TableRunner {
     this.broadcast()
     const r = this.agents.modelReady('coach')
       ? await this.agents.coachSpeak(
-          { memory: await memoryOf('hero'), guided: this.guided, situation: this.heroSituation(t) },
-          (d) => this.patchCoach(entry, { text: entry.text + d }),
+          { memory: await memoryOf('hero'), tag: this.tag(t), guided: this.guided, situation: this.heroSituation(t) },
+          (d) => rid === this.runId && this.patchCoach(entry, { text: entry.text + d }),
           AbortSignal.any([ctrl.signal, this.leaveCtrl.signal])
         )
       : { ok: false, aborted: false, text: '', error: '教练模型未配置' }
@@ -388,8 +389,8 @@ export class TableRunner {
     this.broadcast()
     const r = this.agents.modelReady('coach')
       ? await this.agents.coachAsk(
-          { memory: await memoryOf('hero'), situation: this.heroSituation(t), history: this.askHistory.slice(-ASK_ROUNDS * 2), question: q },
-          (d) => this.patchCoach(entry, { text: entry.text + d }),
+          { memory: await memoryOf('hero'), tag: this.tag(t), situation: this.heroSituation(t), history: this.askHistory.slice(-ASK_ROUNDS * 2), question: q },
+          (d) => rid === this.runId && this.patchCoach(entry, { text: entry.text + d }),
           AbortSignal.any([ctrl.signal, this.leaveCtrl.signal])
         )
       : { ok: false, aborted: false, text: '', error: '教练模型未配置' }
@@ -423,16 +424,18 @@ export class TableRunner {
     this.coachBusy = 'recap'
     const ctrl = (this.coachCtrl = new AbortController())
     this.broadcast()
-    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), summary: heroHandSummary(last.rec) }, AbortSignal.any([ctrl.signal, this.leaveCtrl.signal]))
+    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), tag: { tableId: this.tableId, handNo: last.rec.hand }, summary: heroHandSummary(last.rec) }, AbortSignal.any([ctrl.signal, this.leaveCtrl.signal]))
     if (rid !== this.runId) return
     if (r.ok && r.args) {
       const { note, ...recap } = r.args
       this.patchCoach(entry, { status: 'done', recap: pickRecap(recap) })
       this.recap = 'done'
       if (note?.trim()) await addMemory('hero', note.trim().slice(0, 30))
-      if (last.id !== null) {
-        await saveReview(last.id, JSON.stringify(pickRecap(recap)))
-        this.emit('review:done', { handId: last.id, review: pickRecap(recap) })
+      // 提问恰在落库前发生时，开始复盘那一刻还没有 id：以结束时的为准
+      const id = this.lastRecord?.rec === last.rec ? this.lastRecord.id : last.id
+      if (id !== null) {
+        await saveReview(id, JSON.stringify(pickRecap(recap)))
+        this.emit('review:done', { handId: id, review: pickRecap(recap) })
       }
     } else if (ctrl.signal.aborted) {
       this.patchCoach(entry, { status: 'skipped' })
@@ -452,7 +455,7 @@ export class TableRunner {
     if (!this.agents.modelReady('coach')) return done({ error: 'not_configured' })
     const rec = await getHand(handId)
     if (!rec) return done({ error: 'not_found' })
-    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), summary: heroHandSummary(rec) }, AbortSignal.timeout(60_000))
+    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), tag: await handKeyOf(handId), summary: heroHandSummary(rec) }, new AbortController().signal)
     if (!r.ok || !r.args) return done({ error: r.error ?? 'failed' })
     const recap = pickRecap(r.args)
     await saveReview(handId, JSON.stringify(recap))
@@ -557,8 +560,8 @@ export class TableRunner {
   }
 
   private recordUsage(u: Usage) {
-    const row: UsageRow = { at: Date.now(), tableId: this.table ? this.tableId : null, handNo: this.table?.handNumber() ?? null, ...u }
-    if (this.table) this.usage.push(row)
+    const row: UsageRow = { at: Date.now(), ...u }
+    if (this.table && u.tableId === this.tableId) this.usage.push(row)
     insertUsage(row).then(
       () => this.emit('usage:changed', undefined),
       (e) => console.error('insertUsage failed', e)
@@ -593,12 +596,8 @@ export class TableRunner {
     })
   }
 
-  // 测试与调试用
-  lines() {
-    return this.table ? logLines(this.table, this.seats, 0) : []
-  }
-  board() {
-    return this.table ? cardsText(this.table.communityCards()) : ''
+  private tag(t: Table): UsageTag {
+    return { tableId: this.tableId, handNo: t.handNumber() }
   }
 }
 

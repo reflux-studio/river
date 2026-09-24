@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { callModel, type CallResult } from './llm'
+import { callModel, type CallResult, type UsageTag } from './llm'
 
 // schema 放宽：小模型常把 action 写成 bet、把 to 写成字符串，交给 runner 规范化，不因校验失败停下（reviews/design-3.md F3）
 const act = {
@@ -20,6 +20,7 @@ export interface OpponentInput {
   prompt: string
   memory: string[]
   situation: string
+  tag: UsageTag
 }
 
 const MS = 45_000
@@ -46,6 +47,7 @@ export function opponentAct(i: OpponentInput, signal: AbortSignal): Promise<Call
     tool: act,
     maxRetries: 2,
     timeoutMs: MS,
-    signal
+    signal,
+    tag: i.tag
   })
 }

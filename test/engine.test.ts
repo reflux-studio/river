@@ -392,5 +392,30 @@ describe('与原型对照（牌型评估）', () => {
         expect(mine).toBe(P.equity(hole, board, 2, 200))
       }
     }
+  }, 30_000)
+})
+
+describe('底池划分', () => {
+  it('pots() 与 showdown 一致：资格相同的相邻层合并（审阅 T2-T5-1 L1）', () => {
+    const t = new Table({ smallBlind: 5, bigBlind: 10 }, 3)
+    for (let i = 0; i < 3; i++) t.sitDown(i, 1000)
+    t.startHand()
+    const { bb } = t.blindSeats()
+    while (t.isBettingRoundInProgress()) {
+      const p = t.playerToAct()
+      if (p === bb) t.actionTaken('fold')
+      else if (t.currentBet() < 30) t.actionTaken('raise', 30)
+      else t.actionTaken('call')
+    }
+    t.endBettingRound()
+    const pots = t.pots()
+    expect(pots).toHaveLength(1)
+    expect(pots[0].size).toBe(70)
+    while (t.isHandInProgress()) {
+      if (t.isBettingRoundInProgress()) t.actionTaken('check')
+      else if (!t.areBettingRoundsCompleted()) t.endBettingRound()
+      else t.showdown()
+    }
+    expect(new Set(t.winners().map((w) => w.pot))).toEqual(new Set([0]))
   })
 })
