@@ -3,7 +3,6 @@ import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
 import { initMastra } from './agents/mastra'
 import { initDb } from './db'
 import { guardQuit, registerIpc } from './ipc'
-import { runSpike } from './spike'
 import { TableRunner } from './table/runner'
 
 let win: BrowserWindow | null = null
@@ -59,7 +58,6 @@ app.whenReady().then(async () => {
   registerIpc(ipcMain, runner)
   guardQuit(app, runner)
   createWindow()
-  if (process.argv.includes('--spike') || process.env.RIVER_SPIKE === '1') await runSpike()
 })
 
 app.on('window-all-closed', () => app.quit())
