@@ -1,0 +1,18 @@
+appId: app.river.desktop
+productName: River
+directories:
+  buildResources: build
+files:
+  - out/**
+  - package.json
+# libsql 为 N-API 原生模块，.node 无法从 asar 内加载
+asarUnpack:
+  - node_modules/@libsql/**
+  - node_modules/libsql/**
+mac:
+  target:
+    - target: dmg
+      arch: arm64
+  identity: null
+  artifactName: ${productName}-${version}-${arch}.${ext}
+npmRebuild: false

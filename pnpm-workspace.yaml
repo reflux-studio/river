@@ -1,0 +1,6 @@
+allowBuilds:
+  electron-winstaller: false
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@mastra/core@1.69.0'
+  - electron@44.4.5

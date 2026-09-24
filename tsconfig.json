@@ -1,0 +1,6 @@
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }],
+  // shadcn CLI 只从根 tsconfig 读取别名
+  "compilerOptions": { "baseUrl": ".", "paths": { "@/*": ["src/renderer/src/*"] } }
+}

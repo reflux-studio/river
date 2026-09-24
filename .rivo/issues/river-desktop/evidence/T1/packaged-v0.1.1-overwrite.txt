@@ -1,0 +1,31 @@
+mounted: /Volumes/River 0.1.1-arm64
+installed: 0.1.1
+{
+ "version": "0.1.1",
+ "packaged": true,
+ "userData": "/Users/suziming/Library/Application Support/River",
+ "error": null,
+ "safeStorage": {
+  "available": true,
+  "mode": "decrypt",
+  "ok": true
+ },
+ "checks": {
+  "toolExecuted": true,
+  "modelFnGotRequestContext": true,
+  "stopWhenStoppedAfterFirstStep": true,
+  "memoryHasUpdateWorkingMemory": true,
+  "workingMemoryWritten": true,
+  "abortedReturnsWithoutThrow": true,
+  "mastraTablesInRiverDb": true,
+  "providerRegistryReadable": true,
+  "safeStorage": true
+ },
+ "pass": true,
+ "abortedFinishReason": "aborted",
+ "providerCount": 208
+}
+mastraTables: 44
+-rw-r--r--@   1 suziming  staff  577536 Sep 24 01:26 river.db
+-rw-r--r--@   1 suziming  staff      19 Sep 24 01:25 spike-key.bin
+-rw-r--r--@   1 suziming  staff    2241 Sep 24 01:26 spike-result.json
