@@ -28,7 +28,6 @@ beforeEach(() => setup())
 afterEach(teardown)
 
 async function seat(h: Harness, t: TableStart = table4) {
-  await h.runner.init()
   await h.runner.start(t)
   await tick(0)
 }
@@ -36,7 +35,7 @@ async function seat(h: Harness, t: TableStart = table4) {
 describe('公屏触发表', () => {
   it('玩家发言触发；chat 模式的回应不再触发（限一层）', async () => {
     const r = recorder(() => ({ text: '哈哈好', kind: 'free' }))
-    const h = harness({ rng: always, agents: { ...idle, opponentChat: r.opponentChat } })
+    const h = await harness({ rng: always, agents: { ...idle, opponentChat: r.opponentChat } })
     await seat(h)
     const thinking = h.runner.thinking
     h.runner.sendChat('大家好')
@@ -54,7 +53,7 @@ describe('公屏触发表', () => {
 
   it('10 秒冷却：冷却内再次发言不触发同一对手，满 10 秒后恢复', async () => {
     const r = recorder()
-    const h = harness({ rng: always, agents: { ...idle, opponentChat: r.opponentChat } })
+    const h = await harness({ rng: always, agents: { ...idle, opponentChat: r.opponentChat } })
     await seat(h)
     h.runner.sendChat('一')
     await tick(0)
@@ -72,7 +71,7 @@ describe('公屏触发表', () => {
 
   it('正在决策的对手不被触发', async () => {
     const r = recorder()
-    const h = harness({ rng: always, agents: { ...idle, opponentChat: r.opponentChat } })
+    const h = await harness({ rng: always, agents: { ...idle, opponentChat: r.opponentChat } })
     await seat(h)
     await drive(h, () => h.runner.thinking !== null)
     const thinking = h.runner.thinking
@@ -86,7 +85,7 @@ describe('公屏触发表', () => {
   it('decide 的 free 发言触发，reply 发言不触发', async () => {
     let kind: 'free' | 'reply' = 'free'
     const r = recorder()
-    const h = harness({
+    const h = await harness({
       rng: always,
       agents: { opponentChat: r.opponentChat, opponentDecide: async () => ok({ act: { type: 'call' as const }, say: { text: kind === 'free' ? '我先说' : '回你', kind } }) }
     })
@@ -107,7 +106,7 @@ describe('公屏触发表', () => {
   it('赢家发言触发其他对手回应', async () => {
     await db.updateSettings({ autoNext: false })
     const r = recorder((c) => (c.mode === 'win' ? { text: '赢啦', kind: 'reply' } : undefined))
-    const h = harness({ rng: always, agents: { opponentChat: r.opponentChat, opponentDecide: async () => ok({ act: { type: 'raise' as const, to: 400 } }) } })
+    const h = await harness({ rng: always, agents: { opponentChat: r.opponentChat, opponentDecide: async () => ok({ act: { type: 'raise' as const, to: 400 } }) } })
     await seat(h, table3)
     await drive(h, () => h.runner.game!.done, heroFolds)
     await tick(0)
@@ -120,7 +119,7 @@ describe('公屏触发表', () => {
 
   it('托管预设台词不触发', async () => {
     const r = recorder()
-    const h = harness({ rng: always, limits: { decide: 1 }, agents: { ...idle, opponentChat: r.opponentChat } })
+    const h = await harness({ rng: always, limits: { decide: 1 }, agents: { ...idle, opponentChat: r.opponentChat } })
     await seat(h)
     await drive(h, () => h.chat.some((m) => m.autopilot))
     const m = h.chat.find((x) => x.autopilot)!
@@ -133,7 +132,7 @@ describe('公屏触发表', () => {
     await db.updateSettings({ engine: 'local' })
     let decides = 0
     const r = recorder()
-    const h = harness({ rng: always, agents: { opponentChat: r.opponentChat, opponentDecide: async () => (decides++, ok({})) } })
+    const h = await harness({ rng: always, agents: { opponentChat: r.opponentChat, opponentDecide: async () => (decides++, ok({})) } })
     await seat(h)
     h.runner.sendChat('有人吗')
     await drive(h, () => h.chat.filter((m) => m.act && m.from !== 'hero').length >= 2, () => 'call')
@@ -152,7 +151,7 @@ describe('泄牌过滤', () => {
 
   it('decide 的 say 含本人底牌点数 → 整句丢弃，行动照常', async () => {
     const said: string[] = []
-    const h = harness({
+    const h = await harness({
       rng: always,
       agents: { opponentDecide: async (ctx) => (said.push(leakText(ctx)), ok({ act: { type: 'call' as const }, say: { text: leakText(ctx), kind: 'free' as const } })) }
     })
@@ -166,7 +165,7 @@ describe('泄牌过滤', () => {
   it('chat 与 win 的 say 含本人底牌点数 → 公屏不出现', async () => {
     await db.updateSettings({ autoNext: false })
     const said: string[] = []
-    const h = harness({
+    const h = await harness({
       rng: always,
       agents: {
         opponentDecide: async () => ok({ act: { type: 'raise' as const, to: 400 } }),

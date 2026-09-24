@@ -61,7 +61,7 @@ export function teardown() {
   rmSync(dir, { recursive: true, force: true })
 }
 
-export function harness(o: { agents?: Partial<AgentDeps>; limits?: Partial<Limits>; rng?: () => number; onEmit?: (h: Harness, event: keyof Events, payload: unknown) => void } = {}): Harness {
+export async function harness(o: { agents?: Partial<AgentDeps>; limits?: Partial<Limits>; rng?: () => number; onEmit?: (h: Harness, event: keyof Events, payload: unknown) => void } = {}): Promise<Harness> {
   const h = { events: [], views: [], chat: [] } as unknown as Harness
   h.of = (event) => h.events.filter((e) => e.event === event).map((e) => e.payload) as never
   h.runner = new TableRunner({
@@ -75,6 +75,7 @@ export function harness(o: { agents?: Partial<AgentDeps>; limits?: Partial<Limit
     limits: o.limits,
     rng: o.rng ?? seeded(1)
   })
+  await h.runner.init()
   return h
 }
 

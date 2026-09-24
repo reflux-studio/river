@@ -33,7 +33,7 @@ describe('完整牌局', () => {
     const rng = seeded(42)
     const appended: string[] = []
     const leaks: string[] = []
-    const h = harness({
+    const h = await harness({
       rng,
       agents: {
         opponentDecide: async (ctx) => {
@@ -52,7 +52,6 @@ describe('完整牌局', () => {
         }
       }
     })
-    await h.runner.init()
     await h.runner.start(table6)
     const buy = 100 * 100
     let rebuys = 0
@@ -102,7 +101,7 @@ describe('超时托管与熔断', () => {
   it('决策 11 秒 → 托管并标记；连续 3 次 → breaker 且不再调用；retryModels 恢复', async () => {
     let calls = 0
     let slow = true
-    const h = harness({
+    const h = await harness({
       agents: {
         opponentDecide: (ctx, s) => {
           calls++
@@ -112,7 +111,6 @@ describe('超时托管与熔断', () => {
         }
       }
     })
-    await h.runner.init()
     await h.runner.start(table6)
     await drive(h, () => opponentActs(h).length >= 1)
     const first = opponentActs(h)[0]
@@ -137,7 +135,7 @@ describe('超时托管与熔断', () => {
 
   it('过期结果丢弃：决策期间离桌，返回后不 apply、不计失败', async () => {
     let started = false
-    const h = harness({
+    const h = await harness({
       agents: {
         opponentDecide: async () => {
           started = true
@@ -146,7 +144,6 @@ describe('超时托管与熔断', () => {
         }
       }
     })
-    await h.runner.init()
     await h.runner.start(table6)
     await drive(h, () => started)
     const g = h.runner.game!
@@ -164,7 +161,7 @@ describe('超时托管与熔断', () => {
 
   it('暂停挂起：决策返回时已暂停，resume 后提交原决策', async () => {
     let started = false
-    const h = harness({
+    const h = await harness({
       agents: {
         opponentDecide: async () => {
           started = true
@@ -174,7 +171,6 @@ describe('超时托管与熔断', () => {
         coachAsk: async (_c, _q, _d, s) => delayed<Answer>(500, s, () => ({ ok: true, text: '答', aborted: false }), () => ({ ok: false, text: '', aborted: true }))
       }
     })
-    await h.runner.init()
     await h.runner.start(table6)
     await drive(h, () => started)
     const n = opponentActs(h).length
@@ -190,13 +186,12 @@ describe('超时托管与熔断', () => {
 
   it('决策在途时暂停又恢复：不重复发起决策，原结果照常提交且不算失败', async () => {
     let calls = 0
-    const h = harness({
+    const h = await harness({
       agents: {
         opponentDecide: async (_c, s) => (calls++, delayed(3000, s, () => ok({ act: { type: 'call' } }), () => ({ ok: false, aborted: true, intents: {} }))),
         coachAsk: async () => ({ ok: true, text: '答', aborted: false })
       }
     })
-    await h.runner.init()
     await h.runner.start(table6)
     await drive(h, () => calls === 1)
     const n = opponentActs(h).length
@@ -216,8 +211,7 @@ describe('教练', () => {
 
   it('proactive 返回 pause → 暂停；resume 后同一决策点不再调用教练', async () => {
     let calls = 0
-    const h = harness({ agents: { coachProactive: async () => (calls++, ok({ pause: '想清楚' })) } })
-    await h.runner.init()
+    const h = await harness({ agents: { coachProactive: async () => (calls++, ok({ pause: '想清楚' })) } })
     await h.runner.start(table6)
     await drive(h, () => calls > 0, () => null)
     await tick(0)
@@ -231,14 +225,13 @@ describe('教练', () => {
 
   it('教练晚到：proactive 返回前玩家已行动 → 丢弃 pause', async () => {
     let calls = 0
-    const h = harness({
+    const h = await harness({
       agents: {
         coachProactive: async (_c, s) => (calls++, delayed(2000, s, () => ok({ pause: '晚了' }), () => ({ ok: false, aborted: true, intents: {} }))),
         // 对手慢一些：保证教练返回时还没轮回到玩家（否则新一轮 proactive 会先抢占它）
         opponentDecide: (ctx, s) => delayed(5000, s, () => ok({ act: { type: 'call' as const } }), () => ({ ok: false, aborted: true, intents: {} }))
       }
     })
-    await h.runner.init()
     await h.runner.start(table2)
     await drive(h, () => calls > 0, () => null)
     h.runner.heroAct({ type: 'call' })
@@ -251,8 +244,7 @@ describe('教练', () => {
   it('教练连续 3 次失败 → breaker，之后 proactive 与 ask 都不发起', async () => {
     let calls = 0
     await db.updateSettings({ autoNext: true })
-    const h = harness({ agents: { coachProactive: async () => (calls++, { ok: false, aborted: false, intents: {}, error: 'boom' }) } })
-    await h.runner.init()
+    const h = await harness({ agents: { coachProactive: async () => (calls++, { ok: false, aborted: false, intents: {}, error: 'boom' }) } })
     await h.runner.start(table6)
     await drive(h, () => h.views.some((v) => v.breaker.coach))
     expect(calls).toBe(3)
@@ -263,8 +255,7 @@ describe('教练', () => {
   })
 
   it('未配置教练模型：ask 不暂停，按 renderer 给的 requestId 推 coach:done not_configured', async () => {
-    const h = harness({ agents: { modelReady: (role) => role !== 'coach' } })
-    await h.runner.init()
+    const h = await harness({ agents: { modelReady: (role) => role !== 'coach' } })
     await h.runner.start(table6)
     h.runner.ask('q1', '问')
     expect(h.runner.paused).toBe(false)
@@ -274,7 +265,7 @@ describe('教练', () => {
 
   it('连续两次 ask：第一次 interrupted，askInFlight 在第二次结束才清除；ask 期间不发起 proactive', async () => {
     let proactive = 0
-    const h = harness({
+    const h = await harness({
       agents: {
         coachProactive: async () => (proactive++, ok({})),
         coachAsk: (_c, q, onDelta, s) => {
@@ -283,7 +274,6 @@ describe('教练', () => {
         }
       }
     })
-    await h.runner.init()
     await h.runner.start(table6)
     await drive(h, () => proactive > 0, () => null)
     const [a, b] = ['a', 'b']
@@ -305,13 +295,12 @@ describe('教练', () => {
 
   it('自动下一手等 ask 结束', async () => {
     await db.updateSettings({ autoNext: true, coachOn: false })
-    const h = harness({
+    const h = await harness({
       agents: {
         opponentDecide: async () => ok({ act: { type: 'raise' as const, to: 400 } }),
         coachAsk: (_c, q, _d, s) => delayed<Answer>(8000, s, () => ({ ok: true, text: q, aborted: false }), () => ({ ok: false, text: '', aborted: true }))
       }
     })
-    await h.runner.init()
     await h.runner.start(table2)
     await drive(h, () => h.runner.game!.done, heroFolds)
     h.runner.ask('q', '刚才那手')
@@ -325,7 +314,7 @@ describe('教练', () => {
     const rec = { hand: 1, sb: 50, bb: 100, net: 0, pot: 150, showdown: false, hero: ['As', 'Kd'], board: [], players: [], log: [], vpip: false, pfr: false } as HandRecord
     const ids = [] as number[]
     for (let i = 0; i < 5; i++) ids.push(await db.insertHand('t', rec))
-    const h = harness({
+    const h = await harness({
       agents: {
         coachReview: async (id, _r, s) =>
           id === ids[0] ? { ok: false, error: 'boom' } : delayed<{ ok: boolean; text?: string; error?: string }>(1000, s, () => ({ ok: true, text: '复盘' + id }), () => ({ ok: false, error: 'aborted' }))
@@ -352,13 +341,12 @@ describe('一手结束', () => {
   const raiser = { opponentDecide: async () => ok({ act: { type: 'raise' as const, to: 400 } }) }
 
   it('赢家发言延迟 6 秒：发言写入公屏，下一手在发言返回后才开始', async () => {
-    const h = harness({
+    const h = await harness({
       agents: {
         ...raiser,
         opponentChat: (_c, mode, _i, s) => delayed(6000, s, () => ok(mode === 'win' ? { say: { text: '承让', kind: 'reply' as const } } : {}), () => ({ ok: false, aborted: true, intents: {} }))
       }
     })
-    await h.runner.init()
     await h.runner.start(table2)
     await drive(h, () => h.runner.game!.done, heroFolds)
     expect(h.runner.winSpeechInFlight).toBe(1)
@@ -373,7 +361,7 @@ describe('一手结束', () => {
 
   it('赢家发言被队列拒绝：取预设台词，自动下一手仍在 4.5 秒后触发', async () => {
     let chatCalls = 0
-    const h = harness({
+    const h = await harness({
       rng: () => 0.01,
       agents: { ...raiser, opponentChat: async () => (chatCalls++, ok({ say: { text: '不该出现', kind: 'free' as const } })) },
       onEmit: (hh, e, p) => {
@@ -386,7 +374,6 @@ describe('一手结束', () => {
       }
     })
     let filled = false
-    await h.runner.init()
     await h.runner.start(table2)
     await drive(h, () => h.runner.game!.done, heroFolds)
     await tick(0)
@@ -401,12 +388,11 @@ describe('一手结束', () => {
   })
 
   it('赢家发言返回前手动发下一手：整体丢弃，不补台词', async () => {
-    const h = harness({
+    const h = await harness({
       rng: () => 0.01,
       agents: { ...raiser, opponentChat: (_c, _m, _i, s) => delayed(3000, s, () => ok({ say: { text: '迟到的话', kind: 'free' as const } }), () => ({ ok: false, aborted: true, intents: {} })) }
     })
     await db.updateSettings({ autoNext: false })
-    await h.runner.init()
     await h.runner.start(table2)
     await drive(h, () => h.runner.game!.done, heroFolds)
     h.runner.nextHand()
@@ -417,7 +403,7 @@ describe('一手结束', () => {
 
   it('每手结果 durable：下一手决策抢占时仍写入 thread，且先于决策', async () => {
     const order: string[] = []
-    const h = harness({
+    const h = await harness({
       agents: {
         ...raiser,
         opponentDecide: async (ctx) => (order.push(`decide:${ctx.table.viewFor(ctx.seat).handNo}`), ok({ act: { type: 'raise' as const, to: 400 } })),
@@ -428,7 +414,6 @@ describe('一手结束', () => {
       }
     })
     await db.updateSettings({ autoNext: false })
-    await h.runner.init()
     await h.runner.start(table2)
     await drive(h, () => h.runner.game!.done, heroFolds)
     h.runner.nextHand()
@@ -442,8 +427,7 @@ describe('离桌与退出', () => {
   beforeEach(() => setup())
 
   it('中途退出：before-quit 先拦下，余额加回玩家筹码并写库后才退出', async () => {
-    const h = harness()
-    await h.runner.init()
+    const h = await harness()
     await h.runner.start(table6)
     await drive(h, () => h.runner.game!.log.length > 4)
     const stack = h.runner.game!.players[0].stack
@@ -462,8 +446,7 @@ describe('离桌与退出', () => {
   })
 
   it('table.start 已有桌时先退回原桌筹码；rebuy 扣余额；教学牌局固定配置', async () => {
-    const h = harness()
-    await h.runner.init()
+    const h = await harness()
     await h.runner.start(table6)
     expect(h.runner.bankroll).toBe(90000)
     const back = h.runner.game!.players[0].stack
@@ -486,8 +469,7 @@ describe('IPC', () => {
   beforeEach(() => setup())
 
   it('provider.save 带新 key 后清除 needsKey；bootstrap 不含明文 key 与底牌', async () => {
-    const h = harness()
-    await h.runner.init()
+    const h = await harness()
     const cmd = commandHandlers(h.runner)
     const p = await cmd['provider.save']({ name: 'x', kind: 'openai', apiKey: 'sk-secret-1234' })
     needsKey.add(p.id)
