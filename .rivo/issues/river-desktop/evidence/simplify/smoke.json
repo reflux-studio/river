@@ -1,0 +1,42 @@
+[
+ {
+  "step": "settings",
+  "ok": true
+ },
+ {
+  "step": "seated",
+  "title": "无限注 · 10/20 · 3 人桌"
+ },
+ {
+  "step": "played",
+  "hands": [
+   1,
+   2
+  ],
+  "reloaded": {
+   "navHasTable": true,
+   "restoredActionBar": "跟注"
+  }
+ },
+ {
+  "step": "left",
+  "hasTableTab": false
+ },
+ {
+  "step": "replays",
+  "head": "River | 大厅 | AI 对手 | 手牌回放 | 数据统计 | 设置 | 筹码 | 104,230 | 手牌回放 | #2 | 9/24 12:16 | 6♠ 10♥ | +120 | #1 | 9/24 12:16 | K♠ 10♦ | +230 | #1 | 9/24 11:36 | 3♠ J♦"
+ },
+ {
+  "step": "stats",
+  "kpi": "14",
+  "vpip": "50%",
+  "pfr": "7%"
+ },
+ {
+  "step": "settings-page",
+  "autopilot": "未入座"
+ },
+ {
+  "errors": []
+ }
+]
