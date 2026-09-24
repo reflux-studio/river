@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import {
-  deleteProvider, invoke, openRules, testProvider, toastError, updateSettings, useRiver, type RiverState
+  deleteProvider, invoke, openRules, testProvider, toastError, updateSettings, useRiver, configured
 } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import { COACHES } from '../../../shared/personas'
@@ -17,12 +17,6 @@ type Role = 'opponent' | 'coach'
 const ROLE_NAME: Record<Role, string> = { opponent: '对手', coach: '教练' }
 const NONE = '__none'
 const pillBtn = 'rounded-full border border-input bg-white px-3.5 py-1.5 text-[13px] whitespace-nowrap hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50'
-
-const configured = (s: RiverState, role: Role) => {
-  const m = s.settings.models[role]
-  const p = m && s.providers.find((x) => x.id === m.providerId)
-  return !!p && !p.needsKey
-}
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (

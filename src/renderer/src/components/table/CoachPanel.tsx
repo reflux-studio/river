@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Segmented } from '@/components/Segmented'
 import { Switch } from '@/components/ui/switch'
-import { askCoach, coachConfigured, go, invoke, toastError, updateSettings, useRiver, type CoachItem } from '@/lib/river'
+import { askCoach, configured, go, invoke, toastError, updateSettings, useRiver, type CoachItem } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import { COACHES } from '../../../../shared/personas'
 import type { Settings, TableView } from '../../../../shared/types'
@@ -76,7 +76,7 @@ export function CoachPanel({ view: v }: { view: TableView }) {
   const st = useRiver((s) => s.settings)
   const coach = useRiver((s) => s.coach)
   const alert = v.alert
-  const ready = useRiver(coachConfigured)
+  const ready = useRiver((s) => configured(s, 'coach'))
   const [input, setInput] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
   const loading = v.coachLoading && !coach.some((c) => c.pending && c.text)

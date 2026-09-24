@@ -160,7 +160,7 @@ export function Lobby() {
             <span className="text-[13px] leading-[1.6] text-subtle">先花一分钟看规则，再跟着教练打一手：3 人小桌，教练每一步都会说话。</span>
             <div className="flex gap-2">
               <button onClick={openRules} className={cn(pillBtn, 'border border-input hover:bg-accent')}>规则介绍</button>
-              <button onClick={startGuided} className={cn(pillBtn, 'bg-foreground text-white hover:bg-foreground/85')}>教学牌局</button>
+              <button onClick={() => startGuided()} className={cn(pillBtn, 'bg-foreground text-white hover:bg-foreground/85')}>教学牌局</button>
             </div>
           </div>
           <Recent />

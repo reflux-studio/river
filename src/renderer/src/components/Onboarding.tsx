@@ -5,7 +5,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { GUIDED, finishOnboarding, go, setState, startGuided, startTable, useRiver, type RiverState } from '@/lib/river'
+import { finishOnboarding, go, modelOf, setState, startGuided, useRiver, type RiverState } from '@/lib/river'
 import { cn } from '@/lib/utils'
 
 const PAGES = [
@@ -30,9 +30,8 @@ const ACTS = [
 const pill = 'h-auto rounded-full px-4 py-[9px] text-sm font-normal'
 
 function modelLabel(s: RiverState, role: 'opponent' | 'coach') {
-  const m = s.settings.models[role]
-  const p = m && s.providers.find((x) => x.id === m.providerId)
-  return p ? `${p.name} · ${m.modelId}` : '未配置'
+  const m = modelOf(s, role)
+  return m ? `${m.provider.name} · ${m.modelId}` : '未配置'
 }
 
 function Pages() {
@@ -142,7 +141,7 @@ export function GuidedDialog() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="rounded-full" onClick={() => void startTable({ ...GUIDED, guided: true })}>
+          <AlertDialogCancel className="rounded-full" onClick={() => void startGuided(true)}>
             仍然开始（无教练讲解）
           </AlertDialogCancel>
           <AlertDialogAction className="rounded-full" onClick={() => go('settings')}>去配置</AlertDialogAction>

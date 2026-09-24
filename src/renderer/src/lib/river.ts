@@ -165,17 +165,20 @@ export async function startTable(opts: TableStart) {
   if (opts.guided) await reloadSettings()
 }
 
-export const coachConfigured = (s: RiverState) => {
-  const m = s.settings.models.coach
-  const p = m && s.providers.find((x) => x.id === m.providerId)
-  return !!p && !p.needsKey
-}
+type Role = keyof Settings['models']
 
-export function startGuided() {
-  if (coachConfigured(state)) return startTable({ ...GUIDED, guided: true })
+export function modelOf(s: RiverState, role: Role) {
+  const m = s.settings.models[role]
+  const provider = m && s.providers.find((x) => x.id === m.providerId)
+  return provider && { provider, modelId: m.modelId }
+}
+export const configured = (s: RiverState, role: Role) => modelOf(s, role)?.provider.needsKey === false
+
+// 教学牌局的桌型由主进程固定，这里传大厅配置只为满足参数类型
+export function startGuided(anyway = false) {
+  if (anyway || configured(state, 'coach')) return startTable({ ...state.lobby, guided: true })
   setState({ guidedAsk: true })
 }
-export const GUIDED: Omit<TableStart, 'guided'> = { size: 3, blinds: 0, picks: ['bai', 'zen'] }
 
 // 先落 pending 条目再发命令：之后的 delta/done 一定能按 requestId 找到它
 export async function askCoach(text: string) {

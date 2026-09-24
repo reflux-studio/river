@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Avatar } from '@/components/Avatar'
 import { PlayingCard } from '@/components/PlayingCard'
 import { cardsText, fmt, netColor, signed } from '@/lib/format'
-import { coachConfigured, go, invoke, toastError, useEvent, useRiver } from '@/lib/river'
+import { configured, go, invoke, toastError, useEvent, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import { STREET } from '../../../shared/personas'
 import type { HandRecord, HandSummary } from '../../../shared/types'
@@ -21,7 +21,7 @@ function streetsOf(log: HandRecord['log']) {
 }
 
 function Review({ d, loading, failed, onReview }: { d: Detail; loading: boolean; failed: boolean; onReview: () => void }) {
-  const ready = useRiver(coachConfigured)
+  const ready = useRiver((s) => configured(s, 'coach'))
   return (
     <div className={cn(card, 'flex flex-col gap-2.5 px-[18px] py-4')}>
       <div className="flex items-center gap-2.5">
