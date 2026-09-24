@@ -227,7 +227,7 @@ export interface Commands {
   'table.resume': () => void
   'table.retryModels': () => void
   'chat.send': (text: string) => void
-  'coach.ask': (text: string) => string
+  'coach.ask': (requestId: string, text: string) => void
   'hands.list': () => HandSummary[]
   'hands.get': (id: number) => { record: HandRecord; review?: string } | null
   'hands.review': (id: number) => void

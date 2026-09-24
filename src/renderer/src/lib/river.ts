@@ -96,14 +96,9 @@ export async function invoke<K extends keyof Commands>(cmd: K, ...args: Paramete
 export const go = (page: Page) => setState({ page })
 export const openRules = () => setState({ rulesOpen: true })
 
-// coach.ask 返回前，同 requestId 的事件可能已经到达；只在有提问未返回时暂存，否则未知 id 的事件（重载前的在途回答、旧桌中断）无人认领
-const early = new Map<string, { text: string; done?: Events['coach:done'] }>()
-let asking = 0
-
 function patchCoach(requestId: string, fn: (c: CoachItem) => CoachItem) {
   setState((s) => ({ coach: s.coach.map((c) => (c.role === 'assistant' && c.requestId === requestId ? fn(c) : c)) }))
 }
-const hasAnswer = (id: string) => state.coach.some((c) => c.role === 'assistant' && c.requestId === id)
 const applyDone = (c: CoachItem, d: Events['coach:done']): CoachItem => ({
   ...c,
   pending: false,
@@ -119,17 +114,8 @@ function listen() {
   river.on('breaker', (breaker) => setState({ breaker }))
   river.on('bankroll', (bankroll) => setState({ bankroll }))
   river.on('agent:last', (lastCall) => setState({ lastCall }))
-  river.on('coach:delta', ({ requestId, text }) => {
-    if (hasAnswer(requestId)) return patchCoach(requestId, (c) => ({ ...c, text: c.text + text }))
-    if (!asking) return
-    const e = early.get(requestId) ?? { text: '' }
-    early.set(requestId, { ...e, text: e.text + text })
-  })
-  river.on('coach:done', (d) => {
-    if (hasAnswer(d.requestId)) return patchCoach(d.requestId, (c) => applyDone(c, d))
-    if (!asking) return
-    early.set(d.requestId, { text: early.get(d.requestId)?.text ?? '', done: d })
-  })
+  river.on('coach:delta', ({ requestId, text }) => patchCoach(requestId, (c) => ({ ...c, text: c.text + text })))
+  river.on('coach:done', (d) => patchCoach(d.requestId, (c) => applyDone(c, d)))
 }
 
 export async function init() {
@@ -176,7 +162,6 @@ export async function updateLobby(patch: Partial<Lobby>) {
 
 export async function startTable(opts: TableStart) {
   // table.start 之后事件只追加，旧桌的公屏与教练对话要在入座前清掉
-  early.clear()
   setState({ chat: [], coach: [], alert: null })
   try {
     await invoke('table.start', opts)
@@ -200,22 +185,16 @@ export function startGuided() {
 }
 export const GUIDED: Omit<TableStart, 'guided'> = { size: 3, blinds: 0, picks: ['bai', 'zen'] }
 
+// 先落 pending 条目再发命令：之后的 delta/done 一定能按 requestId 找到它
 export async function askCoach(text: string) {
-  asking++
-  let requestId: string
+  const requestId = crypto.randomUUID()
+  setState((s) => ({ coach: [...s.coach, { role: 'user', text, requestId }, { role: 'assistant', text: '', requestId, pending: true }] }))
   try {
-    requestId = await invoke('coach.ask', text)
-  } finally {
-    asking--
+    await invoke('coach.ask', requestId, text)
+  } catch (e) {
+    patchCoach(requestId, (c) => applyDone(c, { requestId, ok: false, error: 'failed' }))
+    throw e
   }
-  const e = early.get(requestId)
-  early.delete(requestId)
-  if (!asking) early.clear()
-  const answer: CoachItem = { role: 'assistant', text: e?.text ?? '', requestId, pending: true }
-  setState((s) => ({
-    coach: [...s.coach, { role: 'user', text, requestId }, e?.done ? applyDone(answer, e.done) : answer]
-  }))
-  return requestId
 }
 
 export async function finishOnboarding() {

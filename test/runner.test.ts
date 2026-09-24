@@ -178,7 +178,7 @@ describe('超时托管与熔断', () => {
     await h.runner.start(table6)
     await drive(h, () => started)
     const n = opponentActs(h).length
-    h.runner.ask('现在怎么办')
+    h.runner.ask('q', '现在怎么办')
     expect(h.runner.paused).toBe(true)
     await tick(3000)
     expect(h.runner.pendingAI).not.toBeNull()
@@ -200,7 +200,7 @@ describe('超时托管与熔断', () => {
     await h.runner.start(table6)
     await drive(h, () => calls === 1)
     const n = opponentActs(h).length
-    h.runner.ask('等等')
+    h.runner.ask('q', '等等')
     await tick(100)
     h.runner.resume()
     await tick(3000)
@@ -258,20 +258,18 @@ describe('教练', () => {
     expect(calls).toBe(3)
     await drive(h, () => h.runner.game!.hand >= 4)
     expect(calls).toBe(3)
-    const id = h.runner.ask('还在吗')
-    await new Promise((r) => setImmediate(r))
-    expect(h.of('coach:done').at(-1)).toEqual({ requestId: id, ok: false, error: 'breaker' })
+    h.runner.ask('q1', '还在吗')
+    expect(h.of('coach:done').at(-1)).toEqual({ requestId: 'q1', ok: false, error: 'breaker' })
   })
 
-  it('未配置教练模型：ask 不暂停，命令返回后才推 coach:done not_configured', async () => {
+  it('未配置教练模型：ask 不暂停，按 renderer 给的 requestId 推 coach:done not_configured', async () => {
     const h = harness({ agents: { modelReady: (role) => role !== 'coach' } })
     await h.runner.init()
     await h.runner.start(table6)
-    const id = h.runner.ask('问')
-    expect(h.of('coach:done')).toEqual([])
+    h.runner.ask('q1', '问')
     expect(h.runner.paused).toBe(false)
-    await new Promise((r) => setImmediate(r))
-    expect(h.of('coach:done')).toEqual([{ requestId: id, ok: false, error: 'not_configured' }])
+    expect(h.runner.coachThread).toEqual([])
+    expect(h.of('coach:done')).toEqual([{ requestId: 'q1', ok: false, error: 'not_configured' }])
   })
 
   it('连续两次 ask：第一次 interrupted，askInFlight 在第二次结束才清除；ask 期间不发起 proactive', async () => {
@@ -288,9 +286,10 @@ describe('教练', () => {
     await h.runner.init()
     await h.runner.start(table6)
     await drive(h, () => proactive > 0, () => null)
-    const a = h.runner.ask('一')
+    const [a, b] = ['a', 'b']
+    h.runner.ask(a, '一')
     await tick(500)
-    const b = h.runner.ask('二')
+    h.runner.ask(b, '二')
     await tick(2000)
     expect(h.of('coach:done')).toEqual([{ requestId: a, ok: false, error: 'interrupted' }])
     expect(h.runner.askInFlight).toBe(true)
@@ -315,7 +314,7 @@ describe('教练', () => {
     await h.runner.init()
     await h.runner.start(table2)
     await drive(h, () => h.runner.game!.done, heroFolds)
-    h.runner.ask('刚才那手')
+    h.runner.ask('q', '刚才那手')
     await tick(6000)
     expect(h.runner.game!.hand).toBe(1)
     await tick(2100)

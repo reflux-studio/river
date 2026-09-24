@@ -416,19 +416,13 @@ export class TableRunner {
     this.broadcast()
   }
 
-  ask(text: string): string {
-    const requestId = randomUUID()
+  ask(requestId: string, text: string) {
     const g = this.game
-    const reject = (error: 'not_configured' | 'breaker' | 'failed') => {
-      // Renderer 以命令返回的 requestId 关联事件，事件须晚于命令返回
-      setImmediate(() => this.emit('coach:done', { requestId, ok: false, error }))
-      return requestId
-    }
+    const reject = (error: 'not_configured' | 'breaker' | 'failed') => this.emit('coach:done', { requestId, ok: false, error })
     if (!g) return reject('failed')
     if (!this.agents.modelReady('coach')) return reject('not_configured')
     if (this.breaker.trippedCoach) return reject('breaker')
     void this.runAsk(g, requestId, text)
-    return requestId
   }
 
   private async runAsk(g: Game, requestId: string, text: string) {

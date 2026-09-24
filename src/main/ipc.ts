@@ -62,7 +62,7 @@ export function commandHandlers(runner: TableRunner): Handlers {
     'table.resume': () => runner.resume(),
     'table.retryModels': () => runner.retryModels(),
     'chat.send': (text) => runner.sendChat(text),
-    'coach.ask': (text) => runner.ask(text),
+    'coach.ask': (id, text) => runner.ask(id, text),
     'hands.list': () => listHands(),
     'hands.get': async (id) => {
       const record = await getHand(id)
