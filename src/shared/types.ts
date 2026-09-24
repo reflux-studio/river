@@ -156,6 +156,7 @@ export interface BreakerState {
 
 export interface TableView {
   title: string
+  bb: number
   handNo: number
   street: Street | 'idle'
   board: Card[]

@@ -93,6 +93,7 @@ export function buildTableView(s: ViewState): TableView {
   const nameOf = (id: string) => g.players.find((p) => p.id === id)?.name ?? ''
   return {
     title: `无限注 · ${g.sb}/${g.bb} · ${g.players.length} 人桌`,
+    bb: g.bb,
     handNo: g.hand,
     street: g.street,
     board: g.board.slice(),
