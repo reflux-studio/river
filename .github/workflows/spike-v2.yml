@@ -30,7 +30,10 @@ jobs:
   sign:
     runs-on: macos-latest
     steps:
+      # 签名验证与应用内容无关：用 v2 改动之前的基线提交构建，避免受进行中的改动影响
       - uses: actions/checkout@v4
+        with:
+          ref: 1369867526a1fc9c99af269a4c4d3803128f353e
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
