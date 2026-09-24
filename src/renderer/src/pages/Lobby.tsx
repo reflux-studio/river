@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Avatar } from '@/components/Avatar'
 import { Segmented } from '@/components/Segmented'
-import { Switch } from '@/components/ui/switch'
-import { cardsText, fmt, netColor, signed } from '@/lib/format'
-import { go, invoke, openRules, startGuided, startTable, updateLobby, updateSettings, useEvent, useRiver } from '@/lib/river'
+import { MiniCards } from '@/components/PlayingCard'
+import { fmt, netColor, signed } from '@/lib/format'
+import { go, invoke, openRules, startGuided, startTable, updateLobby, useEvent, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
-import { BLINDS, COACHES } from '../../../shared/personas'
+import { BLINDS } from '../../../shared/personas'
 import type { HandSummary, Lobby as LobbyT } from '../../../shared/types'
 
-const PRESETS: { t: string; d: string; cfg: LobbyT }[] = [
+const PRESETS: { t: string; d: string; cfg: Omit<LobbyT, 'mode'> }[] = [
   { t: '新手桌', d: '3 人 · 10/20 · 对手温和', cfg: { size: 3, blinds: 0, picks: ['bai', 'zen'] } },
   { t: '常规桌', d: '6 人 · 50/100 · 各种性格', cfg: { size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'] } },
   { t: '单挑', d: '2 人 · 100/200 · 对阵阿狸', cfg: { size: 2, blinds: 2, picks: ['li'] } }
 ]
+const MODE_DESC = { coach: '每次轮到你教练先说说局面；一手结束亮出所有底牌并复盘', free: '只显示胜率面板，没有教练' }
 
 const card = 'rounded-[14px] border bg-white'
 const pillBtn = 'rounded-full px-3.5 py-[7px] text-[13px]'
@@ -37,8 +38,8 @@ function Recent() {
       {!hands.length && <span className="text-[13px] text-muted-foreground">还没有记录。</span>}
       {hands.map((h) => (
         <div key={h.id} className="flex items-center gap-2.5 text-[13px]">
-          <span className="w-[52px] text-muted-foreground">#{h.handNo}</span>
-          <span className="flex-1 font-medium">{cardsText(h.hero)}</span>
+          <span className="w-11 text-muted-foreground">#{h.handNo}</span>
+          <span className="flex-1"><MiniCards cards={h.hero} w={20} h={28} /></span>
           <span className={cn('font-semibold', netColor(h.net))}>{signed(h.net)}</span>
         </div>
       ))}
@@ -48,9 +49,9 @@ function Recent() {
 
 export function Lobby() {
   const lb = useRiver((s) => s.lobby)
-  const personas = useRiver((s) => s.personas)
-  const settings = useRiver((s) => s.settings)
+  const all = useRiver((s) => s.personas)
   const view = useRiver((s) => s.view)
+  const personas = all.filter((p) => !p.deleted)
   const need = lb.size - 1
   const buy = fmt(BLINDS[lb.blinds][1] * 100)
 
@@ -66,17 +67,19 @@ export function Lobby() {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
             <div className="text-[28px] font-semibold tracking-[-0.01em]">开一桌</div>
-            <div className="text-[15px] text-subtle">只有你和 AI。每位对手都有自己的性格，会在公屏上聊天；教练坐在你身后。</div>
+            <div className="text-[15px] text-subtle">只有你和 AI。每位对手都有自己的性格，轮到自己时会说一句；选教练局，教练坐在你身后。</div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             {PRESETS.map((o) => {
               const on = o.cfg.size === lb.size && o.cfg.blinds === lb.blinds && o.cfg.picks.join() === lb.picks.slice(0, need).join()
+              const disabled = o.cfg.size - 1 > personas.length
               return (
                 <button
                   key={o.t}
+                  disabled={disabled}
                   onClick={() => updateLobby(o.cfg)}
                   className={cn(
-                    'flex flex-col gap-1.5 rounded-[14px] bg-white p-4 text-left',
+                    'flex flex-col gap-1.5 rounded-[14px] bg-white p-4 text-left disabled:opacity-40',
                     on ? 'border-[1.5px] border-foreground' : 'border'
                   )}
                 >
@@ -90,7 +93,8 @@ export function Lobby() {
             <Row label="人数">
               <Segmented
                 value={lb.size}
-                options={([2, 3, 4, 5, 6] as const).map((v) => ({ label: String(v), value: v }))}
+                // 可用对手不够时，更大的桌不可选
+                options={([2, 3, 4, 5, 6] as const).map((v) => ({ label: String(v), value: v, disabled: v - 1 > personas.length }))}
                 onChange={(v) => updateLobby({ size: v, picks: lb.picks.slice(0, v - 1) })}
               />
             </Row>
@@ -124,22 +128,31 @@ export function Lobby() {
                       </button>
                     )
                   })}
+                  <button onClick={() => go('opponents')} className="flex items-center rounded-full border border-dashed border-[#cfcfcb] px-3 py-1 text-[13px] whitespace-nowrap text-label">
+                    ＋ 管理对手
+                  </button>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {lb.picks.length >= need ? `已选 ${need} 位` : `已选 ${lb.picks.length} / ${need} 位，其余随机补位`}
+                  {personas.length < need
+                    ? `只有 ${personas.length} 位对手可用，将开 ${personas.length + 1} 人桌`
+                    : lb.picks.length >= need ? `已选 ${need} 位` : `已选 ${lb.picks.length} / ${need} 位，其余随机补位`}
                 </span>
               </div>
             </Row>
-            <Row label="教练">
-              <Switch checked={settings.coachOn} onCheckedChange={(v) => updateSettings({ coachOn: v })} />
-              <span className="text-[13px] text-muted-foreground">
-                {COACHES[settings.coachPersona].n} · {settings.level === 'novice' ? '新手' : '进阶'}
-              </span>
+            <Row label="对局类型">
+              <div className="flex flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+                <Segmented
+                  value={lb.mode}
+                  options={[{ label: '教练局', value: 'coach' }, { label: '自由局', value: 'free' }]}
+                  onChange={(mode) => updateLobby({ mode })}
+                />
+                <span className="text-[13px] text-muted-foreground">{MODE_DESC[lb.mode]}</span>
+              </div>
             </Row>
             <div className="flex items-center gap-3 border-t border-[#f0f0ee] pt-1">
               <div className="flex-1" />
               <button
-                onClick={() => startTable({ size: lb.size, blinds: lb.blinds, picks: lb.picks, guided: false })}
+                onClick={() => startTable({ size: lb.size, blinds: lb.blinds, picks: lb.picks, mode: lb.mode, guided: false })}
                 className="mt-3.5 rounded-full bg-foreground px-[26px] py-3 text-[15px] font-medium whitespace-nowrap text-white hover:bg-foreground/85"
               >
                 入座 · 买入 {buy}

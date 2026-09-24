@@ -388,6 +388,11 @@ export async function listHands(): Promise<HandSummary[]> {
   })
 }
 
+export async function handKeyOf(id: number): Promise<{ tableId: string; handNo: number } | null> {
+  const r = await db().execute({ sql: 'SELECT table_id, hand_no FROM river_hands WHERE id = ?', args: [id] })
+  return r.rows.length ? { tableId: String(r.rows[0].table_id), handNo: Number(r.rows[0].hand_no) } : null
+}
+
 export async function getHand(id: number): Promise<HandRecord | null> {
   const r = await db().execute({ sql: 'SELECT record FROM river_hands WHERE id = ?', args: [id] })
   return r.rows.length ? JSON.parse(String(r.rows[0].record)) : null

@@ -417,7 +417,7 @@ export class TableRunner {
     if (!last) return
     const rid = this.runId
     this.recap = 'running'
-    const entry = this.recapEntry ?? this.addCoach({ kind: 'recap', text: '', status: 'pending' })
+    const entry = this.recapEntry ?? this.addCoach({ kind: 'recap', text: '', status: 'pending', hand: { net: last.rec.net, hero: last.rec.hero, board: last.rec.board } })
     this.recapEntry = entry
     this.patchCoach(entry, { status: 'pending', error: undefined })
     this.coachBusy = 'recap'

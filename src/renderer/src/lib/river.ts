@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 import type {
-  AgentCall, Bootstrap, ChatMessage, CoachEntry, Commands, Events, Lobby, ProviderInput,
+  Bootstrap, ChatMessage, CoachEntry, Commands, Events, Lobby, Persona, PersonaInput, ProviderInput,
   ProviderPublic, RiverApi, Settings, TableStart, TableView
 } from '../../../shared/types'
 
@@ -15,11 +15,6 @@ export const river = window.river
 
 export type Page = 'lobby' | 'table' | 'opponents' | 'replays' | 'stats' | 'settings'
 
-export interface CoachItem extends CoachEntry {
-  pending?: boolean
-  error?: Events['coach:done']['error']
-}
-
 export interface RiverState {
   ready: boolean
   page: Page
@@ -27,21 +22,23 @@ export interface RiverState {
   lobby: Lobby
   bankroll: number
   onboarded: boolean
-  personas: Bootstrap['personas']
+  personas: Persona[]
   providers: ProviderPublic[]
   view: TableView | null
   chat: ChatMessage[]
-  coach: CoachItem[]
-  lastCall: AgentCall | null
+  coach: CoachEntry[]
   rulesOpen: boolean
-  guidedAsk: boolean
+  // 入座被拦下（没配模型）时的提示
+  needModel: 'opponent' | 'coach' | null
+  version: string
+  update: string | null
 }
 
 let state: RiverState = {
   ready: false,
   page: 'lobby',
-  settings: { engine: 'llm', speed: 1, coachOn: true, coachPersona: 0, level: 'novice', hard: false, autoNext: true, models: {} },
-  lobby: { size: 6, blinds: 1, picks: [] },
+  settings: { speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', models: {} },
+  lobby: { size: 6, blinds: 1, picks: [], mode: 'coach' },
   bankroll: 0,
   onboarded: true,
   personas: [],
@@ -49,9 +46,10 @@ let state: RiverState = {
   view: null,
   chat: [],
   coach: [],
-  lastCall: null,
   rulesOpen: false,
-  guidedAsk: false
+  needModel: null,
+  version: '',
+  update: null
 }
 
 const subs = new Set<() => void>()
@@ -87,29 +85,20 @@ export async function invoke<K extends keyof Commands>(cmd: K, ...args: Paramete
 export const go = (page: Page) => setState({ page })
 export const openRules = () => setState({ rulesOpen: true })
 
-function patchCoach(requestId: string, fn: (c: CoachItem) => CoachItem) {
-  setState((s) => ({ coach: s.coach.map((c) => (c.role === 'assistant' && c.requestId === requestId ? fn(c) : c)) }))
-}
-const applyDone = (c: CoachItem, d: Events['coach:done']): CoachItem => ({
-  ...c,
-  pending: false,
-  ...(!d.ok && { error: d.error, interrupted: d.error === 'interrupted' })
-})
-
 function listen() {
-  river.on('table:view', (v) =>
-    setState((s) => ({ view: v, ...(!v && s.page === 'table' && { page: 'lobby' as Page }) }))
-  )
+  river.on('table:view', (v) => setState((s) => ({ view: v, ...(!v && s.page === 'table' && { page: 'lobby' as Page }) })))
   river.on('chat:append', (m) => setState((s) => (s.chat.some((x) => x.id === m.id) ? {} : { chat: [...s.chat, m] })))
+  river.on('coach:upsert', (e) =>
+    setState((s) => ({ coach: s.coach.some((x) => x.id === e.id) ? s.coach.map((x) => (x.id === e.id ? e : x)) : [...s.coach, e] }))
+  )
   river.on('bankroll', (bankroll) => setState({ bankroll }))
-  river.on('agent:last', (lastCall) => setState({ lastCall }))
-  river.on('coach:delta', ({ requestId, text }) => patchCoach(requestId, (c) => ({ ...c, text: c.text + text })))
-  river.on('coach:done', (d) => patchCoach(d.requestId, (c) => applyDone(c, d)))
+  river.on('personas', (personas) => setState({ personas }))
+  river.on('update:ready', ({ version }) => setState({ update: version }))
 }
 
 export async function init() {
   listen()
-  const b = await invoke('app.bootstrap')
+  const b: Bootstrap = await invoke('app.bootstrap')
   setState({
     ready: true,
     settings: b.settings,
@@ -119,11 +108,11 @@ export async function init() {
     personas: b.personas,
     providers: b.providers,
     view: b.view,
-    lastCall: b.lastCall,
     chat: b.chat,
-    // 重载时的在途回答没有 pending 标记可恢复，后续 delta/done 仍会按 requestId 接上
     coach: b.coachThread,
-    rulesOpen: !b.onboarded
+    rulesOpen: !b.onboarded,
+    version: b.version,
+    update: b.update
   })
 }
 
@@ -148,16 +137,6 @@ export async function updateLobby(patch: Partial<Lobby>) {
   }
 }
 
-export async function startTable(opts: TableStart) {
-  // table.start 之后事件只追加，旧桌的公屏与教练对话要在入座前清掉
-  setState({ chat: [], coach: [] })
-  try {
-    setState({ settings: await invoke('table.start', opts), page: 'table' })
-  } catch (e) {
-    fail(e)
-  }
-}
-
 type Role = keyof Settings['models']
 
 export function modelOf(s: RiverState, role: Role) {
@@ -167,23 +146,25 @@ export function modelOf(s: RiverState, role: Role) {
 }
 export const configured = (s: RiverState, role: Role) => modelOf(s, role)?.provider.needsKey === false
 
-// 教学牌局的桌型由主进程固定，这里传大厅配置只为满足参数类型
-export function startGuided(anyway = false) {
-  if (anyway || configured(state, 'coach')) return startTable({ ...state.lobby, guided: true })
-  setState({ guidedAsk: true })
-}
-
-// 先落 pending 条目再发命令：之后的 delta/done 一定能按 requestId 找到它
-export async function askCoach(text: string) {
-  const requestId = crypto.randomUUID()
-  setState((s) => ({ coach: [...s.coach, { role: 'user', text, requestId }, { role: 'assistant', text: '', requestId, pending: true }] }))
+// 所有入座入口都先检查模型：缺哪个就提示并引导去设置（discussion §9）
+export async function startTable(opts: TableStart) {
+  const coach = opts.guided || opts.mode === 'coach'
+  if (!configured(state, 'opponent')) return setState({ needModel: 'opponent', rulesOpen: false })
+  if (coach && !configured(state, 'coach')) return setState({ needModel: 'coach', rulesOpen: false })
+  // table.start 之后事件只追加，旧桌的公屏与教练对话要在入座前清掉
+  setState({ chat: [], coach: [] })
   try {
-    await invoke('coach.ask', requestId, text)
+    await invoke('table.start', opts)
+    setState({ page: 'table', rulesOpen: false })
   } catch (e) {
-    patchCoach(requestId, (c) => applyDone(c, { requestId, ok: false, error: 'failed' }))
-    throw e
+    fail(e)
   }
 }
+
+// 教学牌局的桌型由主进程固定，这里传大厅配置只为满足参数类型
+export const startGuided = () => startTable({ ...state.lobby, mode: 'coach', guided: true })
+
+export const askCoach = (text: string) => invoke('coach.ask', text).catch(fail)
 
 export async function finishOnboarding() {
   setState({ rulesOpen: false })
@@ -222,20 +203,9 @@ export async function testProvider(providerId: string, modelId: string) {
 let registry: Promise<Awaited<ReturnType<Commands['provider.registry']>>> | undefined
 export const getRegistry = () => (registry ??= invoke('provider.registry'))
 
-export async function setPersonaPrompt(id: string, prompt: string) {
-  const p = state.personas.find((x) => x.id === id)
-  if (!p) return
-  const text = prompt.trim()
-  const reset = !text || text === p.prompt
-  if (reset ? p.promptOverride === undefined : text === p.promptOverride) return
-  try {
-    await (reset ? invoke('persona.resetPrompt', id) : invoke('persona.setPrompt', id, text))
-  } catch (e) {
-    return fail(e)
-  }
-  setState((s) => ({
-    personas: s.personas.map((x) => (x.id !== id ? x : reset ? { ...x, promptOverride: undefined } : { ...x, promptOverride: text }))
-  }))
-}
+export const savePersona = (input: PersonaInput) => invoke('persona.save', input).catch((e) => (fail(e), null))
+export const deletePersona = (id: string) => invoke('persona.delete', id).catch(fail)
+export const restorePersona = (id: string) => invoke('persona.restore', id).catch(fail)
+export const resetPersona = (id: string) => invoke('persona.reset', id).catch(fail)
 
 export { fail as toastError }

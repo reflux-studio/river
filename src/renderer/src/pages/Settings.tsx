@@ -6,9 +6,8 @@ import { Segmented } from '@/components/Segmented'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import {
-  deleteProvider, invoke, openRules, testProvider, toastError, updateSettings, useRiver, configured
-} from '@/lib/river'
+import { BackSwatches, FeltSwatches, FxSegment } from '@/components/Appearance'
+import { deleteProvider, invoke, openRules, testProvider, toastError, updateSettings, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import { COACHES } from '../../../shared/personas'
 import type { ProviderPublic, Settings as SettingsT } from '../../../shared/types'
@@ -188,7 +187,7 @@ function ModelPicker({ role }: { role: Role }) {
   )
 }
 
-function Seg<K extends 'speed' | 'coachPersona' | 'level' | 'engine'>({
+function Seg<K extends 'speed' | 'coachPersona' | 'level'>({
   k, labels, values
 }: {
   k: K
@@ -205,56 +204,23 @@ function Seg<K extends 'speed' | 'coachPersona' | 'level' | 'engine'>({
   )
 }
 
-function Tog({ k }: { k: 'coachOn' | 'hard' | 'autoNext' }) {
+function Tog({ k }: { k: 'hard' }) {
   const v = useRiver((s) => s.settings[k])
   return <Switch checked={v} onCheckedChange={(x) => updateSettings({ [k]: x })} />
 }
 
-function Engine() {
-  const ok = useRiver((s) => configured(s, 'opponent'))
-  const engine = useRiver((s) => s.settings.engine)
-  return (
-    <Row
-      label="决策引擎"
-      desc={ok ? 'LLM 按性格提示词决策和说话；超时或出错时由本地引擎托管。' : '还没有配置对手模型，只能使用本地引擎。'}
-    >
-      <Segmented
-        value={ok ? engine : 'local'}
-        options={[
-          { label: 'LLM', value: 'llm', disabled: !ok },
-          { label: '本地引擎', value: 'local' }
-        ]}
-        onChange={(engine) => updateSettings({ engine })}
-      />
-    </Row>
-  )
-}
-
 function Data() {
-  const lastCall = useRiver((s) => s.lastCall)
   const view = useRiver((s) => s.view)
+  const version = useRiver((s) => s.version)
   const run = (cmd: 'data.clearHistory' | 'data.resetMemory', ok: string) =>
     invoke(cmd).then(() => toast.success(ok), toastError)
 
   return (
     <Group title="牌局与数据">
-      <Row label="自动下一手" desc="一手结束 4 秒后自动发牌。">
-        <Tog k="autoNext" />
-      </Row>
-      <Row label="最近调用" desc="最近一次对手或教练模型调用。">
-        <span className="text-sm font-semibold whitespace-nowrap">
-          {lastCall
-            ? `${ROLE_NAME[lastCall.role]} · ${lastCall.modelId} · ${(lastCall.ms / 1000).toFixed(1)} 秒 · ${lastCall.ok ? '成功' : '失败'}`
-            : '暂无'}
-        </span>
-      </Row>
-      <Row label="本桌托管次数" desc="对手模型超时或出错时，由本地引擎代打并标“托管”。">
-        <span className="text-sm font-semibold">{view ? `${view.autopilotCount} 次` : '未入座'}</span>
-      </Row>
       <Row label="规则介绍" desc="重新看一遍首次进入时的规则卡片。">
         <button className={pillBtn} onClick={openRules}>打开</button>
       </Row>
-      <Row label="清空记录" desc="清除手牌历史和统计，筹码重置为 100,000。">
+      <Row label="清空记录" desc="清除手牌历史和复盘，筹码重置为 100,000。用量统计在“数据统计”里单独清零。">
         <Confirm
           title="清空全部记录？"
           description="手牌历史、统计和教练复盘都会被删除，筹码重置为 100,000。此操作无法撤销。"
@@ -264,18 +230,18 @@ function Data() {
           <button className={pillBtn}>清空</button>
         </Confirm>
       </Row>
-      <Row
-        label="重置 AI 记忆"
-        desc={view ? '请先离桌，再重置 AI 记忆。' : '清除对手对你的印象和教练的学员档案。'}
-      >
+      <Row label="重置 AI 记忆" desc="清除对手记下的印象和教练的学员档案。">
         <Confirm
           title="重置 AI 记忆？"
-          description="对手对你的印象和教练的学员档案都会被清除，此操作无法撤销。"
+          description="对手记下的印象和教练的学员档案都会被清除，此操作无法撤销。"
           action="重置"
           onConfirm={() => run('data.resetMemory', '已重置 AI 记忆')}
         >
           <button className={pillBtn} disabled={!!view}>重置</button>
         </Confirm>
+      </Row>
+      <Row label="版本" desc="有新版本时会在后台下载，下载完在顶栏提示重启更新。">
+        <span className="text-sm font-semibold">{version}</span>
       </Row>
     </Group>
   )
@@ -288,25 +254,32 @@ export function Settings() {
         <div className="text-[28px] font-semibold">设置</div>
         <Providers />
         <Group title="AI 对手">
-          <Engine />
-          <Row label="对手模型" desc="所有对手共用这个模型，各自按性格提示词行动。" below={<ModelPicker role="opponent" />} />
-          <Row label="思考速度" desc="AI 行动前的停顿。">
+          <Row label="对手模型" desc="所有对手共用这个模型，各自按性格提示词行动。开桌必需。" below={<ModelPicker role="opponent" />} />
+          <Row label="思考速度" desc="AI 行动的最短停顿：模型返回太快时补足再落子。">
             <Seg k="speed" labels={['慢', '中', '快']} values={[0, 1, 2]} />
           </Row>
         </Group>
         <Group title="教练">
-          <Row label="教练模型" desc="未配置时教练栏不可用，概率面板照常显示。" below={<ModelPicker role="coach" />} />
-          <Row label="主动提醒" desc="每次轮到你时，教练自己判断是保持沉默、提醒你，还是暂停牌局。">
-            <Tog k="coachOn" />
-          </Row>
+          <Row label="教练模型" desc="教练局需要它：每步讲解、提问与每手复盘。自由局不用。" below={<ModelPicker role="coach" />} />
           <Row label="人设" desc="教练说话的风格。">
             <Seg k="coachPersona" labels={COACHES.map((c) => c.n)} values={[0, 1, 2]} />
           </Row>
           <Row label="讲解深度" desc="新手模式会解释术语；进阶模式会谈范围和 EV。">
             <Seg k="level" labels={['新手', '进阶']} values={['novice', 'pro']} />
           </Row>
-          <Row label="硬核模式" desc="隐藏胜率、底池赔率和出路。">
+          <Row label="硬核模式" desc="教练局中隐藏胜率、底池赔率和出路。">
             <Tog k="hard" />
+          </Row>
+        </Group>
+        <Group title="牌桌外观">
+          <Row label="桌布" desc="五种预设，或点最后一个自选颜色。">
+            <FeltSwatches size={24} />
+          </Row>
+          <Row label="牌背" desc="对手手牌背面的颜色。">
+            <BackSwatches />
+          </Row>
+          <Row label="动效" desc="完整：发牌、筹码飞行、加注与全下特效；精简：只保留发牌、翻牌和气泡。">
+            <FxSegment />
           </Row>
         </Group>
         <Data />

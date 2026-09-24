@@ -214,6 +214,8 @@ export interface CoachEntry {
   text: string
   handNo: number
   recap?: Recap
+  // 复盘卡头部：这一手的输赢、玩家底牌与公共牌
+  hand?: { net: number; hero: Card[]; board: Card[] }
   status: 'pending' | 'done' | 'failed' | 'skipped'
   error?: string
 }
@@ -273,7 +275,7 @@ export interface Commands {
   'coach.skip': () => void
   'coach.retry': () => void
   'hands.list': () => HandSummary[]
-  'hands.get': (id: number) => { record: HandRecord; review?: Recap | string } | null
+  'hands.get': (id: number) => { record: HandRecord; review?: Recap | string; cost?: Cost } | null
   'hands.review': (id: number) => void
   'usage.summary': () => UsageSummary
   'usage.reset': () => void

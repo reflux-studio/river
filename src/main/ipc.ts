@@ -2,10 +2,10 @@ import type { App, IpcMain } from 'electron'
 import { PROVIDER_REGISTRY } from '@mastra/core/llm'
 import type { Commands, Recap } from '../shared/types'
 import {
-  clearHistory, clearMemory, deletePersona, deleteProvider, getBankroll, getHand, getLobby, getOnboarded, getReview, getSettings, listHands,
+  clearHistory, clearMemory, deletePersona, deleteProvider, getBankroll, getHand, getLobby, handKeyOf, listUsage, getOnboarded, getReview, getSettings, listHands,
   listProviders, personasCache, resetPersona, resetUsage, restorePersona, saveProvider, savePersona, setOnboarded, updateLobby, updateSettings
 } from './db'
-import { usageSummary } from './models/prices'
+import { costTotal, usageSummary } from './models/prices'
 import { clearNeedsKey, needsKey, testProvider } from './models/resolve'
 import type { TableRunner } from './table/runner'
 
@@ -100,7 +100,9 @@ export function commandHandlers(runner: TableRunner, app: AppInfo = { version: (
       const record = await getHand(id)
       if (!record) return null
       const review = await getReview(id)
-      return { record, ...(review !== null && { review: parseReview(review) }) }
+      const key = await handKeyOf(id)
+      const rows = key ? (await listUsage()).filter((u) => u.tableId === key.tableId && u.handNo === key.handNo) : []
+      return { record, ...(review !== null && { review: parseReview(review) }), ...(rows.length && { cost: costTotal(rows) }) }
     },
     'hands.review': (id) => void runner.review(id),
     'usage.summary': () => usageSummary(),
