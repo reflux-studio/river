@@ -209,6 +209,40 @@ function Tog({ k }: { k: 'hard' }) {
   return <Switch checked={v} onCheckedChange={(x) => updateSettings({ [k]: x })} />
 }
 
+function Currency() {
+  const v = useRiver((s) => s.settings.currency)
+  return (
+    <Segmented<SettingsT['currency']>
+      value={v}
+      options={[{ label: '人民币', value: 'CNY' }, { label: '美元', value: 'USD' }]}
+      onChange={(currency) => updateSettings({ currency })}
+    />
+  )
+}
+
+function UsdCny() {
+  const cur = useRiver((s) => s.settings.currency)
+  const rate = useRiver((s) => s.settings.usdCny)
+  const [text, setText] = useState(String(rate))
+  useEffect(() => setText(String(rate)), [rate])
+  if (cur !== 'CNY') return null
+  // 失焦时保存；非正数恢复原值
+  const save = () => {
+    const x = Number(text)
+    if (x > 0 && x !== rate) void updateSettings({ usdCny: Math.round(x * 10000) / 10000 })
+    else setText(String(rate))
+  }
+  return (
+    <Row label="汇率" desc="只影响显示，统计按美元记录，改汇率后历史花费一并换算。">
+      <span className="flex items-center gap-2 text-sm text-label">
+        1 美元 =
+        <Input value={text} inputMode="decimal" onChange={(e) => setText(e.target.value)} onBlur={save} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="h-8 w-20 rounded-[9px] border-input text-right shadow-none" />
+        元
+      </span>
+    </Row>
+  )
+}
+
 function Data() {
   const view = useRiver((s) => s.view)
   const version = useRiver((s) => s.version)
@@ -281,6 +315,12 @@ export function Settings() {
           <Row label="动效" desc="完整：发牌、筹码飞行、加注与全下特效；精简：只保留发牌、翻牌和气泡。">
             <FxSegment />
           </Row>
+        </Group>
+        <Group title="用量计价">
+          <Row label="货币" desc="价格来自 models.dev（美元），选人民币时按下面的汇率换算。">
+            <Currency />
+          </Row>
+          <UsdCny />
         </Group>
         <Data />
       </div>

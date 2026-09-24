@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Avatar } from '@/components/Avatar'
 import { MiniCards, PlayingCard } from '@/components/PlayingCard'
 import { RecapRows } from '@/components/table/CoachPanel'
-import { costText, fmt, netColor, signed } from '@/lib/format'
+import { costText, fmt, netColor, signed, useMoney } from '@/lib/format'
 import { configured, go, invoke, toastError, useEvent, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import { STREET } from '../../../shared/personas'
@@ -56,6 +56,7 @@ function Review({ d, loading, failed, onReview }: { d: Detail; loading: boolean;
 
 function HandDetail({ d, ...review }: { d: Detail } & Omit<Parameters<typeof Review>[0], 'd'>) {
   const personas = useRiver((s) => s.personas)
+  const m = useMoney()
   const r = d.record
   return (
     <div className="mx-auto flex max-w-[820px] flex-col gap-5 p-8">
@@ -67,7 +68,7 @@ function HandDetail({ d, ...review }: { d: Detail } & Omit<Parameters<typeof Rev
           盲注 {r.sb}/{r.bb} · 底池 {fmt(r.pot)}
           {r.showdown && ' · 摊牌'}
           {r.mode === 'coach' && ' · 教练局'}
-          {d.cost && ` · ${costText(d.cost)}`}
+          {d.cost && ` · ${costText(d.cost, m)}`}
         </span>
       </div>
       {r.board.length > 0 && (

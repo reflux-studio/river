@@ -1,4 +1,4 @@
-import { costText, fmt } from '@/lib/format'
+import { costText, fmt, useMoney } from '@/lib/format'
 import { go, invoke, toastError, useRiver, type Page } from '@/lib/river'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +15,7 @@ export function TopBar({ page }: { page: Page }) {
   const view = useRiver((s) => s.view)
   const bankroll = useRiver((s) => s.bankroll)
   const update = useRiver((s) => s.update)
+  const m = useMoney()
   const onTable = page === 'table'
 
   return (
@@ -51,7 +52,7 @@ export function TopBar({ page }: { page: Page }) {
             >
               <span className="size-1.5 rounded-full bg-[oklch(0.7_0.14_70)]" />
               <span className="text-muted-foreground">本桌</span>
-              <span className="font-semibold">{costText(view.cost)}</span>
+              <span className="font-semibold">{costText(view.cost, m)}</span>
             </button>
           )}
           <button

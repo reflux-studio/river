@@ -14,7 +14,7 @@ const SUIT: Record<string, string> = {
 const rank = (c: Card) => (c[0] === 'T' ? '10' : c[0])
 const red = (c: Card) => c[1] === 'h' || c[1] === 'd'
 
-export function Suit({ c, size, className }: { c: Card; size: number; className?: string }) {
+export function Suit({ c, size, className }: { c: Card; size: number | string; className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={cn('block', className)} style={{ width: size, height: size }}>
       <path d={SUIT[c[1]]} fill="currentColor" />
@@ -46,7 +46,7 @@ export function MiniCard({ card, w = 18, h = 25 }: { card: Card; w?: number; h?:
   const k = h / 25
   return (
     <span
-      className={cn('inline-flex shrink-0 flex-col items-center justify-center gap-px border border-[#dcdcd8] bg-white align-[-7px]', red(card) ? 'text-lose' : 'text-foreground')}
+      className={cn('inline-flex shrink-0 flex-col items-center justify-center gap-px border border-[#dcdcd8] bg-white', red(card) ? 'text-lose' : 'text-foreground')}
       style={{ width: w, height: h, borderRadius: 3.5 * k }}
     >
       <span className="leading-none font-bold tracking-[-0.05em]" style={{ fontSize: 10.5 * k }}>{rank(card)}</span>
@@ -82,12 +82,26 @@ export function CardBack({ rot = 0, className }: { rot?: number; className?: str
 // 文本里的“A♠”渲染成小牌面
 const CARD_RE = /(10|[2-9TJQKA])([♠♥♦♣])️?/g
 const SYM: Record<string, string> = { '♠': 's', '♥': 'h', '♦': 'd', '♣': 'c' }
+// 文字里的小牌面：尺寸随字号，竖直居中于汉字，负外边距避免撑高行距
+function InlineCard({ card }: { card: Card }) {
+  return (
+    <span
+      className={cn('mx-[0.1em] -my-[0.3em] inline-flex h-[1.55em] w-[1.15em] -translate-y-[0.06em] flex-col items-center justify-center gap-[0.04em] rounded-[0.2em] border border-[#dcdcd8] bg-white align-middle', red(card) ? 'text-lose' : 'text-foreground')}
+    >
+      <span className="text-[0.7em] leading-none font-bold tracking-[-0.05em]">{rank(card)}</span>
+      <Suit c={card} size="0.6em" />
+    </span>
+  )
+}
+
 export function RichText({ text }: { text: string }) {
   const out: React.ReactNode[] = []
   let last = 0
   for (const m of text.matchAll(CARD_RE)) {
-    if (m.index! > last) out.push(text.slice(last, m.index))
-    out.push(<MiniCard key={m.index} card={(m[1] === '10' ? 'T' : m[1]) + SYM[m[2]]} />)
+    // 两张牌之间只隔空白时不留空格，像一手牌那样挨着
+    const gap = text.slice(last, m.index)
+    if (gap && !(last > 0 && !gap.trim())) out.push(gap)
+    out.push(<InlineCard key={m.index} card={(m[1] === '10' ? 'T' : m[1]) + SYM[m[2]]} />)
     last = m.index! + m[0].length
   }
   if (last < text.length) out.push(text.slice(last))

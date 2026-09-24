@@ -37,7 +37,7 @@ export interface RiverState {
 let state: RiverState = {
   ready: false,
   page: 'lobby',
-  settings: { speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', models: {} },
+  settings: { speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'CNY', usdCny: 7.1, models: {} },
   lobby: { size: 6, blinds: 1, picks: [], mode: 'coach' },
   bankroll: 0,
   onboarded: true,

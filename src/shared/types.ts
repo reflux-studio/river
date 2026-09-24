@@ -21,6 +21,9 @@ export interface Settings {
   feltCustom: string
   back: Back
   fx: Fx
+  // 花费显示的货币；价格源（models.dev）是美元，人民币按 usdCny 换算
+  currency: 'CNY' | 'USD'
+  usdCny: number
   models: { opponent?: ModelRef; coach?: ModelRef }
 }
 

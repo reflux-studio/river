@@ -14,7 +14,7 @@ export interface ProviderRow {
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', models: {}
+  speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'CNY', usdCny: 7.1, models: {}
 }
 const DEFAULT_LOBBY: Lobby = { size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'coach' }
 const MEMORY_KEEP = 10
