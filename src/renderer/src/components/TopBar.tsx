@@ -19,7 +19,10 @@ export function TopBar({ page }: { page: Page }) {
   return (
     // 左侧留出 hiddenInset 的系统红绿灯；整条可拖动窗口，交互元素单独取消
     <header className="flex h-[52px] shrink-0 items-center gap-3 border-b bg-topbar pr-4 pl-[88px] [-webkit-app-region:drag]">
-      <div className="text-base font-semibold">River</div>
+      <div className="flex shrink-0 items-center gap-1.5 text-base font-semibold">
+        <img src="./river-icon.png" alt="" width={28} height={28} />
+        River
+      </div>
       <nav className="ml-1.5 flex min-w-0 gap-0.5 overflow-hidden [-webkit-app-region:no-drag]">
         {NAV.filter(([k]) => k !== 'table' || view).map(([k, l]) => (
           <button

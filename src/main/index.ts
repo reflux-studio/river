@@ -8,8 +8,13 @@ import { TableRunner } from './table/runner'
 
 let win: BrowserWindow | null = null
 
+const iconPath = app.isPackaged
+  ? join(process.resourcesPath, 'icon.png')
+  : join(import.meta.dirname, '../../build/icon.png')
+
 function createWindow() {
   win = new BrowserWindow({
+    icon: iconPath,
     width: 1280,
     height: 800,
     minWidth: 880,
@@ -39,6 +44,7 @@ const runner = new TableRunner({
 })
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(iconPath)
   try {
     const url = 'file:' + join(app.getPath('userData'), 'river.db')
     await initDb({ url, encrypt: (t) => safeStorage.encryptString(t), decrypt: (b) => safeStorage.decryptString(b) })
