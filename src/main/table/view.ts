@@ -116,7 +116,7 @@ export function buildTableView(s: ViewState): TableView {
     nums: s.nums && { ...s.nums, stale: !(heroTurn && s.numsKey === `${g.hand}-${g.log.length}`) },
     coachLoading: s.coachLoading,
     autopilotCount: s.autopilotCount,
-    breaker: { ...s.breaker },
+    breaker: s.breaker,
     guided: s.guided
   }
 }

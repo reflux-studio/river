@@ -245,13 +245,12 @@ export interface Events {
   // error：'interrupted' 被新提问中断；'not_configured' | 'breaker' 未发起；'failed' 超时或出错
   'coach:done': { requestId: string; ok: boolean; error?: 'interrupted' | 'not_configured' | 'breaker' | 'failed' }
   'review:done': { handId: number; text?: string; error?: string }
-  breaker: BreakerState
   bankroll: number
   'hands:changed': void
   'agent:last': AgentCall
 }
 
-// 约定：先用 on 注册监听再调用 app.bootstrap（其后会补发 table:view、coach:alert、breaker）；
+// 约定：先用 on 注册监听再调用 app.bootstrap（其后会补发 table:view、coach:alert）；
 // bootstrap 的 chat 快照与之后的 chat:append 可能重叠，Renderer 按消息 id 去重
 export interface RiverApi {
   invoke<K extends keyof Commands>(cmd: K, ...args: Parameters<Commands[K]>): Promise<Awaited<ReturnType<Commands[K]>>>

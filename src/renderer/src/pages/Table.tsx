@@ -33,7 +33,6 @@ function Banner({ text, onRetry }: { text: string; onRetry: () => void }) {
 export function Table() {
   const view = useRiver((s) => s.view)
   const chat = useRiver((s) => s.chat)
-  const breaker = useRiver((s) => s.breaker)
   const who = useSpeaker()
   const width = useWidth()
   const [saved, setSaved] = useState(readChatShown)
@@ -58,8 +57,8 @@ export function Table() {
     <div className="flex min-h-0 flex-1">
       {showChat && <ChatPanel onCollapse={toggleChat} />}
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-        {breaker.opponent && <Banner text="对手模型连续失败，已托管" onRetry={retry} />}
-        {breaker.coach && <Banner text="教练模型连续失败，已停用" onRetry={retry} />}
+        {view.breaker.opponent && <Banner text="对手模型连续失败，已托管" onRetry={retry} />}
+        {view.breaker.coach && <Banner text="教练模型连续失败，已停用" onRetry={retry} />}
         <div className="relative min-h-[540px] flex-1">
           {!showChat && (
             <button

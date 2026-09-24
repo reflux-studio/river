@@ -119,7 +119,7 @@ describe('超时托管与熔断', () => {
     expect(first.autopilot).toBe(true)
     expect(h.runner.game!.log.some((x) => x.autopilot)).toBe(true)
     expect(h.views.some((v) => v.seats.some((s) => s.autopilot && s.status.startsWith('托管 · ')))).toBe(true)
-    await drive(h, () => h.of('breaker').some((b) => b.opponent))
+    await drive(h, () => h.views.some((v) => v.breaker.opponent))
     expect(calls).toBe(3)
     expect(h.runner.autopilotCount).toBe(3)
     const acts = opponentActs(h).length
@@ -128,7 +128,7 @@ describe('超时托管与熔断', () => {
     expect(opponentActs(h).slice(acts).every((m) => m.autopilot)).toBe(true)
     slow = false
     h.runner.retryModels()
-    expect(h.of('breaker').at(-1)).toEqual({ opponent: false, coach: false })
+    expect(h.views.at(-1)!.breaker).toEqual({ opponent: false, coach: false })
     const n = opponentActs(h).length
     await drive(h, () => opponentActs(h).length >= n + 1)
     expect(calls).toBe(4)
@@ -254,7 +254,7 @@ describe('教练', () => {
     const h = harness({ agents: { coachProactive: async () => (calls++, { ok: false, aborted: false, intents: {}, error: 'boom' }) } })
     await h.runner.init()
     await h.runner.start(table6)
-    await drive(h, () => h.of('breaker').some((b) => b.coach))
+    await drive(h, () => h.views.some((v) => v.breaker.coach))
     expect(calls).toBe(3)
     await drive(h, () => h.runner.game!.hand >= 4)
     expect(calls).toBe(3)

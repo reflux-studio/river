@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 import type {
-  AgentCall, Bootstrap, BreakerState, ChatMessage, CoachAlert, CoachEntry, Commands, Events, Lobby, ProviderInput,
+  AgentCall, Bootstrap, ChatMessage, CoachAlert, CoachEntry, Commands, Events, Lobby, ProviderInput,
   ProviderPublic, RiverApi, Settings, TableStart, TableView
 } from '../../../shared/types'
 
@@ -34,7 +34,6 @@ export interface RiverState {
   chat: ChatMessage[]
   coach: CoachItem[]
   alert: CoachAlert | null
-  breaker: BreakerState
   lastCall: AgentCall | null
   rulesOpen: boolean
   guidedAsk: boolean
@@ -54,7 +53,6 @@ let state: RiverState = {
   chat: [],
   coach: [],
   alert: null,
-  breaker: { opponent: false, coach: false },
   lastCall: null,
   rulesOpen: false,
   guidedAsk: false
@@ -111,7 +109,6 @@ function listen() {
   )
   river.on('chat:append', (m) => setState((s) => (s.chat.some((x) => x.id === m.id) ? {} : { chat: [...s.chat, m] })))
   river.on('coach:alert', (alert) => setState({ alert }))
-  river.on('breaker', (breaker) => setState({ breaker }))
   river.on('bankroll', (bankroll) => setState({ bankroll }))
   river.on('agent:last', (lastCall) => setState({ lastCall }))
   river.on('coach:delta', ({ requestId, text }) => patchCoach(requestId, (c) => ({ ...c, text: c.text + text })))

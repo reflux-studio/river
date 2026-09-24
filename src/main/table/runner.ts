@@ -155,7 +155,6 @@ export class TableRunner {
     this.breaker = { opponent: 0, coach: 0, trippedOpponent: false, trippedCoach: false }
     this.autopilotCount = 0
     this.lastTriggered.clear()
-    this.emit('breaker', this.breakerState())
     this.sys(`入座 · ${sb}/${bb} · ${players.length} 人桌`)
     this.setAlert(guided ? GUIDED_ALERT : null)
     this.bankroll -= buy
@@ -212,7 +211,6 @@ export class TableRunner {
 
   retryModels() {
     this.breaker = { opponent: 0, coach: 0, trippedOpponent: false, trippedCoach: false }
-    this.emit('breaker', this.breakerState())
     this.broadcast()
   }
 
@@ -646,7 +644,7 @@ export class TableRunner {
     const key = role === 'opponent' ? 'trippedOpponent' : 'trippedCoach'
     if (b[role] >= 3 && !b[key]) {
       b[key] = true
-      this.emit('breaker', this.breakerState())
+      this.broadcast()
     }
   }
 
@@ -750,7 +748,6 @@ export class TableRunner {
   replay() {
     this.broadcast()
     this.emit('coach:alert', this.alert)
-    this.emit('breaker', this.breakerState())
   }
 }
 
