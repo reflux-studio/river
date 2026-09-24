@@ -27,7 +27,7 @@ function makeTable() {
   startHand(g)
   const viewed: number[] = []
   const table: TableQuery = {
-    viewFor: (seat) => (viewed.push(seat), buildSeatView(g, seat, (id) => g.players.find((p) => p.id === id)!.name, () => '')),
+    viewFor: (seat) => (viewed.push(seat), buildSeatView(g, seat)),
     chat: () => [{ id: 'm1', kind: 'msg', from: 'hero', text: '来啊', triggers: true, at: 1 }],
     equityFor: () => ({ eq: 0.5, need: 0.3, outs: null, handName: '高牌' })
   }

@@ -683,7 +683,7 @@ export class TableRunner {
     return {
       viewFor: (seat) => {
         check()
-        return buildSeatView(g, seat, (id) => g.players.find((p) => p.id === id)?.name ?? '', (pid) => (pid ? personaOf(pid)!.tag : ''))
+        return buildSeatView(g, seat)
       },
       chat: (limit) => (check(), this.chat.slice(-limit)),
       equityFor: (seat, iters) => {

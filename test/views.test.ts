@@ -4,12 +4,10 @@ import { coachTools } from '../src/main/agents/tools'
 import { buildSeatView, heroHandSummary, publicHandResult, type TableQuery } from '../src/main/agents/views'
 import { apply, newGame, runoutStep, startHand, type Action, type Game } from '../src/main/engine/poker'
 import { txt } from '../src/shared/format'
+import { personaOf } from '../src/shared/personas'
 import type { Card, HandRecord } from '../src/shared/types'
+import { seeded } from './table-helpers'
 
-function seeded(seed: number) {
-  let s = seed
-  return () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648)
-}
 
 const IDS = ['hero', 'li', 'k', 'bai']
 function game(seed: number, stacks = [10000, 10000, 10000, 10000]) {
@@ -38,14 +36,14 @@ const forms = (c: Card) => [c, txt(c)]
 // 每个座位的视图里不得出现其他座位的底牌（代码形式或显示形式）
 function assertIsolated(g: Game) {
   g.players.forEach((_, seat) => {
-    const json = JSON.stringify(buildSeatView(g, seat, nameOf(g), () => 'tag'))
+    const json = JSON.stringify(buildSeatView(g, seat))
     g.players.forEach((q, j) => {
       for (const c of q.hole) {
         if (j === seat || g.board.includes(c)) continue
         for (const f of forms(c)) expect(json.includes(f), `seat ${seat} sees seat ${j} card ${f}`).toBe(false)
       }
     })
-    expect(buildSeatView(g, seat, nameOf(g), () => '').myCards).toEqual(g.players[seat].hole)
+    expect(buildSeatView(g, seat).myCards).toEqual(g.players[seat].hole)
   })
 }
 
@@ -82,16 +80,17 @@ describe('buildSeatView', () => {
   it('字段：选项与加注范围、行动记录用名字', () => {
     const g = game(3)
     const seat = g.toAct
-    const v = buildSeatView(g, seat, nameOf(g), (pid) => (pid ? 'AI' : '玩家'))
+    const v = buildSeatView(g, seat)
     expect(v.options).toEqual(['fold', 'call 100', `raise 200~${g.players[seat].stack + g.players[seat].bet}`])
     expect(v.actions).toEqual([`${g.players[g.sbI].name} 小盲 50`, `${g.players[g.bbI].name} 大盲 100`])
     expect(v.players.find((p) => p.isYou)?.seat).toBe(seat)
-    expect(v.players[0].tag).toBe('玩家')
+    expect(v.players[0].tag).toBe('')
+    expect(v.players[1].tag).toBe(personaOf('li')!.tag)
   })
 
   it('view_hero 工具只含座位 0 的底牌', async () => {
     const g = game(5)
-    const table: TableQuery = { viewFor: (s) => buildSeatView(g, s, nameOf(g), () => ''), chat: () => [], equityFor: () => ({ eq: 0, need: 0, outs: null, handName: '' }) }
+    const table: TableQuery = { viewFor: (s) => buildSeatView(g, s), chat: () => [], equityFor: () => ({ eq: 0, need: 0, outs: null, handName: '' }) }
     const requestContext = new RequestContext()
     requestContext.set('table', table)
     requestContext.set('role', 'coach')

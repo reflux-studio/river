@@ -1,5 +1,5 @@
 // 信息隔离的唯一出口：agent 能看到的牌局与手牌记录都经这里裁剪，T5 不另行拼装。
-import { STREET } from '../../shared/personas'
+import { personaOf, STREET } from '../../shared/personas'
 import type { Card, ChatMessage, HandPlayer, HandRecord, Street } from '../../shared/types'
 import { cardsText as cards, fmt, signed } from '../../shared/format'
 import { legal, pot, type Game } from '../engine/poker'
@@ -28,7 +28,8 @@ export interface TableQuery {
   equityFor(seat: number, iters: number): { eq: number; need: number; outs: number | null; handName: string; sugg?: string }
 }
 
-export function buildSeatView(g: Game, seat: number, nameOf: (id: string) => string, tagOf: (pid?: string) => string): SeatView {
+export function buildSeatView(g: Game, seat: number): SeatView {
+  const nameOf = (id?: string) => g.players.find((p) => p.id === id)?.name ?? ''
   const me = g.players[seat]
   const L = legal(g, seat)
   const options = L.toCall === 0 ? ['check'] : ['fold', `call ${L.toCall}`]
@@ -48,9 +49,9 @@ export function buildSeatView(g: Game, seat: number, nameOf: (id: string) => str
     maxTo: L.maxTo,
     canRaise: L.canRaise,
     players: g.players.map((p, i) => ({
-      seat: i, name: p.name, tag: tagOf(p.personaId), stack: p.stack, bet: p.bet, folded: p.folded, allin: p.allin, out: p.out, isYou: i === seat
+      seat: i, name: p.name, tag: personaOf(p.personaId)?.tag ?? '', stack: p.stack, bet: p.bet, folded: p.folded, allin: p.allin, out: p.out, isYou: i === seat
     })),
-    actions: g.log.map((x) => (x.board ? `【${STREET[x.street]} ${x.label}】` : `${nameOf(x.id!)} ${x.label}`))
+    actions: g.log.map((x) => (x.board ? `【${STREET[x.street]} ${x.label}】` : `${nameOf(x.id)} ${x.label}`))
   }
 }
 
