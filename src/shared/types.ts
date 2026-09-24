@@ -91,6 +91,8 @@ export interface HandSummary {
   hero: Card[]
   net: number
   showdown: boolean
+  vpip: boolean
+  pfr: boolean
 }
 
 export interface ProviderInput {

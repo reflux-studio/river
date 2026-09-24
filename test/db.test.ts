@@ -103,7 +103,7 @@ describe('手牌', () => {
     const b = await db.insertHand('t1', hand(2, ['k'], -50))
     const list = await db.listHands()
     expect(list.map((h) => h.id)).toEqual([b, a])
-    expect(list[0]).toMatchObject({ handNo: 2, hero: ['As', 'Kd'], net: -50, showdown: true })
+    expect(list[0]).toMatchObject({ handNo: 2, hero: ['As', 'Kd'], net: -50, showdown: true, vpip: true, pfr: false })
     expect(typeof list[0].playedAt).toBe('number')
     expect(await db.getHand(a)).toEqual(hand(1, ['li']))
     expect(await db.getHand(999)).toBeNull()

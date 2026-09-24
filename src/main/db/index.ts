@@ -222,7 +222,7 @@ export async function listHands(): Promise<HandSummary[]> {
   const r = await db().execute('SELECT id, hand_no, played_at, net, record FROM river_hands ORDER BY id DESC')
   return r.rows.map((x) => {
     const rec = JSON.parse(String(x.record)) as HandRecord
-    return { id: Number(x.id), handNo: Number(x.hand_no), playedAt: Number(x.played_at), hero: rec.hero, net: Number(x.net), showdown: rec.showdown }
+    return { id: Number(x.id), handNo: Number(x.hand_no), playedAt: Number(x.played_at), hero: rec.hero, net: Number(x.net), showdown: rec.showdown, vpip: rec.vpip, pfr: rec.pfr }
   })
 }
 

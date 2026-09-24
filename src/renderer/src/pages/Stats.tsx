@@ -2,19 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { signed } from '@/lib/format'
 import { invoke, toastError, useEvent } from '@/lib/river'
 import { cn } from '@/lib/utils'
-import type { HandRecord } from '../../../shared/types'
+import type { HandSummary } from '../../../shared/types'
 
-// ponytail: vpip/pfr 只在完整记录里，按手逐条 hands.get；上千手变慢时再加主进程聚合命令
-async function loadAll() {
-  const list = await invoke('hands.list')
-  const got = await Promise.all(list.map((h) => invoke('hands.get', h.id)))
-  return got.flatMap((r) => (r ? [r.record] : [])).reverse()
-}
+const loadAll = async () => (await invoke('hands.list')).reverse()
 
 export function Stats() {
-  const [H, setH] = useState<HandRecord[] | null>(null)
+  const [H, setH] = useState<HandSummary[] | null>(null)
   const [failed, setFailed] = useState(false)
-  // 手数多时加载慢，连续 hands:changed 的早一次可能晚返回，只认最后一次
+  // 连续 hands:changed 的早一次可能晚返回，只认最后一次
   const seq = useRef(0)
   const load = () => {
     const n = ++seq.current
