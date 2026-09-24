@@ -1,0 +1,94 @@
+# river-v2 T1 前置验证（验收后删除）：自签证书能否让 macOS 更新链成立；models.dev 是否提供价格
+name: Spike v2
+
+on:
+  push:
+    branches: ['claude/**']
+    paths: ['.github/workflows/spike-v2.yml']
+
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -sSf https://models.dev/api.json -o api.json && ls -l api.json
+      - run: |
+          python3 - <<'EOF'
+          import json
+          d = json.load(open('api.json'))
+          print('providers', len(d))
+          for p in ['anthropic', 'openai', 'deepseek', 'google', 'moonshotai', 'zhipuai', 'alibaba']:
+              if p not in d: print(p, 'MISSING'); continue
+              ms = d[p]['models']
+              k = next(iter(ms))
+              print(p, len(ms), k, json.dumps(ms[k].get('cost')))
+          priced = sum(1 for p in d.values() for m in p.get('models', {}).values() if isinstance(m.get('cost'), dict))
+          total = sum(len(p.get('models', {})) for p in d.values())
+          print('priced models', priced, '/', total)
+          print('sample keys', sorted(next(iter(d['anthropic']['models'].values())).keys()))
+          EOF
+
+  sign:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 生成自签代码签名证书并导入临时钥匙串
+        run: |
+          cat > ext.cnf <<'EOF'
+          [req]
+          distinguished_name = dn
+          x509_extensions = ext
+          prompt = no
+          [dn]
+          CN = River Self Signed
+          [ext]
+          basicConstraints = critical, CA:false
+          keyUsage = critical, digitalSignature
+          extendedKeyUsage = critical, codeSigning
+          EOF
+          /usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 3650 -config ext.cnf
+          /usr/bin/openssl pkcs12 -export -inkey key.pem -in cert.pem -out cert.p12 -passout pass:river
+          security create-keychain -p river build.keychain
+          security set-keychain-settings build.keychain
+          security unlock-keychain -p river build.keychain
+          security import cert.p12 -k build.keychain -P river -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k river build.keychain
+          security list-keychains -d user -s build.keychain $(security list-keychains -d user | tr -d '"')
+          echo '--- 未信任时 find-identity -v -p codesigning'
+          security find-identity -v -p codesigning build.keychain || true
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k build.keychain cert.pem
+          echo '--- 信任后 find-identity -v -p codesigning'
+          security find-identity -v -p codesigning build.keychain
+      - run: pnpm build
+      - name: 用同一张证书打两个版本（只出 .app）
+        run: |
+          for v in 0.0.1 0.0.2; do
+            pnpm exec electron-builder --mac dir --arm64 --publish never \
+              -c.mac.identity="River Self Signed" -c.extraMetadata.version=$v -c.directories.output=out-$v
+          done
+          ls out-0.0.1 out-0.0.2
+      - name: 新版本是否满足旧版本的 designated requirement（Squirrel.Mac 的校验方式）
+        run: |
+          A=out-0.0.1/mac-arm64/River.app
+          B=out-0.0.2/mac-arm64/River.app
+          codesign -dvvv "$A" 2>&1 | grep -E 'Authority|Identifier|Signature|TeamIdentifier'
+          REQ=$(codesign -d -r- "$A" 2>&1 | sed -n 's/^designated => //p')
+          echo "DR(0.0.1): $REQ"
+          codesign --verify --deep --strict "$B" && echo 'B 签名完整'
+          codesign --verify --deep --strict -R="=$REQ" "$B" && echo 'PASS: 0.0.2 满足 0.0.1 的 DR'
+          /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$B/Contents/Info.plist"
+      - name: 对照：ad-hoc 签名的两个版本
+        continue-on-error: true
+        run: |
+          for v in 0.0.1 0.0.2; do
+            pnpm exec electron-builder --mac dir --arm64 --publish never \
+              -c.mac.identity=- -c.extraMetadata.version=$v -c.directories.output=adhoc-$v
+          done
+          REQ=$(codesign -d -r- adhoc-0.0.1/mac-arm64/River.app 2>&1 | sed -n 's/^designated => //p')
+          echo "DR(adhoc 0.0.1): $REQ"
+          if codesign --verify --deep --strict -R="=$REQ" adhoc-0.0.2/mac-arm64/River.app; then echo 'adhoc 也通过（意外）'; else echo 'EXPECTED: adhoc 0.0.2 不满足 0.0.1 的 DR'; fi
