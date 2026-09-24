@@ -116,8 +116,7 @@ export function Replays() {
   // null 表示跟随最新一手，新手牌落库后自动切过去
   const [picked, setPicked] = useState<number | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
-  const [reviewing, setReviewing] = useState<ReadonlySet<number>>(new Set())
-  const [failed, setFailed] = useState<ReadonlySet<number>>(new Set())
+  const [reviews, setReviews] = useState<Record<number, 'loading' | 'failed'>>({})
 
   const [listFailed, setListFailed] = useState(false)
   const seq = useRef(0)
@@ -140,26 +139,19 @@ export function Replays() {
     return () => void (live = false)
   }, [selId])
 
-  const toggle = (set: ReadonlySet<number>, id: number, on: boolean) => {
-    const n = new Set(set)
-    if (on) n.add(id)
-    else n.delete(id)
-    return n
-  }
+  const mark = (id: number, st?: 'loading' | 'failed') =>
+    setReviews(({ [id]: _, ...rest }) => (st ? { ...rest, [id]: st } : rest))
 
   useEvent('review:done', ({ handId, text, error }) => {
-    setReviewing((s) => toggle(s, handId, false))
-    setFailed((s) => toggle(s, handId, !!error))
+    mark(handId, error ? 'failed' : undefined)
     if (text) setDetail((d) => (d?.id === handId ? { ...d, review: text } : d))
   })
 
   const review = (id: number) => {
-    if (reviewing.has(id)) return
-    setReviewing((s) => toggle(s, id, true))
-    setFailed((s) => toggle(s, id, false))
+    if (reviews[id] === 'loading') return
+    mark(id, 'loading')
     invoke('hands.review', id).catch((e) => {
-      setReviewing((s) => toggle(s, id, false))
-      setFailed((s) => toggle(s, id, true))
+      mark(id, 'failed')
       toastError(e)
     })
   }
@@ -196,8 +188,8 @@ export function Replays() {
         {detail && detail.id === selId && (
           <HandDetail
             d={detail}
-            loading={reviewing.has(detail.id)}
-            failed={failed.has(detail.id)}
+            loading={reviews[detail.id] === 'loading'}
+            failed={reviews[detail.id] === 'failed'}
             onReview={() => review(detail.id)}
           />
         )}
