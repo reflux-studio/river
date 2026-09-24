@@ -1,0 +1,93 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Helvetica Neue', sans-serif;
+  --font-heading: var(--font-sans);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-blue: var(--blue);
+  --color-win: var(--win);
+  --color-lose: var(--lose);
+  --color-subtle: var(--subtle);
+  --color-label: var(--label);
+  --color-divider: var(--divider);
+  --color-topbar: var(--topbar);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.6);
+}
+
+/* 只有浅色主题（方案明确不做深色模式） */
+:root {
+  --background: #fbfbfa;
+  --foreground: #1d1d1f;
+  --card: #fff;
+  --card-foreground: #1d1d1f;
+  --popover: #fff;
+  --popover-foreground: #1d1d1f;
+  --primary: #1d1d1f;
+  --primary-foreground: #fff;
+  --secondary: #f1f1ef;
+  --secondary-foreground: #1d1d1f;
+  --muted: #f1f1ef;
+  --muted-foreground: #86868b;
+  --accent: #f5f5f3;
+  --accent-foreground: #1d1d1f;
+  --destructive: oklch(0.56 0.2 25);
+  --border: #ebebe9;
+  --input: #e3e3e0;
+  --ring: oklch(0.6 0.17 255);
+  --radius: 0.625rem;
+
+  --blue: oklch(0.6 0.17 255);
+  --win: oklch(0.55 0.14 155);
+  --lose: oklch(0.56 0.2 25);
+  --subtle: #6e6e73;
+  --label: #55555a;
+  --divider: #f3f3f1;
+  --topbar: #f7f7f5;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    overflow: hidden;
+  }
+  textarea,
+  input {
+    font-family: inherit;
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
