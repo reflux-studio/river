@@ -46,13 +46,19 @@ export function commandHandlers(runner: TableRunner): Handlers {
     'provider.delete': async (id) => {
       await deleteProvider(id)
       clearNeedsKey(id)
+      // 引用它的角色模型会一并清空
+      return getSettings()
     },
     'provider.test': ({ providerId, modelId }) => testProvider(providerId, modelId),
     'provider.registry': () => [
       ...Object.entries(PROVIDER_REGISTRY).map(([kind, v]) => ({ kind, name: v.name, models: [...v.models] })),
       { kind: 'openai-compatible', name: 'OpenAI 兼容接口', models: [] }
     ],
-    'table.start': (o) => runner.start(o),
+    'table.start': async (o) => {
+      await runner.start(o)
+      // 教学牌局会改写 coachOn、level
+      return getSettings()
+    },
     'table.heroAct': (a) => runner.heroAct(a),
     'table.nextHand': () => runner.nextHand(),
     'table.rebuy': () => runner.rebuy(),

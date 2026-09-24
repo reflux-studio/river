@@ -138,7 +138,6 @@ export async function updateSettings(patch: Partial<Settings>) {
     fail(e)
   }
 }
-export const reloadSettings = () => updateSettings({})
 
 export async function updateLobby(patch: Partial<Lobby>) {
   setState((s) => ({ lobby: { ...s.lobby, ...patch } }))
@@ -153,13 +152,10 @@ export async function startTable(opts: TableStart) {
   // table.start 之后事件只追加，旧桌的公屏与教练对话要在入座前清掉
   setState({ chat: [], coach: [] })
   try {
-    await invoke('table.start', opts)
+    setState({ settings: await invoke('table.start', opts), page: 'table' })
   } catch (e) {
-    return fail(e)
+    fail(e)
   }
-  setState({ page: 'table' })
-  // 教学牌局会改写 coachOn、level 但不推送
-  if (opts.guided) await reloadSettings()
 }
 
 type Role = keyof Settings['models']
@@ -206,13 +202,11 @@ export async function saveProvider(input: ProviderInput) {
 
 export async function deleteProvider(id: string) {
   try {
-    await invoke('provider.delete', id)
+    const settings = await invoke('provider.delete', id)
+    setState((s) => ({ settings, providers: s.providers.filter((x) => x.id !== id) }))
   } catch (e) {
-    return fail(e)
+    fail(e)
   }
-  setState((s) => ({ providers: s.providers.filter((x) => x.id !== id) }))
-  // 主进程会同时清空引用它的角色模型
-  await reloadSettings()
 }
 
 export async function testProvider(providerId: string, modelId: string) {

@@ -218,10 +218,10 @@ export interface Commands {
   'persona.setPrompt': (personaId: string, prompt: string) => void
   'persona.resetPrompt': (personaId: string) => void
   'provider.save': (input: ProviderInput) => ProviderPublic
-  'provider.delete': (id: string) => void
+  'provider.delete': (id: string) => Settings
   'provider.test': (input: { providerId: string; modelId: string }) => { ok: boolean; supportsRequired?: boolean; error?: string }
   'provider.registry': () => { kind: string; name: string; models: string[] }[]
-  'table.start': (opts: TableStart) => void
+  'table.start': (opts: TableStart) => Settings
   'table.heroAct': (a: { type: 'fold' | 'call' | 'raise'; to?: number }) => void
   'table.nextHand': () => void
   'table.rebuy': () => void

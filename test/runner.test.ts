@@ -486,6 +486,10 @@ describe('IPC', () => {
     const g = h.runner.game!
     for (const q of g.players.slice(1)) for (const c of q.hole) expect(json).not.toContain(`"${c}"`)
     expect((await cmd['provider.registry']()).at(-1)!.kind).toBe('openai-compatible')
+    await cmd['settings.update']({ models: { coach: { providerId: p.id, modelId: 'm' } } })
+    expect((await cmd['provider.delete'](p.id)).models.coach).toBeUndefined()
+    await cmd['settings.update']({ level: 'pro', coachOn: false })
+    expect(await cmd['table.start']({ ...table6, guided: true })).toMatchObject({ level: 'novice', coachOn: true })
     await expect(cmd['data.resetMemory']()).rejects.toThrow()
   })
 })
