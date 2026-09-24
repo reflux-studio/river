@@ -155,6 +155,8 @@ export interface BreakerState {
   coach: boolean
 }
 
+export type HeroAction = { type: 'fold' | 'call' } | { type: 'raise'; to: number }
+
 export interface TableView {
   title: string
   bb: number
@@ -222,7 +224,7 @@ export interface Commands {
   'provider.test': (input: { providerId: string; modelId: string }) => { ok: boolean; supportsRequired?: boolean; error?: string }
   'provider.registry': () => { kind: string; name: string; models: string[] }[]
   'table.start': (opts: TableStart) => Settings
-  'table.heroAct': (a: { type: 'fold' | 'call' | 'raise'; to?: number }) => void
+  'table.heroAct': (a: HeroAction) => void
   'table.nextHand': () => void
   'table.rebuy': () => void
   'table.leave': () => void

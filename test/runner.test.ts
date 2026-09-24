@@ -120,6 +120,11 @@ describe('超时托管与熔断', () => {
     await drive(h, () => h.views.some((v) => v.breaker.opponent))
     expect(calls).toBe(3)
     expect(h.runner.autopilotCount).toBe(3)
+    // 熔断在第 3 次失败当下就要推送，而不是等托管出牌那次 broadcast 顺带带出
+    const tripped = h.views.findIndex((v) => v.breaker.opponent)
+    const thirdAuto = h.views.findIndex((v) => v.autopilotCount === 3)
+    expect(tripped).toBeGreaterThanOrEqual(0)
+    expect(tripped).toBeLessThan(thirdAuto)
     const acts = opponentActs(h).length
     await drive(h, () => opponentActs(h).length >= acts + 3)
     expect(calls).toBe(3)

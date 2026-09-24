@@ -448,7 +448,7 @@ triggerReplies(msg)：对除发言者外在座、未弃桌（`!out`）、非 `th
 - 赢家发言回归：假 agent 赢家发言延迟 6 秒、开启自动下一手 → 发言写入公屏，下一手在发言返回后才开始；发言被队列拒绝时自动下一手仍在 4.5 秒后触发。
 
 结果：已完成（2026-09-24）。独立审阅 reviews/T5-1.md（需修改：补测试）→ T5-2.md（通过）。证据 evidence/T5/（含真实主进程冒烟与退出落库验证）。
-- 偏差（已审阅接受）：熔断后的本地决策也标“托管”并计数（落实 plan“本桌剩余时间全部托管”；用户选本地引擎或未配置模型时不标）；教练提醒应用时除 heroKey 不变外还要求当前仍是该玩家决策点；同一决策点只允许一次对手决策在途（避免恢复牌局时重复发起并误托管）；无需跟注时 fold/call 按原型转 check；加注无金额用默认加注额；无桌时 `coach.ask` 返回 `error:'failed'`；复盘未配置或手牌不存在返回 `not_configured`/`not_found`；本地引擎模式也把每手结果写入对手记忆。
+- 偏差（已审阅接受）：熔断后的本地决策也标“托管”并计数（落实 plan“本桌剩余时间全部托管”；用户选本地引擎或未配置模型时不标）；教练提醒应用时除 heroKey 不变外还要求当前仍是该玩家决策点；同一决策点只允许一次对手决策在途（避免恢复牌局时重复发起并误托管）；无需跟注时 fold/call 按原型转 check；加注金额为必填（`HeroAction` 联合类型，简化轮后不再有无金额回退）；无桌时 `coach.ask` 返回 `error:'failed'`；复盘未配置或手牌不存在返回 `not_configured`/`not_found`；本地引擎模式也把每手结果写入对手记忆。
 - 契约补充：`TableView.runout`；离桌推送 `table:view` 为 null；`hands.get` 查不到返回 null；`app.bootstrap` 返回后主进程补发当前 `table:view`、`coach:alert`、`breaker`。
 - 给 Renderer（T6/T7/T8）的约定：先用 `window.river.on` 注册监听，再调用 `app.bootstrap`；公屏快照与之后的 `chat:append` 可能重叠，按消息 id 去重；`table.start` 之后事件只追加，入座前自行清空本地公屏与教练对话；教学牌局会改写 settings（`coachOn`、`level`）但不推送，入座后重新读取设置；`coach.ask` 返回 requestId，同 id 事件可能先于返回到达，需缓存。
 - 技术债：`Legal` 在 `src/shared/types.ts` 与引擎各有一份相同定义（修改引擎文件被权限拦下）；待用户允许后改为引擎引用共享类型。

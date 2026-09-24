@@ -99,7 +99,7 @@ export async function drive(h: Harness, until: () => boolean, pick: (v: TableVie
     if (g && !g.done && !g.runout && g.toAct === 0 && !h.runner.paused) {
       const v = h.views.at(-1)!
       const a = pick(v)
-      if (a) h.runner.heroAct({ type: a })
+      if (a) h.runner.heroAct(a === 'raise' ? { type: a, to: v.hero.defaultRaiseTo } : { type: a })
     }
     await tick(100)
   }

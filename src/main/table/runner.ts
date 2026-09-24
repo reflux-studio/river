@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { cardsText, fmt } from '../../shared/format'
 import { BLINDS, PERSONAS, personaOf, STREET } from '../../shared/personas'
-import type { AgentCall, BreakerState, ChatMessage, CoachAlert, CoachEntry, Events, HandRecord, TableStart, TableView } from '../../shared/types'
+import type { AgentCall, BreakerState, ChatMessage, CoachAlert, CoachEntry, Events, HandRecord, HeroAction, TableStart, TableView } from '../../shared/types'
 import { coachAsk, coachProactive, coachReview } from '../agents/coach'
 import { coachAlert } from '../agents/intents'
 import { filterSay } from '../agents/leak'
@@ -354,7 +354,7 @@ export class TableRunner {
     this.maybeAutoNext()
   }
 
-  heroAct(a: { type: 'fold' | 'call' | 'raise'; to?: number }) {
+  heroAct(a: HeroAction) {
     const g = this.game
     if (!g || g.done || g.runout || g.toAct !== 0 || this.paused) return
     const L = legal(g, 0)
@@ -362,7 +362,7 @@ export class TableRunner {
     if (a.type !== 'raise' && L.toCall === 0) act.type = 'check'
     if (a.type === 'raise') {
       if (!L.canRaise) return
-      act.to = Math.max(L.minTo, Math.min(L.maxTo, a.to ?? L.minTo))
+      act.to = Math.max(L.minTo, Math.min(L.maxTo, a.to))
     }
     const label = apply(g, 0, act)
     this.push({ kind: 'act', from: 'hero', act: label, triggers: false })
