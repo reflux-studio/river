@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { BackSwatches, FeltSwatches, FxSegment } from '@/components/Appearance'
 import { deleteProvider, invoke, openRules, testProvider, toastError, updateSettings, useRiver } from '@/lib/river'
+import { rateText, useMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { CURRENCIES, currencyOf } from '../../../shared/currency'
 import { COACHES } from '../../../shared/personas'
 import type { ProviderPublic, Settings as SettingsT } from '../../../shared/types'
 
@@ -212,32 +214,47 @@ function Tog({ k }: { k: 'hard' }) {
 function Currency() {
   const v = useRiver((s) => s.settings.currency)
   return (
-    <Segmented<SettingsT['currency']>
-      value={v}
-      options={[{ label: '人民币', value: 'CNY' }, { label: '美元', value: 'USD' }]}
-      onChange={(currency) => updateSettings({ currency })}
-    />
+    // 换币种时手动汇率作废，回到自动
+    <Select value={v} onValueChange={(currency) => updateSettings({ currency: currency as SettingsT['currency'], fxRate: null })}>
+      <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {CURRENCIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.name} · {c.code.toUpperCase()}</SelectItem>)}
+      </SelectContent>
+    </Select>
   )
 }
 
-function UsdCny() {
-  const cur = useRiver((s) => s.settings.currency)
-  const rate = useRiver((s) => s.settings.usdCny)
-  const [text, setText] = useState(String(rate))
-  useEffect(() => setText(String(rate)), [rate])
-  if (cur !== 'CNY') return null
+function FxRate() {
+  const m = useMoney()
+  const manual = useRiver((s) => s.settings.fxRate)
+  const [text, setText] = useState(rateText(m.rate))
+  useEffect(() => setText(rateText(m.rate)), [m.rate])
+  if (m.currency === 'usd') return null
+  const unit = currencyOf(m.currency).unit
   // 失焦时保存；非正数恢复原值
   const save = () => {
     const x = Number(text)
-    if (x > 0 && x !== rate) void updateSettings({ usdCny: Math.round(x * 10000) / 10000 })
-    else setText(String(rate))
+    if (x > 0 && x !== manual) void updateSettings({ fxRate: Math.round(x * 10000) / 10000 })
+    else setText(rateText(m.rate))
   }
+  const desc = m.source === 'auto' ? `自动：每天更新${m.date ? `，数据日期 ${m.date}` : ''}。` : m.source === 'approx' ? '自动：还没拉到汇率，暂用内置估值，联网后自动更新。' : '手动：按你填的汇率换算。'
   return (
-    <Row label="汇率" desc="只影响显示，统计按美元记录，改汇率后历史花费一并换算。">
-      <span className="flex items-center gap-2 text-sm text-label">
-        1 美元 =
-        <Input value={text} inputMode="decimal" onChange={(e) => setText(e.target.value)} onBlur={save} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="h-8 w-20 rounded-[9px] border-input text-right shadow-none" />
-        元
+    <Row label="汇率" desc={`${desc}用量按美元记录，改汇率后历史花费一并换算。`}>
+      <span className="flex items-center gap-3 text-sm text-label">
+        <Segmented
+          value={manual ? 'manual' : 'auto'}
+          options={[{ label: '自动', value: 'auto' }, { label: '手动', value: 'manual' }]}
+          onChange={(x) => void updateSettings({ fxRate: x === 'auto' ? null : Number(rateText(m.rate)) })}
+        />
+        <span className="flex items-center gap-2 whitespace-nowrap">
+          1 美元 =
+          {manual ? (
+            <Input value={text} inputMode="decimal" onChange={(e) => setText(e.target.value)} onBlur={save} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="h-8 w-20 rounded-[9px] border-input text-right shadow-none" />
+          ) : (
+            <span className="font-semibold text-foreground">{rateText(m.rate)}</span>
+          )}
+          {unit}
+        </span>
       </span>
     </Row>
   )
@@ -317,10 +334,10 @@ export function Settings() {
           </Row>
         </Group>
         <Group title="用量计价">
-          <Row label="货币" desc="价格来自 models.dev（美元），选人民币时按下面的汇率换算。">
+          <Row label="货币" desc="价格来自 models.dev（美元），按下面的汇率换算成所选货币。">
             <Currency />
           </Row>
-          <UsdCny />
+          <FxRate />
         </Group>
         <Data />
       </div>

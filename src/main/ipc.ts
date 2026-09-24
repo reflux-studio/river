@@ -1,6 +1,6 @@
 import type { App, IpcMain } from 'electron'
 import { PROVIDER_REGISTRY } from '@mastra/core/llm'
-import type { Commands, Recap } from '../shared/types'
+import type { Commands, FxRates, Recap } from '../shared/types'
 import {
   clearHistory, clearMemory, deletePersona, deleteProvider, getBankroll, getHand, getLobby, handKeyOf, listUsage, getOnboarded, getReview, getSettings, listHands,
   listProviders, personasCache, resetPersona, resetUsage, restorePersona, saveProvider, savePersona, setOnboarded, updateLobby, updateSettings
@@ -15,6 +15,7 @@ export interface AppInfo {
   version: () => string
   update: () => string | null
   install: () => void
+  fx: () => FxRates | null
 }
 
 // 旧版本存的是纯文本复盘，新版本存 JSON
@@ -28,7 +29,7 @@ function parseReview(text: string): Recap | string {
   return text
 }
 
-export function commandHandlers(runner: TableRunner, app: AppInfo = { version: () => '0.0.0', update: () => null, install: () => {} }): Handlers {
+export function commandHandlers(runner: TableRunner, app: AppInfo = { version: () => '0.0.0', update: () => null, install: () => {}, fx: () => null }): Handlers {
   const personasChanged = () => runner.emit('personas', personasCache)
   return {
     'app.bootstrap': async () => ({
@@ -42,7 +43,8 @@ export function commandHandlers(runner: TableRunner, app: AppInfo = { version: (
       coachThread: runner.coachThread,
       chat: runner.chat,
       version: app.version(),
-      update: app.update()
+      update: app.update(),
+      fx: app.fx()
     }),
     'settings.update': async (patch) => {
       const s = await updateSettings(patch)

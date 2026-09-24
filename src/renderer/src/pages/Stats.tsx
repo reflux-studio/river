@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Confirm } from '@/components/Confirm'
-import { costText, money, signed, tokens, useMoney } from '@/lib/format'
+import { costText, money, rateText, signed, tokens, useMoney } from '@/lib/format'
+import { currencyOf } from '../../../shared/currency'
 import { invoke, toastError, useEvent } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import type { HandSummary, Purpose, UsageSummary } from '../../../shared/types'
@@ -30,7 +31,7 @@ function Usage() {
   // 有价格时按花费分占比，全无价格时按 token
   const share = (x: { usd: number; tokens: number }) => (priced ? (t.usd ? x.usd / t.usd : 0) : t.tokens ? x.tokens / t.tokens : 0)
   const kpis = [
-    { l: '估算花费', v: priced ? usd(t.usd) : '—', h: t.unpriced ? `另有 ${tokens(t.unpriced)} token 无价格` : m.currency === 'CNY' ? `按 models.dev 美元价格估算，1 美元 = ${m.usdCny} 元` : '按 models.dev 价格估算' },
+    { l: '估算花费', v: priced ? usd(t.usd) : '—', h: t.unpriced ? `另有 ${tokens(t.unpriced)} token 无价格` : m.currency === 'usd' ? '按 models.dev 价格估算' : `按 models.dev 美元价格估算，1 美元 = ${rateText(m.rate)} ${currencyOf(m.currency).unit}` },
     { l: '调用次数', v: String(t.calls), h: t.unknown ? `其中 ${t.unknown} 次用量未知（超时或中止）` : '对手与教练合计' },
     { l: 'Token 输入 / 输出', v: `${tokens(t.input)} / ${tokens(t.output)}`, h: '提供方返回的用量' },
     {

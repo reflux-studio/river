@@ -57,7 +57,7 @@ describe('迁移', () => {
     ], 'write')
     c.close()
     await db.initDb({ url, ...crypto })
-    expect(db.getSettings()).toEqual({ ...{ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'CNY', usdCny: 7.1, models: {} }, speed: 2 })
+    expect(db.getSettings()).toEqual({ ...{ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} }, speed: 2 })
     const li = db.personaOf('li')!
     expect(li).toMatchObject({ name: '阿狸', prompt: '旧提示词', builtin: true, edited: true, deleted: false })
     expect(db.personasCache.filter((p) => p.builtin)).toHaveLength(8)
@@ -66,7 +66,7 @@ describe('迁移', () => {
 
 describe('kv', () => {
   it('默认值', async () => {
-    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'CNY', usdCny: 7.1, models: {} })
+    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} })
     expect(await db.getLobby()).toEqual({ size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'coach' })
     expect(await db.getBankroll()).toBe(100000)
     expect(await db.getOnboarded()).toBe(false)
@@ -76,7 +76,7 @@ describe('kv', () => {
     await db.updateSettings({ speed: 2, models: { coach: { providerId: 'p', modelId: 'm' } } })
     await db.updateSettings({ hard: true, models: { opponent: { providerId: 'p', modelId: 'o' } } })
     const want = {
-      speed: 2, coachPersona: 0, level: 'novice', hard: true, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'CNY', usdCny: 7.1,
+      speed: 2, coachPersona: 0, level: 'novice', hard: true, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null,
       models: { coach: { providerId: 'p', modelId: 'm' }, opponent: { providerId: 'p', modelId: 'o' } }
     }
     expect(db.getSettings()).toEqual(want)
@@ -338,7 +338,7 @@ describe('写锁冲突', () => {
     // 等锁不能在主线程同步阻塞
     expect(maxGap).toBeLessThan(100)
     expect(results.every((r) => r.status === 'rejected' && /SQLITE_BUSY/.test(String(r.reason)))).toBe(true)
-    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'CNY', usdCny: 7.1, models: {} })
+    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} })
     expect(db.getLobby().size).toBe(4)
     expect(db.listProviders().map((x) => x.name)).toEqual(['A'])
   }, 15000)

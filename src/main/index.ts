@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
 import { initDb } from './db'
 import { guardQuit, registerIpc } from './ipc'
+import { fxRates, loadFx, refreshFx } from './models/fx'
 import { loadPrices, refreshPrices } from './models/prices'
 import { TableRunner } from './table/runner'
 import { initUpdater, installUpdate, readyVersion } from './updater'
@@ -45,6 +46,7 @@ app.whenReady().then(async () => {
     const url = 'file:' + join(app.getPath('userData'), 'river.db')
     await initDb({ url, encrypt: (t) => safeStorage.encryptString(t), decrypt: (b) => safeStorage.decryptString(b) })
     await loadPrices()
+    await loadFx()
     await runner.init()
   } catch (e) {
     dialog.showErrorBox('River 启动失败', e instanceof Error ? e.message : String(e))
@@ -52,7 +54,8 @@ app.whenReady().then(async () => {
     return
   }
   void refreshPrices()
-  registerIpc(ipcMain, runner, { version: () => app.getVersion(), update: readyVersion, install: installUpdate })
+  void refreshFx().then((fx) => fx && runner.emit('fx', fx))
+  registerIpc(ipcMain, runner, { version: () => app.getVersion(), update: readyVersion, install: installUpdate, fx: fxRates })
   guardQuit(app, runner)
   createWindow()
   initUpdater(runner.emit)

@@ -1,3 +1,5 @@
+import type { Currency } from './currency'
+
 export type Card = string
 export type Street = 'preflop' | 'flop' | 'turn' | 'river' | 'showdown'
 // 教练局：教练每步先说、一手结束亮全部底牌并复盘；自由局只有概率面板
@@ -21,9 +23,10 @@ export interface Settings {
   feltCustom: string
   back: Back
   fx: Fx
-  // 花费显示的货币；价格源（models.dev）是美元，人民币按 usdCny 换算
-  currency: 'CNY' | 'USD'
-  usdCny: number
+  // 花费显示的货币；价格源（models.dev）是美元，按汇率换算
+  currency: Currency
+  // 手动汇率（1 美元 = fxRate 当前货币）；null 为自动
+  fxRate: number | null
   models: { opponent?: ModelRef; coach?: ModelRef }
 }
 
@@ -252,6 +255,13 @@ export interface Bootstrap {
   chat: ChatMessage[]
   version: string
   update: string | null
+  fx: FxRates | null
+}
+
+// 以美元为基准的汇率（只保留可选币种）
+export interface FxRates {
+  date: string
+  rates: Partial<Record<Currency, number>>
 }
 
 export interface TableStart {
@@ -306,6 +316,7 @@ export interface Events {
   'hands:changed': void
   'usage:changed': void
   'update:ready': { version: string }
+  fx: FxRates
 }
 
 // bootstrap 的 chat 快照与之后的 chat:append 可能重叠，Renderer 按消息 id 去重

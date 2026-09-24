@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 import type {
-  Bootstrap, ChatMessage, CoachEntry, Commands, Events, Lobby, Persona, PersonaInput, ProviderInput,
+  Bootstrap, ChatMessage, CoachEntry, Commands, Events, FxRates, Lobby, Persona, PersonaInput, ProviderInput,
   ProviderPublic, RiverApi, Settings, TableStart, TableView
 } from '../../../shared/types'
 
@@ -32,12 +32,13 @@ export interface RiverState {
   needModel: 'opponent' | 'coach' | null
   version: string
   update: string | null
+  fx: FxRates | null
 }
 
 let state: RiverState = {
   ready: false,
   page: 'lobby',
-  settings: { speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'CNY', usdCny: 7.1, models: {} },
+  settings: { speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} },
   lobby: { size: 6, blinds: 1, picks: [], mode: 'coach' },
   bankroll: 0,
   onboarded: true,
@@ -49,7 +50,8 @@ let state: RiverState = {
   rulesOpen: false,
   needModel: null,
   version: '',
-  update: null
+  update: null,
+  fx: null
 }
 
 const subs = new Set<() => void>()
@@ -97,6 +99,7 @@ function listen() {
   river.on('bankroll', (bankroll) => setState({ bankroll }))
   river.on('personas', (personas) => setState({ personas }))
   river.on('update:ready', ({ version }) => setState({ update: version }))
+  river.on('fx', (fx) => setState({ fx }))
 }
 
 export async function init() {
@@ -115,7 +118,8 @@ export async function init() {
     coach: b.coachThread,
     rulesOpen: !b.onboarded,
     version: b.version,
-    update: b.update
+    update: b.update,
+    fx: b.fx
   })
 }
 

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { createClient, type Client } from '@libsql/client'
 import { PERSONAS } from '../../shared/personas'
-import type { HandRecord, HandSummary, Lobby, Persona, PersonaInput, ProviderInput, ProviderPublic, Purpose, Settings } from '../../shared/types'
+import { CURRENCIES, type Currency } from '../../shared/currency'
+import type { FxRates, HandRecord, HandSummary, Lobby, Persona, PersonaInput, ProviderInput, ProviderPublic, Purpose, Settings } from '../../shared/types'
 
 export interface ProviderRow {
   id: string
@@ -14,7 +15,7 @@ export interface ProviderRow {
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'CNY', usdCny: 7.1, models: {}
+  speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}
 }
 const DEFAULT_LOBBY: Lobby = { size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'coach' }
 const MEMORY_KEEP = 10
@@ -144,6 +145,9 @@ const pick = <T extends object>(base: T, v: T): T => Object.fromEntries(Object.k
 
 async function loadCaches() {
   settingsCache = pick(DEFAULT_SETTINGS, await getKv('settings', DEFAULT_SETTINGS))
+  // 不认识的币种（含早期存的大写代码）回到可识别的值
+  const cur = String(settingsCache.currency).toLowerCase()
+  settingsCache.currency = CURRENCIES.some((c) => c.code === cur) ? (cur as Currency) : DEFAULT_SETTINGS.currency
   lobbyCache = pick(DEFAULT_LOBBY, await getKv('lobby', DEFAULT_LOBBY))
   personasCache = await loadPersonas()
   const tails = await db().execute("SELECT key, value FROM river_kv WHERE key LIKE 'provider_tail:%'")
@@ -364,6 +368,8 @@ export async function resetUsage() {
   await write((c) => c.batch(['DELETE FROM river_usage', kvUpsert('usage_since', Date.now())], 'write'))
 }
 
+export const getFxCache = () => getKv<FxRates | null>('fx', null)
+export const setFxCache = (v: FxRates) => setKv('fx', v)
 export const getPriceCache = () => getKv<unknown>('prices', null)
 export const setPriceCache = (v: unknown) => setKv('prices', v)
 
