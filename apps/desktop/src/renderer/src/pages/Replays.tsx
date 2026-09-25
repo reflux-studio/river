@@ -188,7 +188,7 @@ export function Replays() {
             >
               <span className="flex w-[64px] flex-col leading-tight text-muted-foreground">
                 <span className="text-[13px]">#{h.handNo}</span>
-                <span className="text-[11px]">{new Date(h.playedAt).toLocaleString(lang, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-[11px]">{new Date(h.playedAt).toLocaleString(lang, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</span>
               </span>
               <span className="flex-1"><MiniCards cards={h.hero} w={20} h={28} /></span>
               <span className={cn('font-semibold', netColor(h.net))}>{signed(h.net)}</span>

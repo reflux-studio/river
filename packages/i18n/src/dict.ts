@@ -318,6 +318,7 @@ export const zh = {
     table: {
       you: '你',
       youIni: '你',
+      unknownSpeaker: '？',
       nameSep: '、',
       thinking: '思考中…',
       won: (amount: string, cat: string) => `赢得 ${amount}${cat ? ' · ' + cat : ''}`,
@@ -417,6 +418,8 @@ export const zh = {
   prompt: promptZh
 }
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
 export const en: typeof zh = {
   common: {
     localeNames,
@@ -461,7 +464,7 @@ export const en: typeof zh = {
       costTitle: 'LLM usage at this table. Click for details',
       thisTable: 'This table',
       leave: 'Leave table',
-      update: (v) => `${v} is ready · Restart to update`,
+      update: (v) => `Version ${v} is ready · Restart to update`,
       bankroll: 'Chips'
     },
     needModel: {
@@ -484,7 +487,7 @@ export const en: typeof zh = {
       buyIn: (amount) => `Buy-in ${amount} (100 big blinds)`,
       opponents: 'Opponents',
       manage: '+ Manage opponents',
-      fewer: (n, size) => `Only ${n} opponents available; the table will have ${size} players`,
+      fewer: (n, size) => `Only ${plural(n, 'opponent')} available; the table will have ${size} players`,
       picked: (n) => `${n} selected`,
       pickedSome: (n, need) => `${n} / ${need} selected; the rest are random`,
       mode: 'Game type',
@@ -538,7 +541,7 @@ export const en: typeof zh = {
       won: (amount) => `Won ${amount}`
     },
     stats: {
-      intro: (n) => `Based on all ${n} hands.`,
+      intro: (n) => `Based on all ${plural(n, 'hand')}.`,
       hands: 'Hands played',
       allHands: 'All hands',
       net: 'Net',
@@ -550,7 +553,7 @@ export const en: typeof zh = {
       pfr: 'PFR',
       pfrHint: 'Share of hands you raised preflop; the closer to VPIP, the more aggressive',
       sdWin: 'Showdowns won',
-      sdCount: (n) => `${n} showdowns`,
+      sdCount: (n) => plural(n, 'showdown'),
       perHandNet: 'Net per hand',
       usage: 'LLM usage and cost',
       since: (date) => `Since ${date}`,
@@ -568,7 +571,7 @@ export const en: typeof zh = {
       io: 'Tokens in / out',
       ioHint: 'As reported by providers',
       avg: 'Per hand',
-      basedOn: (n) => `Based on ${n} hands`,
+      basedOn: (n) => `Based on ${plural(n, 'hand')}`,
       afterFirst: 'Available after your first hand',
       cols: { purpose: 'Purpose', costShare: 'Cost share', tokenShare: 'Token share', calls: 'Calls', tokens: 'Tokens', cost: 'Cost' },
       purposes: { decide: 'AI decisions', talk: 'After-hand talk', speak: 'Coach advice', ask: 'Coach Q&A', recap: 'Hand recaps' },
@@ -588,7 +591,7 @@ export const en: typeof zh = {
       testedRequired: 'Tested · Supports required tool calls',
       testedAuto: 'Tested · Tool calls fall back to auto',
       deleteTitle: (name) => `Delete provider “${name}”?`,
-      deleteInUse: (roles) => `The ${roles} model setting uses it. Deleting it clears that choice.`,
+      deleteInUse: (roles) => `It's set as the ${roles} model. Deleting it will clear that setting.`,
       deleteDesc: 'You’ll need to add it again and re-enter the API key.',
       addProvider: 'Add provider',
       addFirst: 'Add a model provider above first.',
@@ -730,6 +733,7 @@ export const en: typeof zh = {
     table: {
       you: 'You',
       youIni: 'Y',
+      unknownSpeaker: '?',
       nameSep: ', ',
       thinking: 'Thinking…',
       won: (amount, cat) => `Won ${amount}${cat ? ' · ' + cat : ''}`,

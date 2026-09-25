@@ -11,7 +11,7 @@ export function useSpeaker() {
   return (from?: string) => {
     if (!from || from === 'hero') return { name: t.desktop.table.you, ini: t.desktop.table.youIni, hue: undefined as number | undefined }
     const p = seats?.find((x) => x.personaId === from) ?? personas.find((x) => x.id === from)
-    return p ? { name: p.name, ini: p.ini, hue: p.hue as number | undefined } : { name: t.desktop.model.unknown, ini: t.desktop.model.unknown, hue: undefined }
+    return p ? { name: p.name, ini: p.ini, hue: p.hue as number | undefined } : { name: t.desktop.table.unknownSpeaker, ini: t.desktop.table.unknownSpeaker, hue: undefined }
   }
 }
 

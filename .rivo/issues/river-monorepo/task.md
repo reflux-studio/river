@@ -415,6 +415,12 @@ export async function completeOnboarding(locale: Locale) {
 - 中文模式下的截图和 `evidence/T1/baseline/` 一致。
 
 **结果**：
+- 已完成：实现提交 `7e7d67a`，小修见后续提交。
+  - F1：英文单复数；
+  - F4：公屏里身份不明的发言者，改用界面自己的词条 `desktop.table.unknownSpeaker`；
+  - F5：更新提示写成 “Version x is ready”，删除提供方的提示改写；
+  - F2：回放列表的时间统一用 24 小时制，英文显示为 “9/25, 15:04”，放得进 64px 宽的列。
+- 独立审阅：`reviews/T6-1.md`，结论是可以接受。F3（英文牌桌页实机截图）并入整体验证，和真实模型开桌一起做。
 
 ## 任务 7：手动检查更新
 
