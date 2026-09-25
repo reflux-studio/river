@@ -229,6 +229,9 @@
 - 主进程误引 `@river/ui` 主入口时 typecheck 会失败：临时试一次，确认后撤回。
 
 **结果**：
+- 代码已完成：实现提交 `dc40968`，补测试提交 `a31d4f5`。
+- 独立审阅：`reviews/T3-1.md` 结论为有条件通过，修复复审 `reviews/T3-2.md` 确认 F1、F5 已关闭。F2 转入 T8，F3、F6 为可选项，不处理。
+- **未完成**：F4，也就是真实开桌的特效实测、牌桌截图对比、`lite` 和 `off` 两档特效的检查。这一项要用户同意产生模型费用后，由主代理完成。
 
 ## 任务 4：@river/i18n、语言设置与引导页选语言
 
@@ -487,7 +490,9 @@ export async function completeOnboarding(locale: Locale) {
 **实施步骤**：
 1. 用 Astro 组件照设计稿逐区块实现：页头导航、首屏加演示桌、牌友、功能（教练、复盘、外观、费用）、模型、下载、FAQ、结尾 CTA、页脚。设计稿中的文案全部移到 `site.ts`，按 zh/en 各一份。
 2. 做成 React 岛的部分：演示桌、外观切换（牌桌色、牌背、特效档位）、全下展示（每 2.8 秒调用一次 `playAllIn`）、教练档位和提问、币种切换、下载平台切换、FAQ 展开。
-3. 演示桌外层用包裹元素做 `transform: scale` 自适应，`TableStage` 本身不加 transform。
+3. 演示桌外层用包裹元素做 `transform: scale` 自适应，`TableStage` 本身不加 transform。注意（T3 审阅 F2）：
+   - `TableStage` 根节点目前带有 desktop 的布局类 `min-h-[560px] flex-1` 和固定底色，外层包裹元素要给定宽度，高度不能低于 560px。
+   - 如果底色或布局和官网冲突，就给 `TableStage` 加一个可选的 `className` prop（desktop 不传，行为不变），并同步更新 plan 中的 props 表。
 4. 牌友区使用 `presets[lang]`（name、tag、desc、prompt、hue）。
 5. 下载区：
    - 在客户端请求 `https://api.github.com/repos/reflux-studio/river/releases/latest`，按 `artifactName` 规则匹配各平台的文件；
