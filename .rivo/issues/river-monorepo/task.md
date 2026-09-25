@@ -248,7 +248,7 @@
   - `shared/types.ts` 中 `Settings` 增加 `locale`，`Bootstrap` 增加 `packaged`（T7 使用），`Commands['onboarding.done']` 改签名；
   - `main/db/index.ts`：`DEFAULT_SETTINGS`、加载设置时补预选值、种子改为 `presets[locale]`；
   - `main/ipc.ts`：`onboarding.done`，以及 `settings.update` 对 `locale` 的守卫；
-  - `renderer`：`lib/river.ts` 提供 i18n context；`components/Onboarding.tsx` 增加语言页；
+  - `renderer`：`lib/river.ts` 提供 `useT()` hook；`components/Onboarding.tsx` 增加语言页；
   - `shared/personas.ts` 删除 `PERSONAS` 和 `COACHES`，把 `STREET` 迁到 i18n，保留 `BLINDS`。同步修改使用方，保证 T4 结束时 typecheck 能通过：
     - `PERSONAS`：`main/db`；
     - `COACHES`：`main/agents/coach.ts`、`renderer/components/table/CoachPanel.tsx`、`pages/Settings.tsx`；
@@ -295,7 +295,7 @@ export async function completeOnboarding(locale: Locale) {
    - “是否改过”的判断逻辑不变。
 3. 主进程实现 `onboarding.done` 和守卫。
 4. 渲染进程：
-   - 提供一个 `useT()` context，值来自 `settings.locale`。
+   - 提供一个 `useT()` hook，值来自 `settings.locale`。
    - 引导 Dialog 在 `!onboarded` 时才显示第一页“语言页”，预选值取 `settings.locale`；在语言页切换时，只修改本地状态，并让后面的卡片立即换成所选语言。
    - 所有结束引导的路径都要调用 `finishOnboarding(selected)`：“跳过”“稍后再说”“去配置”“带我打一手”、Esc，以及点击遮罩（后两者都会触发 `onOpenChange(false)`）。实施时以 `Onboarding.tsx` 中实际存在的按钮为准，逐一核对。
    - “去配置”“带我打一手”先 `await` 再跳转。
@@ -404,7 +404,7 @@ export async function completeOnboarding(locale: Locale) {
 - 用户数据（对手名称和提示词、提问、模型输出、回放内容）原样显示，不翻译。
 - 用 `useT()`（T4 已提供）取字典。
 - 顺便修正引导页英文牌型表第一行略超出分隔线的问题（T4 审阅 F2）。
-- 模拟英文系统：dev 启动时加 `-- --lang=en-US -AppleLanguages "(en-US)"`。
+- 模拟英文系统：`cd apps/desktop && npx electron-vite dev -- --lang=en-US -AppleLanguages "(en-US)"`。
 
 **验证与完成标准**：
 - `rg -n '\p{Han}' apps/desktop/src/renderer/src -g '*.ts' -g '*.tsx'` 只能命中注释；
