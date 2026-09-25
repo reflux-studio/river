@@ -445,7 +445,7 @@ describe('随机压测', () => {
 })
 
 describe('与原型对照（牌型评估）', () => {
-  const src = readFileSync(resolve(__dirname, '../.rivo/issues/river-desktop/design-source/poker.js'), 'utf8')
+  const src = readFileSync(resolve(__dirname, '../../../.rivo/issues/river-desktop/design-source/poker.js'), 'utf8')
   const ctx = vm.createContext({ window: {} })
   vm.runInContext(src, ctx)
   const P = ctx.window.RiverPoker

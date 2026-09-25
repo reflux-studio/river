@@ -20,11 +20,14 @@
 ## 开发
 
 ```bash
-pnpm install
-pnpm dev        # 开发运行，数据写在 River-dev 目录
-pnpm test
-pnpm dist       # 打当前平台的安装包到 dist/
+pnpm install      # 在仓库根目录执行，安装整个 workspace
+pnpm dev          # 开发运行桌面端（apps/desktop），数据写在 River-dev 目录
+pnpm typecheck    # 所有包的类型检查
+pnpm test         # 所有包的测试
+pnpm dist         # 打当前平台的安装包到 apps/desktop/dist/
 ```
+
+仓库是 pnpm workspace：桌面应用在 `apps/desktop`，只针对它执行命令时可用 `pnpm --filter ./apps/desktop <脚本>`。
 
 ## 发布
 
