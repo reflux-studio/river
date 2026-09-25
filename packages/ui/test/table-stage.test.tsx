@@ -58,6 +58,14 @@ describe('TableStage', () => {
     expect(layerText()).not.toContain('加注到 20')
   })
 
+  it('下注额没增加时不播加注特效：加注者再次思考、加注后赢下', () => {
+    render([seat(), seat({ bet: 40, status: 'Raise to 40', lastAct: 'raise' })])
+    render([seat(), seat({ bet: 40, status: 'Thinking…', lastAct: 'raise' })])
+    expect(layerText()).not.toContain('Thinking…')
+    render([seat(), seat({ bet: 40, status: 'Won 80', lastAct: 'raise' })])
+    expect(layerText()).not.toContain('Won 80')
+  })
+
   it('全下与加注二选一：全下时只出 ALL IN 标签', () => {
     render([seat(), seat({ bet: 10, status: 'x' })])
     render([seat(), seat({ bet: 1000, allin: true, status: 'All in', lastAct: 'raise' })])
