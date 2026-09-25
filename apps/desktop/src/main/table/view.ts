@@ -2,7 +2,7 @@
 // 亮牌规则：摊牌时未弃牌者亮牌；教练局一手结束后所有人亮牌（弃牌者标 mucked）
 import { fmt, signed } from '../../shared/format'
 import type { CoachState, Cost, Legal, Mode, SeatViewPublic, TableView } from '../../shared/types'
-import type { Table } from '@river/engine'
+import { lastActs, type Table } from '@river/engine'
 import { label, type SeatInfo } from './text'
 
 export interface Nums {
@@ -65,6 +65,7 @@ export function buildTableView(s: ViewState): TableView {
   log.forEach((e, k) => {
     if (k > lastBoard && 'seat' in e && e.type !== 'return') last.set(e.seat, label(e, blinds))
   })
+  const acts = lastActs(log, t.roundOfBetting())
   const total = t.totalPot()
   const bets = st.reduce((a, x) => a + (x?.bet ?? 0), 0)
 
@@ -84,6 +85,7 @@ export function buildTableView(s: ViewState): TableView {
     const h = holes[i]
     const reveal = i === 0 || (showdown && !p.folded) || (done && s.mode === 'coach')
     const bubble = s.bubbles.get(i)
+    const act = acts.get(i)
     return {
       name: info.name,
       ...(info.personaId && { personaId: info.personaId }),
@@ -104,6 +106,7 @@ export function buildTableView(s: ViewState): TableView {
       winner: !!win,
       ...(reveal && h && { cards: h, ...(p.folded && i !== 0 && { mucked: true }) }),
       hasCards: !p.folded && !p.out && !!h,
+      ...(act && { lastAct: act }),
       ...(bubble && bubble.until > s.now && { bubble: bubble.text })
     }
   })

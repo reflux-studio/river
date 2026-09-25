@@ -1,5 +1,6 @@
+import { MiniCards } from '@river/ui'
 import { useEffect, useRef, useState } from 'react'
-import { MiniCards, RichText } from '@/components/PlayingCard'
+import { RichText } from '@/components/RichText'
 import { Segmented } from '@/components/Segmented'
 import { Switch } from '@/components/ui/switch'
 import { netColor, signed } from '@/lib/format'

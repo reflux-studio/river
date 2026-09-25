@@ -1,13 +1,13 @@
-import { Avatar } from '@/components/Avatar'
-import { CardBack, PlayingCard } from '@/components/PlayingCard'
-import { chipBg, chipEdge, stacks } from '@/lib/felt'
-import { fmt } from '@/lib/format'
-import { cn } from '@/lib/utils'
-import type { SeatViewPublic } from '../../../../shared/types'
+import { fmt } from '@river/engine'
+import { cn } from 'cn'
+import { Avatar } from './avatar'
+import { CardBack, PlayingCard } from './cards'
+import { chipBg, chipEdge, stacks } from './felt'
+import type { Back, SeatView } from './types'
 
-// 原型极坐标：第 0 位（玩家）在正下方，其余顺时针均分
-export const angle = (i: number, n: number) => ((90 + (i * 360) / n) * Math.PI) / 180
-export const polar = (i: number, n: number, rx: number, ry: number) => {
+// 原型极坐标：第 0 位在正下方，其余顺时针均分
+const angle = (i: number, n: number) => ((90 + (i * 360) / n) * Math.PI) / 180
+const polar = (i: number, n: number, rx: number, ry: number) => {
   const a = angle(i, n)
   return { left: `${50 + rx * Math.cos(a)}%`, top: `${50 + ry * Math.sin(a)}%` }
 }
@@ -15,7 +15,7 @@ export const polar = (i: number, n: number, rx: number, ry: number) => {
 const BLUE = 'oklch(0.6 0.17 255)'
 const GREEN = 'oklch(0.55 0.14 155)'
 const RED = 'oklch(0.56 0.2 25)'
-const TONE: Record<SeatViewPublic['statusTone'], { color: string; bg: string; dot: string; w: number }> = {
+const TONE: Record<SeatView['statusTone'], { color: string; bg: string; dot: string; w: number }> = {
   muted: { color: '#55555a', bg: '#fff', dot: '#a1a1a6', w: 500 },
   blue: { color: BLUE, bg: '#fff', dot: BLUE, w: 500 },
   green: { color: '#fff', bg: GREEN, dot: '#fff', w: 600 },
@@ -38,8 +38,15 @@ function Bubble({ text, up, seat }: { text: string; up: boolean; seat: number })
   )
 }
 
-export function Seat({ seat: p, i, n, heroTurn }: { seat: SeatViewPublic; i: number; n: number; heroTurn: boolean }) {
-  const isHero = i === 0
+export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels }: {
+  seat: SeatView
+  i: number
+  n: number
+  isHero: boolean
+  heroTurn: boolean
+  back: Back
+  labels: { sb: string; bb: string }
+}) {
   const active = p.thinking || (isHero && heroTurn)
   const up = Math.sin(angle(i, n)) > -0.2
   const tone = TONE[p.statusTone]
@@ -56,8 +63,8 @@ export function Seat({ seat: p, i, n, heroTurn }: { seat: SeatViewPublic; i: num
       ) : (
         p.hasCards && (
           <div data-seat-cards={i} className="-mb-4 flex">
-            <CardBack rot={-7} />
-            <CardBack rot={7} className="-ml-2.5" />
+            <CardBack back={back} rot={-7} />
+            <CardBack back={back} rot={7} className="-ml-2.5" />
           </div>
         )
       )}
@@ -80,8 +87,8 @@ export function Seat({ seat: p, i, n, heroTurn }: { seat: SeatViewPublic; i: num
           <span className="text-xs text-muted-foreground">{fmt(p.stack)}</span>
         </div>
         <div className="absolute -top-2.5 left-2.5 flex gap-1">
-          {p.isSB && <span className="rounded-full bg-[oklch(0.58_0.15_250)] px-[7px] py-0.5 text-[11px] font-bold tracking-[0.02em] text-white shadow-[0_0_0_2px_#fff]">小盲</span>}
-          {p.isBB && <span className="rounded-full bg-[oklch(0.8_0.15_80)] px-[7px] py-0.5 text-[11px] font-bold tracking-[0.02em] text-foreground shadow-[0_0_0_2px_#fff]">大盲</span>}
+          {p.isSB && <span className="rounded-full bg-[oklch(0.58_0.15_250)] px-[7px] py-0.5 text-[11px] font-bold tracking-[0.02em] text-white shadow-[0_0_0_2px_#fff]">{labels.sb}</span>}
+          {p.isBB && <span className="rounded-full bg-[oklch(0.8_0.15_80)] px-[7px] py-0.5 text-[11px] font-bold tracking-[0.02em] text-foreground shadow-[0_0_0_2px_#fff]">{labels.bb}</span>}
         </div>
         {p.isDealer && (
           <div className="absolute top-1/2 -right-[30px] flex size-[22px] -translate-y-1/2 items-center justify-center rounded-full bg-white text-[11px] font-extrabold text-foreground shadow-[inset_0_0_0_1.5px_#1d1d1f,0_2px_5px_rgba(0,0,0,0.3)]">

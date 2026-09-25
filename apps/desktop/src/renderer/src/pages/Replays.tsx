@@ -1,6 +1,5 @@
+import { Avatar, MiniCards, PlayingCard } from '@river/ui'
 import { useEffect, useRef, useState } from 'react'
-import { Avatar } from '@/components/Avatar'
-import { MiniCards, PlayingCard } from '@/components/PlayingCard'
 import { RecapRows } from '@/components/table/CoachPanel'
 import { costText, fmt, netColor, signed, useMoney } from '@/lib/format'
 import { configured, go, invoke, toastError, useEvent, useRiver } from '@/lib/river'

@@ -1,6 +1,5 @@
+import { Avatar, MiniCards } from '@river/ui'
 import { useEffect, useRef } from 'react'
-import { Avatar } from '@/components/Avatar'
-import { MiniCards } from '@/components/PlayingCard'
 import { useRiver } from '@/lib/river'
 import type { ChatMessage } from '../../../../shared/types'
 

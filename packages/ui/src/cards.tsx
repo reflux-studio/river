@@ -1,7 +1,8 @@
-import { useRiver } from '@/lib/river'
-import { backOf } from '@/lib/felt'
-import { cn } from '@/lib/utils'
-import type { Card } from '../../../shared/types'
+import type { Card } from '@river/engine'
+import { cn } from 'cn'
+import type { CSSProperties } from 'react'
+import { backOf } from './felt'
+import type { Back } from './types'
 
 // 花色矢量，照搬设计稿
 const SUIT: Record<string, string> = {
@@ -23,7 +24,7 @@ export function Suit({ c, size, className }: { c: Card; size: number | string; c
 }
 
 // 大牌面：左上角点数与小花色，右下角大花色（公共牌 56×80、玩家 60×84、对手 44×62、回放 50×70）
-export function PlayingCard({ card, w = 56, h = 80, rot = 0, className, style }: { card: Card; w?: number; h?: number; rot?: number; className?: string; style?: React.CSSProperties }) {
+export function PlayingCard({ card, w = 56, h = 80, rot = 0, className, style }: { card: Card; w?: number; h?: number; rot?: number; className?: string; style?: CSSProperties }) {
   const k = h / 80
   return (
     <div
@@ -67,8 +68,7 @@ export function EmptyCard({ w = 56, h = 80, border }: { w?: number; h?: number; 
   return <div className="box-border shrink-0 rounded-[7px] border-[1.5px] border-dashed" style={{ width: w, height: h, borderColor: border }} />
 }
 
-export function CardBack({ rot = 0, className }: { rot?: number; className?: string }) {
-  const back = useRiver((s) => s.settings.back)
+export function CardBack({ back, rot = 0, className }: { back: Back; rot?: number; className?: string }) {
   return (
     <div
       className={cn('box-border h-12 w-[34px] rounded-[5px] bg-white p-[2.5px] shadow-[0_2px_6px_rgba(0,0,0,0.28)]', className)}
@@ -79,11 +79,8 @@ export function CardBack({ rot = 0, className }: { rot?: number; className?: str
   )
 }
 
-// 文本里的“A♠”渲染成小牌面
-const CARD_RE = /(10|[2-9TJQKA])([♠♥♦♣])️?/g
-const SYM: Record<string, string> = { '♠': 's', '♥': 'h', '♦': 'd', '♣': 'c' }
 // 文字里的小牌面：尺寸随字号，竖直居中于汉字，负外边距避免撑高行距
-function InlineCard({ card }: { card: Card }) {
+export function InlineCard({ card }: { card: Card }) {
   return (
     <span
       className={cn('mx-[0.1em] -my-[0.3em] inline-flex h-[1.55em] w-[1.15em] -translate-y-[0.06em] flex-col items-center justify-center gap-[0.04em] rounded-[0.2em] border border-[#dcdcd8] bg-white align-middle', red(card) ? 'text-lose' : 'text-foreground')}
@@ -92,18 +89,4 @@ function InlineCard({ card }: { card: Card }) {
       <Suit c={card} size="0.6em" />
     </span>
   )
-}
-
-export function RichText({ text }: { text: string }) {
-  const out: React.ReactNode[] = []
-  let last = 0
-  for (const m of text.matchAll(CARD_RE)) {
-    // 两张牌之间只隔空白时不留空格，像一手牌那样挨着
-    const gap = text.slice(last, m.index)
-    if (gap && !(last > 0 && !gap.trim())) out.push(gap)
-    out.push(<InlineCard key={m.index} card={(m[1] === '10' ? 'T' : m[1]) + SYM[m[2]]} />)
-    last = m.index! + m[0].length
-  }
-  if (last < text.length) out.push(text.slice(last))
-  return <>{out}</>
 }

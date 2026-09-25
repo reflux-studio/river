@@ -36,6 +36,19 @@ describe('lastActs', () => {
     expect(acts(t)).toEqual({ 1: 'check' })
   })
 
+  it('摊牌时结果等于河牌圈的最后动作', () => {
+    const t = table([1000, 1000, 1000], { button: 0 })
+    act(t, 'call'); act(t, 'call'); act(t, 'check')
+    for (let k = 0; k < 2; k++) (t.endBettingRound(), act(t, 'check'), act(t, 'check'), act(t, 'check'))
+    t.endBettingRound()
+    act(t, 'bet', 20); act(t, 'call'); act(t, 'fold')
+    t.endBettingRound()
+    t.showdown()
+    expect(t.roundOfBetting()).toBe('showdown')
+    expect(acts(t)).toEqual(acts(t, 'river'))
+    expect(acts(t)).toEqual({ 0: 'fold', 1: 'bet', 2: 'call' })
+  })
+
   it('随机压测：每一步里每个座位的结果等于该座位本街最后一条有效记录', () => {
     const expected = (log: LogEntry[], street: Street) => {
       const out = new Map<number, LastAct>()

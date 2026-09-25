@@ -1,7 +1,9 @@
 import type { Card, Street } from '@river/engine'
+import type { Back, Felt, Fx, SeatView } from '@river/ui/types'
 import type { Currency } from './currency'
 
-export type { Card, Street }
+export type { Card, Street, Back, Felt, Fx }
+export type { SeatView as SeatViewPublic }
 // 教练局：教练每步先说、一手结束亮全部底牌并复盘；自由局只有概率面板
 export type Mode = 'coach' | 'free'
 
@@ -9,10 +11,6 @@ export interface ModelRef {
   providerId: string
   modelId: string
 }
-
-export type Felt = 'green' | 'blue' | 'wine' | 'graphite' | 'paper' | 'custom'
-export type Back = 'red' | 'blue' | 'black' | 'green'
-export type Fx = 'full' | 'lite' | 'off'
 
 export interface Settings {
   speed: 0 | 1 | 2
@@ -158,31 +156,6 @@ export interface Legal {
   stack: number
 }
 
-export interface SeatViewPublic {
-  name: string
-  personaId?: string
-  tag: string
-  ini: string
-  hue: number
-  stack: number
-  bet: number
-  isDealer: boolean
-  isSB: boolean
-  isBB: boolean
-  folded: boolean
-  out: boolean
-  allin: boolean
-  status: string
-  statusTone: 'muted' | 'blue' | 'green' | 'dark' | 'red'
-  thinking: boolean
-  winner: boolean
-  cards?: Card[]
-  // 教练局一手结束亮出的弃牌者底牌
-  mucked?: boolean
-  hasCards: boolean
-  bubble?: string
-}
-
 export type HeroAction = { type: 'fold' | 'call' } | { type: 'raise'; to: number }
 
 export interface CoachState {
@@ -203,7 +176,7 @@ export interface TableView {
   street: Street | 'idle'
   board: Card[]
   pot: number
-  seats: SeatViewPublic[]
+  seats: SeatView[]
   hero: { legal: Legal; toCall: number; isTurn: boolean; defaultRaiseTo: number; presets: { label: string; to: number }[] }
   done: boolean
   runout: boolean

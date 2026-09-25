@@ -1,8 +1,11 @@
+import { BACKS, backPattern, FELTS, RAINBOW } from '@river/ui'
 import { useEffect, useState } from 'react'
 import { Segmented } from '@/components/Segmented'
-import { BACKS, backPattern, FELTS, RAINBOW } from '@/lib/felt'
 import { updateSettings, useRiver } from '@/lib/river'
-import type { Fx } from '../../../shared/types'
+import type { Felt, Fx } from '../../../shared/types'
+
+// ponytail: 临时的中文名，T6 改从 i18n 取
+const FELT_NAME: Record<Exclude<Felt, 'custom'>, string> = { green: '经典绿', blue: '深海蓝', wine: '酒红', graphite: '石墨', paper: '素白' }
 
 const ON = '0 0 0 2px #fff, 0 0 0 4px #1d1d1f'
 const OFF = '0 0 0 1px rgba(0,0,0,0.14)'
@@ -23,7 +26,7 @@ export function FeltSwatches({ size = 26 }: { size?: number }) {
   return (
     <div className="flex flex-wrap gap-2">
       {FELTS.map((f) => (
-        <button key={f.k} title={f.n} onClick={() => updateSettings({ felt: f.k })} className="rounded-full" style={{ width: size, height: size, background: f.felt, boxShadow: felt === f.k ? ON : OFF }} />
+        <button key={f.k} title={FELT_NAME[f.k]} onClick={() => updateSettings({ felt: f.k })} className="rounded-full" style={{ width: size, height: size, background: f.felt, boxShadow: felt === f.k ? ON : OFF }} />
       ))}
       <label title="自定义颜色" className="relative block cursor-pointer rounded-full" style={{ width: size, height: size, background: felt === 'custom' ? custom : RAINBOW, boxShadow: felt === 'custom' ? ON : OFF }}>
         <input

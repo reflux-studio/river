@@ -1,12 +1,12 @@
 // 桌面外观与筹码的取值，照搬设计稿 River v2（脚本 395–415 行）
-import type { Back, Felt, Settings } from '../../../shared/types'
+import type { Back, Felt } from './types'
 
-export const FELTS: { k: Exclude<Felt, 'custom'>; n: string; felt: string; rail: string; dark: boolean }[] = [
-  { k: 'green', n: '经典绿', felt: 'oklch(0.47 0.1 158)', rail: '#3a2a1f', dark: true },
-  { k: 'blue', n: '深海蓝', felt: 'oklch(0.43 0.09 248)', rail: '#1b1e26', dark: true },
-  { k: 'wine', n: '酒红', felt: 'oklch(0.42 0.12 18)', rail: '#2b1b18', dark: true },
-  { k: 'graphite', n: '石墨', felt: 'oklch(0.35 0.012 260)', rail: '#131315', dark: true },
-  { k: 'paper', n: '素白', felt: '#eeeeea', rail: '#dcdcd7', dark: false }
+export const FELTS: { k: Exclude<Felt, 'custom'>; felt: string; rail: string; dark: boolean }[] = [
+  { k: 'green', felt: 'oklch(0.47 0.1 158)', rail: '#3a2a1f', dark: true },
+  { k: 'blue', felt: 'oklch(0.43 0.09 248)', rail: '#1b1e26', dark: true },
+  { k: 'wine', felt: 'oklch(0.42 0.12 18)', rail: '#2b1b18', dark: true },
+  { k: 'graphite', felt: 'oklch(0.35 0.012 260)', rail: '#131315', dark: true },
+  { k: 'paper', felt: '#eeeeea', rail: '#dcdcd7', dark: false }
 ]
 
 export const BACKS: { k: Back; c: string }[] = [
@@ -26,7 +26,7 @@ const hexLum = (h: string) => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-export function feltOf(st: Pick<Settings, 'felt' | 'feltCustom'>) {
+export function feltOf(st: { felt: Felt; feltCustom: string }) {
   if (st.felt === 'custom') return { felt: st.feltCustom, rail: `color-mix(in oklch, ${st.feltCustom}, black 62%)`, dark: hexLum(st.feltCustom) < 0.62 }
   return FELTS.find((f) => f.k === st.felt) ?? FELTS[0]
 }

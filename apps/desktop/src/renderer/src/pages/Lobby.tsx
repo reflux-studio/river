@@ -1,7 +1,6 @@
+import { Avatar, MiniCards } from '@river/ui'
 import { useEffect, useState } from 'react'
-import { Avatar } from '@/components/Avatar'
 import { Segmented } from '@/components/Segmented'
-import { MiniCards } from '@/components/PlayingCard'
 import { fmt, netColor, signed } from '@/lib/format'
 import { go, invoke, openRules, startGuided, startTable, updateLobby, useEvent, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
