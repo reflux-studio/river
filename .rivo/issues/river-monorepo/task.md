@@ -139,6 +139,8 @@
 - `pnpm dev` 下能正常打牌。
 
 **结果**：
+- 已完成，提交 `c61619f`。
+- 独立审阅见 `reviews/T2-1.md`，结论是可以完成：F1 已写入 plan 和 T3，F3 转给 T8，F4 并入 T3 的验证。
 
 ## 任务 3：抽出 @river/ui 与 TableStage
 
@@ -164,7 +166,8 @@
 - `Table.tsx` 改为使用 `<TableStage>`，把原来的“公屏”按钮和外观浮层作为 `children` 传入。
 - `index.css` 改为 `@import '@river/ui/tokens.css'`，并加上 `@source` 扫描 `packages/ui/src`。
 - `shared/types.ts`：`SeatViewPublic` 改为 `export type { SeatView as SeatViewPublic }`，同时重新导出 `Felt`、`Back`、`Fx`；`SeatView` 新增 `lastAct?: LastAct`。
-- `main/table/view.ts` 用 `lastActs` 给 `lastAct` 赋值（原来的状态文字计算不变）。
+- `main/table/view.ts` 用 `lastActs` 给 `lastAct` 赋值（原来的状态文字计算不变）。当前街为 `'showdown'` 时改为传入 `'river'`，并补一条用例：摊牌时 `lastAct` 等于河牌圈的最后动作。
+- 边界情况：全下后多余部分被退回的座位，`lastAct` 仍是 `'allin'`，但 `allin` 状态为 false。全下特效按 `allin` 状态由假变真来判断，不受影响；加注特效要求 `lastAct` 为 bet 或 raise，也不受影响。
 - `Appearance.tsx` 中的牌桌色名称，暂时在 desktop 本地用 key→中文的映射表提供，T6 再改成从 i18n 取。
 - `feltOf` 的参数类型改为 `{ felt: Felt; feltCustom: string }`，不再引用 desktop 的 `Settings`。
 - `PlayingCard.tsx` 需要拆分：卡牌组件移到 ui，`RichText` 留在 desktop（例如改名为 `components/RichText.tsx`），`CoachPanel` 改为从新位置引用。
@@ -220,7 +223,7 @@
   - 赢家延时收筹码；
   - 气泡；
   - `lite` 和 `off` 两档。
-- 和 `evidence/T1/baseline/` 中的牌桌截图对比，新截图保存到 `evidence/T3/`。
+- 和 `evidence/T1/baseline/` 中的牌桌截图对比，新截图保存到 `evidence/T3/`。这一步要在 dev 下真实开一桌、打过至少一手（补上 T2 审阅 F4）。会调用用户在 dev 数据里配置的模型，一手的费用约 ¥0.01。
 - 主进程误引 `@river/ui` 主入口时 typecheck 会失败：临时试一次，确认后撤回。
 
 **结果**：
@@ -461,6 +464,8 @@ export async function completeOnboarding(locale: Locale) {
 **目标**：用 Astro 加 React 岛实现设计稿 `River Site v2`，提供 `/` 中文和 `/en/` 英文两个页面。演示桌用 `TableStage` 自动对局，对手预设和术语来自 `@river/i18n`。
 
 **前置依赖**：T3、T5（演示桌的英文状态文字需要 T5 提供的 `handCat` 和英文术语）。
+
+**另需处理**（T2 审阅 F3）：engine 的 tsconfig 为了测试开启了 Node 类型，src 里误用 Node API 时类型检查不会报错。官网在浏览器中运行 engine，所以本任务要把 engine 的 src 和 test 拆成两个 tsconfig，src 不带 Node 类型；也可以用 `astro check` 覆盖到 engine 源码。
 
 **修改位置**：
 - `apps/site/{package.json,astro.config.mjs,tsconfig.json}`；
