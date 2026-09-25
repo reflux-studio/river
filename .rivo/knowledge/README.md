@@ -1,24 +1,55 @@
 # River 项目知识
 
-本页记录 River 桌面应用的**当前实现**，以及以后改动时要守住的约束。内容已对照代码与测试核实。
-- 系统结构、信息隔离、Agent 运行规则三节核实于 2026-09-25，对应 `main` @ 3ba346c，加上 unified-agent 的改动。
+本页记录 River（桌面应用与官网）的**当前实现**，以及以后改动时要守住的约束。内容已对照代码与测试核实。
+- 仓库结构与包边界、i18n、系统结构、打包与发布四节核实于 2026-09-26，对应 `feat/monorepo-site-i18n` @ 05395c3（river-monorepo T1–T8）。
+- 信息隔离、Agent 运行规则两节核实于 2026-09-25，对应 `main` @ 3ba346c，加上 unified-agent 的改动；文件已随迁移移到 `apps/desktop/src/main/`，规则未变。
 - 其余各节核实于 2026-09-24，对应 v0.1.0。
 
 方案推导见交付材料：
 - v1：[river-desktop](../issues/river-desktop/)
 - v2：`../issues/river-v2/`
 - 统一 Agent 上下文：`../issues/unified-agent/`
+- monorepo、官网与中英双语：`../issues/river-monorepo/`
+
+## 仓库结构与包边界
+
+pnpm workspace（`pnpm-workspace.yaml`：`apps/*`、`packages/*`），不用 Turborepo，编排只靠 `pnpm -r` 与 `--filter`：
+
+```
+apps/desktop     Electron 应用（包名仍是 river，appId/版本/发布配置未变）
+apps/site        官网，Astro 静态站 + React 岛
+packages/engine  @river/engine  规则、牌型评估、lastActs、fmt/signed、Card/Street 等类型
+packages/ui      @river/ui      TableStage、座位、卡牌、筹码、特效、felt、tokens.css；子路径 ./types
+packages/i18n    @river/i18n    Locale、字典、扑克术语、对手预设、系统提示词
+
+依赖只能向下（ADR-007）：
+  desktop main/shared ─► engine、i18n、@river/ui/types（仅类型）
+  desktop renderer    ─► ui、i18n、engine
+  site                ─► ui、i18n、engine
+  ui ─► engine        i18n ─► engine（仅类型）        engine ─► 无
+```
+
+- **包没有构建步骤**：`exports` 直接指向 `src/*.ts`，由使用方的 Vite / electron-vite 编译。desktop 把三个包写在 `devDependencies`（`workspace:*`），electron-vite 把它们打进 bundle，electron-builder 的运行时依赖清单不受影响。
+- **边界**：ui 只放纯展示组件（不碰 IPC、store，不写文案）；i18n 只放固定内容；engine 只放规则。官网演示桌的机器人在 `apps/site/src/sim/`，不属于 engine。
+- **主进程只能引用 `@river/ui/types`**：守卫是 `apps/desktop/tsconfig.node.json` 不开 `jsx`，误引 ui 主入口时 typecheck 报错。要给它开 jsx，先换守卫（ADR-007）。
+- **根脚本**（根 `package.json` 只放编排，保留 `packageManager: pnpm@11.22.0` 供 CI 的 `pnpm/action-setup` 取版本）：`dev`、`dist`（`--filter ./apps/desktop`）、`dev:site`、`build:site`、`typecheck`/`test`（`pnpm -r`）。每个包都有 `typecheck` 与 `test`；desktop 分别检查 `tsconfig.node.json`、`tsconfig.web.json`，官网用 `astro check`。
+
+## i18n
+
+- **语言只选一次**：新用户在引导页第一页选择（预选值按系统语言，`zh*` 为中文，否则英文），`onboarding.done(locale)` 写入；之后 `settings.update` 带 `locale` 会被拒绝（`apps/desktop/src/main/ipc.ts`）。从设置页重看规则介绍时没有语言页。已完成引导但库里没有 `locale` 的老用户固定为 `zh`（`db/index.ts`）。选英文且币种仍是人民币时改为美元。
+- **固定内容双语**，都在 `@river/i18n`：界面文案、主进程模板文字、系统提示词与局面描述（提示词写明回复语言）、对手预设种子。取字典用 `dict(locale)`；`en` 的类型是 `typeof zh`，缺词在 typecheck 时报错。
+- **动态内容保持生成时的快照**，不随语言翻译：选定后的对手预设、用户写的内容、模型输出、历史记录。
+- **官网**：中文 `/`、英文 `/en/`，文案在 `apps/site/src/i18n/site.ts`，术语与预设同样取自 `@river/i18n`。
 
 ## 系统结构
 
-River 是单人对 AI 的德州扑克教学应用，基于 Electron，分主进程和界面两部分：
+River 是单人对 AI 的德州扑克教学应用，基于 Electron，分主进程和界面两部分（下列路径相对 `apps/desktop/src/main/`；规则引擎在 `packages/engine/src/`）：
 
 ```
 Renderer（React + shadcn/ui）         只持有 UI 状态，展示主进程推送的 TableView
    │  preload：window.river.invoke(命令) / on(事件)
 Main（Node，ESM）
-   ├ engine/table.ts     规则引擎：发牌、下注轮、边池、摊牌
-   ├ engine/eval.ts      牌型评估、随机牌胜率（蒙特卡洛）、改进牌
+   ├ @river/engine       table.ts 规则引擎（发牌、下注轮、边池、摊牌）；eval.ts 牌型评估、随机牌胜率（蒙特卡洛）、改进牌
    ├ table/runner.ts     TableRunner：牌局与各 Agent thread 的唯一写入者，负责调度、落库、赛后发言
    ├ table/text.ts       按视角生成给模型的文字（局面、往手摘要、复盘摘要）与落库记录
    ├ table/view.ts       引擎状态 → TableView（按玩家视角裁剪）
@@ -27,13 +58,14 @@ Main（Node，ESM）
    ├ agents/opponent.ts  对手：act（出牌）、talk（赛后发言）
    ├ agents/coach.ts     教练：讲解、回答（流式），recap（复盘）
    ├ models/resolve.ts   用户配置的提供方 → 模型；连接测试记录是否支持强制调用工具
-   └ db/index.ts         river_* 业务表与缓存，river.db 唯一写入方（ADR-004）
+   ├ db/index.ts         river_* 业务表与缓存，river.db 唯一写入方（ADR-004）
+   └ updater.ts          electron-updater：仅打包版运行，每 6 小时后台检查并自动下载；设置页可手动检查（update.check）
         ↓
  <userData>/river.db     只有业务层读写；旧版遗留的 mastra_* 表不读也不删
 ```
 
 - **userData 位置**：打包版是 `~/Library/Application Support/River`；开发（`pnpm dev`）是 `River-dev`。开发时的数据不会进入正式目录。
-- **进程间契约**：命令和事件的名称与负载都定义在 `src/shared/types.ts` 的 `Commands`、`Events` 里。
+- **进程间契约**：命令和事件的名称与负载都定义在 `apps/desktop/src/shared/types.ts` 的 `Commands`、`Events` 里。
   - 界面要先注册事件监听，再调用 `app.bootstrap`。
   - 牌桌状态只经 `table:view` 推送。
 
@@ -83,12 +115,16 @@ Main（Node，ESM）
 
 ## 打包与发布
 
-- **打包配置**：electron-builder，按宿主平台出包。
-  - macOS：arm64 dmg，ad-hoc 签名，关闭 hardened runtime。
+- **打包配置**：`apps/desktop/electron-builder.yml`，按宿主平台出包，产物在 `apps/desktop/dist/`。
+  - macOS：arm64 dmg + zip（zip 供自动更新）。本地构建 ad-hoc 签名；CI 用固定自签证书 `River Self Signed` 签名（river-v2 ADR-005），关闭 hardened runtime。
   - Windows：x64 nsis。
   - Linux：x64 AppImage。
 - **libsql 原生模块**：需要 `asarUnpack`。它只按宿主平台安装，所以不能交叉打包，每个平台都在自己的 GitHub Actions runner 上构建（`.github/workflows/build.yml`）。
-- **CI 流程**：推送 `v*` 标签后，先测试，再三平台构建，最后生成草稿 Release。只用 `GITHUB_TOKEN`，不需要额外密钥。
+- **CI**（`.github/workflows/`）：
+  - `ci.yml`：PR 和推送到 `main` 时，在 ubuntu 上根目录执行 `pnpm install --frozen-lockfile`、`pnpm typecheck`、`pnpm test`。
+  - `build.yml`：推送 `v*` 标签或手动触发。根目录安装与测试；打包步骤在 `apps/desktop` 下执行，版本号取自标签（手动触发时取 `apps/desktop/package.json`），macOS 从 Secrets `MAC_CERT_P12`/`MAC_CERT_PASSWORD` 导入证书并断言签名身份；上传 `apps/desktop/dist/*` 的安装包、blockmap、`latest*.yml`。标签触发时发布为正式 Release（非草稿，electron-updater 看不到草稿）。
+  - `site.yml`：推送到 `main` 且改动命中 `apps/site/**`、`packages/**`、`pnpm-lock.yaml`，或手动触发。全仓 typecheck、test 后 `pnpm build:site`，把 `apps/site/dist` 发布到 GitHub Pages（需在仓库 Settings → Pages 把来源设为 GitHub Actions）。
+- **官网**：`https://reflux-studio.github.io/river/`（`astro.config` 的 `site` + `base: '/river'`，换自定义域名时改这两项并加 CNAME）。下载区运行时请求 GitHub Releases 的 latest，按 `apps/site/src/lib/store.ts` 的 `ASSET` 匹配安装包名，改 `artifactName` 时要同步。官网发布失败不影响 app 发版。
 - **macOS 签名的坑**：`identity: null` 会留下残缺的签名，带下载隔离标记时系统直接提示“已损坏”，而且没有放行入口。ad-hoc 签名走的则是可以手动放行的“无法验证开发者”流程。ad-hoc 签名再加 hardened runtime，会让库校验拦下 libsql 的 `.node` 文件。
 - **pnpm 11**：必须用默认的 isolated 布局。hoisted 布局下，electron-builder 26 收集依赖时会装错嵌套版本。
 
@@ -103,6 +139,8 @@ Main（Node，ESM）
   - 880px 宽展开公屏时，座位会被裁切。
 
 ## 依据
+
+- monorepo：[plan](../issues/river-monorepo/plan.md)、[task](../issues/river-monorepo/task.md)、[ADR-007 包边界](../issues/river-monorepo/adr/007-monorepo-package-boundaries.md)；自动更新与签名：[river-v2 ADR-005](../issues/river-v2/adr/005-self-signed-auto-update.md)
 
 - 交付材料：[plan](../issues/river-desktop/plan.md)、[task 各任务结果](../issues/river-desktop/task.md)、[调查笔记](../issues/river-desktop/note.md)
 - ADR：[001 引擎在主进程](../issues/river-desktop/adr/001-engine-in-main-process.md)、[002 不用 Workflow](../issues/river-desktop/adr/002-no-mastra-workflow.md)、[003 单文件 SQLite](../issues/river-desktop/adr/003-single-sqlite-storage.md)

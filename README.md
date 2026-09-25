@@ -4,6 +4,8 @@
 
 技术栈：Electron（electron-vite）· React + shadcn/ui · Mastra · SQLite（libSQL）。
 
+官网：<https://reflux-studio.github.io/river/>（中文）、[/en/](https://reflux-studio.github.io/river/en/)（英文）。
+
 ## 下载
 
 在 [Releases](https://github.com/reflux-studio/river/releases) 下载对应平台的安装包：macOS（Apple Silicon）`.dmg`、Windows `-setup.exe`、Linux `.AppImage`。
@@ -25,9 +27,11 @@ pnpm dev          # 开发运行桌面端（apps/desktop），数据写在 River
 pnpm typecheck    # 所有包的类型检查
 pnpm test         # 所有包的测试
 pnpm dist         # 打当前平台的安装包到 apps/desktop/dist/
+pnpm dev:site     # 开发运行官网（apps/site）
+pnpm build:site   # 构建官网到 apps/site/dist/
 ```
 
-仓库是 pnpm workspace：桌面应用在 `apps/desktop`，只针对它执行命令时可用 `pnpm --filter ./apps/desktop <脚本>`。
+仓库是 pnpm workspace：桌面应用在 `apps/desktop`，官网在 `apps/site`（Astro），共享包在 `packages/`（`@river/engine`、`@river/ui`、`@river/i18n`）。只针对某个包执行命令时可用 `pnpm --filter ./apps/desktop <脚本>`。
 
 ## 发布
 
@@ -42,4 +46,6 @@ macOS 自动更新要求新旧版本由同一证书签名。第一次发布前�
 
 本地 `pnpm dist` 使用 ad-hoc 签名，只用于自测。
 
-设计与实施过程记录在 `.rivo/issues/river-desktop/` 和 `.rivo/issues/river-v2/`。
+官网由 `.github/workflows/site.yml` 在 `main` 上自动发布到 GitHub Pages（仓库 Settings → Pages 的来源需设为 GitHub Actions）；PR 和 `main` 上的检查见 `ci.yml`。
+
+设计与实施过程记录在 `.rivo/issues/` 下（`river-desktop`、`river-v2`、`river-monorepo` 等）。
