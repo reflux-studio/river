@@ -1,6 +1,6 @@
 // 牌型评估与概率：逐函数移植自原型 design-source/poker.js（与原型对照测试见 test/engine.test.ts）
 
-import type { Card } from '../../shared/types'
+import type { Card } from './types'
 
 export type Rng = () => number
 

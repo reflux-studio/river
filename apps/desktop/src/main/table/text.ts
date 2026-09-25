@@ -2,8 +2,7 @@
 import { cardsText as cards, fmt, signed } from '../../shared/format'
 import { STREET } from '../../shared/personas'
 import type { ChatMessage, HandLogEntry, HandRecord, Mode } from '../../shared/types'
-import { handName } from '../engine/eval'
-import type { LogEntry, Table } from '../engine/table'
+import { handName, type LogEntry, type Table } from '@river/engine'
 
 export interface SeatInfo {
   id: string

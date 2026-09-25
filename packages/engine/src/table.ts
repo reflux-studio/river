@@ -4,7 +4,7 @@
 // 2. 平分底池的余数从按钮左侧起逐枚分配
 // 3. 无人跟注的下注在本轮结束时退回，不计入赢得
 
-import type { Card, Street } from '../../shared/types'
+import type { Card, Street } from './types'
 import { best, FULL, handName, shuffle, type Rng } from './eval'
 
 export type ActionType = 'fold' | 'check' | 'call' | 'bet' | 'raise'

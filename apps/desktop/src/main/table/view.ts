@@ -2,7 +2,7 @@
 // 亮牌规则：摊牌时未弃牌者亮牌；教练局一手结束后所有人亮牌（弃牌者标 mucked）
 import { fmt, signed } from '../../shared/format'
 import type { CoachState, Cost, Legal, Mode, SeatViewPublic, TableView } from '../../shared/types'
-import type { Table } from '../engine/table'
+import type { Table } from '@river/engine'
 import { label, type SeatInfo } from './text'
 
 export interface Nums {

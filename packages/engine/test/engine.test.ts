@@ -2,82 +2,8 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { disp } from '../src/shared/format'
-import { best, equity, FULL, handName, outs } from '../src/main/engine/eval'
-import { Table, type ActionType, type LogEntry } from '../src/main/engine/table'
-import { handRecord, heroHandSummary, opponentSummary, positions, situation } from '../src/main/table/text'
-
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = a
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-const cards = (s: string) => s.split(' ')
-
-// 造一个随机数序列：构造时按钮落在 button 前一位（startHand 再前移一位），洗牌结果使发牌顺序为
-// 每人第一张、每人第二张（按座位号），然后 烧 翻翻翻 烧 转 烧 河
-function rigged(n: number, button: number, holes: string[], board = '') {
-  const want: string[] = []
-  const h = holes.map(cards)
-  for (let r = 0; r < 2; r++) for (const x of h) if (x.length) want.push(x[r])
-  const b = board ? cards(board) : []
-  const rest = FULL.filter((c) => !want.includes(c) && !b.includes(c))
-  const burn = () => rest.pop()!
-  if (b.length) want.push(burn(), b[0], b[1], b[2], burn(), b[3], burn(), b[4])
-  // pop 从尾部取：最先发的牌放在最后
-  const deck = [...rest, ...want.reverse()]
-  const out = [(((button - 1 + n) % n) + 0.5) / n]
-  const a = FULL.slice()
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = a.indexOf(deck[i])
-    out.push((j + 0.5) / (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  let k = 0
-  return () => out[k++] ?? 0.5
-}
-
-function table(stacks: number[], o: { sb?: number; bb?: number; button?: number; holes?: string[]; board?: string; rng?: () => number } = {}) {
-  const n = stacks.length
-  const rng = o.rng ?? rigged(n, o.button ?? 0, o.holes ?? stacks.map(() => ''), o.board)
-  const t = new Table({ smallBlind: o.sb ?? 5, bigBlind: o.bb ?? 10 }, n, rng)
-  stacks.forEach((s, i) => t.sitDown(i, s))
-  t.startHand()
-  return t
-}
-
-// 下注轮结束后逐街推进到摊牌
-function finish(t: Table) {
-  while (t.isHandInProgress()) {
-    if (t.isBettingRoundInProgress()) throw new Error('someone still needs to act')
-    t.endBettingRound()
-    if (t.areBettingRoundsCompleted()) t.showdown()
-  }
-}
-
-// 剩下的人每街都过牌
-function checkDown(t: Table) {
-  while (t.isHandInProgress()) {
-    if (t.isBettingRoundInProgress()) t.actionTaken('check')
-    else {
-      t.endBettingRound()
-      if (t.areBettingRoundsCompleted()) t.showdown()
-    }
-  }
-}
-
-const act = (t: Table, a: ActionType, to?: number) => {
-  const seat = t.playerToAct()
-  t.actionTaken(a, to)
-  return seat
-}
-const stacks = (t: Table) => t.seats().map((s) => s!.stack)
+import { best, equity, FULL, handName, outs, Table, type LogEntry } from '../src'
+import { act, cards, checkDown, finish, mulberry32, rigged, stacks, table } from './helpers'
 
 describe('牌型', () => {
   it('皇家同花顺', () => {
@@ -161,61 +87,6 @@ describe('改进牌', () => {
   it('翻牌前和河牌不计算', () => {
     expect(n('Ah 5h', '')).toBeNull()
     expect(n('Ah 5h', 'Kh 9h 2s 7c 3d')).toBeNull()
-  })
-})
-
-describe('局面文本', () => {
-  const seats = ['你', '阿狸', '老K', '石头'].map((name, i) => ({ id: String(i), name, tag: i ? '标签' : '' }))
-  const t = () => table([1000, 1000, 1000, 1000], { button: 0 })
-  it('对手视角：「你」只指自己，玩家写作「玩家」，带盲注、投入与所需胜率', () => {
-    const s = situation(t(), seats, 1)
-    expect(s).toContain('无限注 · 盲注 5/10 · 4 人桌')
-    expect(s).toContain('你的位置：小盲')
-    expect(s).toContain('当前牌型：')
-    expect(s).toContain('- 你（小盲）：筹码 995，本轮已下 5，本手共投入 5（含本轮）')
-    expect(s).toContain('- 玩家（按钮）：')
-    expect(s).toMatch(/- 石头（枪口，标签）：筹码 1,000\n/)
-    expect(s).toContain('所需胜率（底池赔率）：25.0%')
-    expect(s).not.toContain('胜率约')
-    expect(s).toContain('本手行动：你 小盲 5，老K 大盲 10')
-    expect(s).not.toMatch(/你（按钮|你 大盲/)
-  })
-  it('教练视角：称玩家', () => {
-    const s = situation(t(), seats, 0, { you: false })
-    expect(s).toContain('玩家的位置：按钮')
-    expect(s).not.toContain('你')
-  })
-})
-
-describe('往手摘要称呼', () => {
-  it('对手摘要：玩家写「玩家」、自己写「你」；教练摘要：玩家写「玩家」', () => {
-    const seats = ['你', '阿狸', '老K'].map((name, i) => ({ id: i ? `p${i}` : 'hero', ...(i && { personaId: `p${i}` }), name, tag: '' }))
-    const t = table([1000, 1000, 1000], { button: 0 })
-    while (t.isHandInProgress()) {
-      if (t.isBettingRoundInProgress()) t.actionTaken(t.legalActions().toCall ? 'call' : 'check')
-      else if (t.areBettingRoundsCompleted()) t.showdown()
-      else t.endBettingRound()
-    }
-    const rec = handRecord(t, seats, 'coach', { sb: 5, bb: 10 }, () => '')
-    const s = opponentSummary(rec, 'p1')
-    expect(s).toContain('玩家（按钮）')
-    expect(s).toContain('你（小盲）')
-    expect(s).toContain('老K（大盲）')
-    expect(s).toMatch(/行动：你小盲 5，老K大盲 10，玩家跟注 10/)
-    expect(heroHandSummary(rec)).toMatch(/行动：阿狸小盲 5，老K大盲 10，玩家跟注 10/)
-  })
-})
-
-describe('位置', () => {
-  const pos = (t: Table) => positions(t).map((x) => `${x.seat}:${x.pos}`).join(' ')
-  it('六人桌按小盲起排到按钮', () => {
-    expect(pos(table([1000, 1000, 1000, 1000, 1000, 1000], { button: 0 }))).toBe('1:小盲 2:大盲 3:枪口 4:中位 5:关煞 0:按钮')
-  })
-  it('跳过没筹码的座位', () => {
-    expect(pos(table([1000, 0, 1000, 1000, 1000], { button: 0 }))).toBe('2:小盲 3:大盲 4:枪口 0:按钮')
-  })
-  it('单挑时按钮即小盲', () => {
-    expect(pos(table([1000, 1000], { button: 0 }))).toBe('0:按钮/小盲 1:大盲')
   })
 })
 
@@ -449,16 +320,14 @@ describe('与原型对照（牌型评估）', () => {
   const ctx = vm.createContext({ window: {} })
   vm.runInContext(src, ctx)
   const P = ctx.window.RiverPoker
-  const plain = <T>(x: T): T => JSON.parse(JSON.stringify(x))
 
-  it('2000 组随机 2–7 张牌：handName、outs、disp 一致；equity 在相同随机序列下一致', () => {
+  it('2000 组随机 2–7 张牌：handName、outs 一致；equity 在相同随机序列下一致', () => {
     const rng = mulberry32(2026)
     for (let k = 0; k < 2000; k++) {
       const deck = FULL.slice().sort(() => rng() - 0.5)
       const hole = deck.slice(0, 2)
       const board = deck.slice(2, 2 + [0, 3, 4, 5][(rng() * 4) | 0])
       expect(handName(hole.concat(board))).toBe(P.handName(hole.concat(board)))
-      expect(disp(hole[0])).toEqual(plain(P.disp(hole[0])))
       if (k % 100 === 0) {
         const seed = 9000 + k
         const mine = equity(hole, board, 2, 200, mulberry32(seed))

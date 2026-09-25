@@ -1,7 +1,7 @@
+import type { Card, Street } from '@river/engine'
 import type { Currency } from './currency'
 
-export type Card = string
-export type Street = 'preflop' | 'flop' | 'turn' | 'river' | 'showdown'
+export type { Card, Street }
 // 教练局：教练每步先说、一手结束亮全部底牌并复盘；自由局只有概率面板
 export type Mode = 'coach' | 'free'
 

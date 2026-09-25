@@ -9,8 +9,7 @@ import { Thread } from '../agents/thread'
 import {
   addMemory, getBankroll, getHand, handKeyOf, insertHand, insertUsage, memoryOf, personasCache, personaOf, saveReview, setBankroll, settingsCache, type UsageRow
 } from '../db'
-import { equity, handName, outs } from '../engine/eval'
-import { Table, type ActionType } from '../engine/table'
+import { equity, handName, outs, Table, type ActionType } from '@river/engine'
 import { costTotal } from '../models/prices'
 import { modelReady } from '../models/resolve'
 import { chatBlock, handRecord, heroHandSummary, label, opponentSummary, situation } from './text'
