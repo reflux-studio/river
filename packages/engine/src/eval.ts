@@ -1,13 +1,13 @@
 // 牌型评估与概率：逐函数移植自原型 design-source/poker.js（与原型对照测试见 test/engine.test.ts）
 
-import type { Card } from './types'
+import type { Card, HandCat } from './types'
 
 export type Rng = () => number
 
 const R = '23456789TJQKA'
 export const FULL: Card[] = []
 for (const r of R) for (const s of 'shdc') FULL.push(r + s)
-const CAT = ['高牌', '一对', '两对', '三条', '顺子', '同花', '葫芦', '四条', '同花顺']
+const CAT: HandCat[] = ['highCard', 'pair', 'twoPair', 'trips', 'straight', 'flush', 'fullHouse', 'quads', 'straightFlush']
 export const shuffle = <T>(a: T[], rng: Rng): T[] => { for (let i = a.length - 1; i > 0; i--) { const j = rng() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]] } return a }
 const rv = (c: Card) => R.indexOf(c[0]) + 2
 const combCache: Record<number, number[][]> = {}
@@ -47,10 +47,10 @@ export function best(cs: Card[]): number {
   return b
 }
 const catOf = (s: number) => Math.floor(s / 759375)
-export function handName(cs: Card[]): string {
-  if (cs.length < 5) return cs[0][0] === cs[1][0] ? '口袋对子' : (cs[0][1] === cs[1][1] ? '同花底牌' : '高牌')
+export function handCat(cs: Card[]): HandCat {
+  if (cs.length < 5) return cs[0][0] === cs[1][0] ? 'pocketPair' : (cs[0][1] === cs[1][1] ? 'suitedHole' : 'highCard')
   const s = best(cs), c = catOf(s)
-  if (c === 8 && Math.floor(s / 50625) % 15 === 14) return '皇家同花顺'
+  if (c === 8 && Math.floor(s / 50625) % 15 === 14) return 'royalFlush'
   return CAT[c]
 }
 function looseCat(cards: Card[]): number {

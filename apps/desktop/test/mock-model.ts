@@ -6,11 +6,15 @@ export interface Step {
   error?: string
 }
 
-type Options = { tools?: { name: string }[]; toolChoice?: unknown; abortSignal?: AbortSignal; prompt?: { role: string; content: unknown }[] }
+type ToolDef = { name: string; description?: string; inputSchema?: unknown }
+type Options = { tools?: ToolDef[]; toolChoice?: unknown; abortSignal?: AbortSignal; prompt?: { role: string; content: unknown }[] }
 const usage = { inputTokens: 1, outputTokens: 1, totalTokens: 2 }
 
-export function scriptModel(steps: Step[]) {
-  const calls: { tools: string[]; toolChoice: unknown; system: string; messages: number; prompt: { role: string; content: unknown }[] }[] = []
+type Call = { tools: string[]; toolDefs: ToolDef[]; toolChoice: unknown; system: string; messages: number; prompt: { role: string; content: unknown }[] }
+
+// steps 为函数时按本次调用现场生成（随机压测用）
+export function scriptModel(steps: Step[] | ((call: Call) => Step)) {
+  const calls: Call[] = []
   let i = 0
   const model = {
     specificationVersion: 'v2',
@@ -39,12 +43,14 @@ export function scriptModel(steps: Step[]) {
   async function next(options: Options): Promise<Step> {
     calls.push({
       tools: (options.tools ?? []).map((t) => t.name),
+      toolDefs: (options.tools ?? []).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
       toolChoice: options.toolChoice,
       system: (options.prompt ?? []).filter((m) => m.role === 'system').map((m) => String(m.content)).join('\n'),
       messages: (options.prompt ?? []).filter((m) => m.role !== 'system').length,
       prompt: (options.prompt ?? []).filter((m) => m.role !== 'system')
     })
-    const step = steps[i++] ?? { text: 'ok' }
+    const step = (typeof steps === 'function' ? steps(calls.at(-1)!) : steps[i]) ?? { text: 'ok' }
+    i++
     if (step.delayMs) {
       await new Promise<void>((resolve, reject) => {
         const t = setTimeout(resolve, step.delayMs)

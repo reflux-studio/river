@@ -2,14 +2,16 @@
 // 亮牌规则：摊牌时未弃牌者亮牌；教练局一手结束后所有人亮牌（弃牌者标 mucked）
 import { fmt, signed } from '../../shared/format'
 import type { CoachState, Cost, Legal, Mode, SeatViewPublic, TableView } from '../../shared/types'
-import { lastActs, type Table } from '@river/engine'
+import { lastActs, type HandCat, type Table } from '@river/engine'
+import { dict } from '@river/i18n'
+import { settingsCache } from '../db'
 import { label, type SeatInfo } from './text'
 
 export interface Nums {
   eq: number
   need: number
   outs: number | null
-  handName: string
+  handCat: HandCat
 }
 
 export type SeatDisplay = SeatInfo & { ini: string; hue: number }
@@ -46,6 +48,8 @@ export function heroLegal(t: Table): Legal {
 }
 
 export function buildTableView(s: ViewState): TableView {
+  const d = dict(settingsCache.locale)
+  const T = d.desktop.table
   const t = s.table
   const inHand = t.isHandInProgress()
   const done = s.started && !inHand
@@ -58,7 +62,7 @@ export function buildTableView(s: ViewState): TableView {
   const won = new Map<number, number>()
   if (done) for (const w of t.winners()) won.set(w.seat, (won.get(w.seat) ?? 0) + w.amount)
   const handNames = new Map<number, string>()
-  if (done) for (const w of t.winners()) if (w.handName) handNames.set(w.seat, w.handName)
+  if (done) for (const w of t.winners()) if (w.handCat) handNames.set(w.seat, d.poker.hand[w.handCat])
   // 当前街上各座位最近一次行动
   const lastBoard = log.map((e) => 'board' in e).lastIndexOf(true)
   const last = new Map<number, string>()
@@ -75,12 +79,12 @@ export function buildTableView(s: ViewState): TableView {
     const win = won.get(i)
     let status = ''
     let statusTone: SeatViewPublic['statusTone'] = 'muted'
-    if (thinking) (status = '思考中…'), (statusTone = 'blue')
-    else if (win) (status = `赢得 ${fmt(win)}${handNames.get(i) ? ' · ' + handNames.get(i) : ''}`), (statusTone = 'green')
-    else if (p.out) status = '旁观'
-    else if (p.folded) (status = '已弃牌'), (statusTone = 'dark')
-    else if (p.allIn) (status = '已全下'), (statusTone = 'red')
-    else if (i === 0 && heroTurn) (status = '轮到你'), (statusTone = 'blue')
+    if (thinking) (status = T.thinking), (statusTone = 'blue')
+    else if (win) (status = T.won(fmt(win), handNames.get(i) ?? '')), (statusTone = 'green')
+    else if (p.out) status = T.out
+    else if (p.folded) (status = T.folded), (statusTone = 'dark')
+    else if (p.allIn) (status = T.allin), (statusTone = 'red')
+    else if (i === 0 && heroTurn) (status = T.yourTurn), (statusTone = 'blue')
     else if (inHand) status = last.get(i) ?? ''
     const h = holes[i]
     const reveal = i === 0 || (showdown && !p.folded) || (done && s.mode === 'coach')
@@ -117,7 +121,7 @@ export function buildTableView(s: ViewState): TableView {
   const clamp = (x: number) => Math.max(L.minTo, Math.min(L.maxTo, x))
   const cur = t.currentBet()
   const presets = (
-    [['⅓ 池', 0.33], ['½ 池', 0.5], ['¾ 池', 0.75], ['满池', 1], ['全下', null]] as const
+    [[T.presets.third, 0.33], [T.presets.half, 0.5], [T.presets.threeQuarters, 0.75], [T.presets.pot, 1], [T.presets.allin, null]] as const
   ).map(([lab, f]) => ({ label: lab, to: f === null ? L.maxTo : clamp(cur + r((total + L.toCall) * f)) }))
   const defaultRaiseTo = L.canRaise ? clamp(cur === 0 ? r(total * 0.5) : r(cur * 2.5)) : 0
 
@@ -128,15 +132,15 @@ export function buildTableView(s: ViewState): TableView {
     const hw = won.get(0)
     const names = [...won.keys()].map((i) => s.seats[i].name)
     result = {
-      text: hw ? `你赢得 ${fmt(hw)}${handNames.get(0) ? ' · ' + handNames.get(0) : ''}` : `${names.join('、')} 赢下这一手`,
-      sub: `本手 ${signed(net)}${s.mode === 'coach' ? ' · 教练复盘见右侧' : ''}`,
+      text: hw ? T.heroWon(fmt(hw), handNames.get(0) ?? '') : T.othersWon(names.join(T.nameSep)),
+      sub: T.sub(signed(net), s.mode === 'coach'),
       heroWon: !!hw,
       net
     }
   }
   return {
     mode: s.mode,
-    title: `无限注 · ${smallBlind}/${bb} · ${s.seats.length} 人桌`,
+    title: T.title(smallBlind, bb, s.seats.length),
     bb,
     handNo: t.handNumber(),
     street: s.started ? t.roundOfBetting() : 'idle',

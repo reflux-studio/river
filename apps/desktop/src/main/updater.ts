@@ -2,6 +2,8 @@
 // 后台下载，下载完提示“重启更新”，只在不在牌桌上时安装
 import { app } from 'electron'
 import electronUpdater from 'electron-updater'
+import { dict } from '@river/i18n'
+import { settingsCache } from './db'
 import type { Emit } from './table/runner'
 
 const { autoUpdater } = electronUpdater
@@ -27,6 +29,6 @@ export function initUpdater(emit: Emit) {
 export const readyVersion = () => ready
 
 export function installUpdate() {
-  if (!ready) throw new Error('没有已下载的新版本')
+  if (!ready) throw new Error(dict(settingsCache.locale).desktop.error.noUpdate)
   autoUpdater.quitAndInstall()
 }

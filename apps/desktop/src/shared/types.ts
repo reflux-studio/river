@@ -1,9 +1,9 @@
-import type { Card, Street } from '@river/engine'
+import type { Card, HandCat, Street } from '@river/engine'
 import type { Locale, PersonaSeed } from '@river/i18n'
 import type { Back, Felt, Fx, SeatView } from '@river/ui/types'
 import type { Currency } from './currency'
 
-export type { Card, Street, Back, Felt, Fx }
+export type { Card, HandCat, Street, Back, Felt, Fx }
 export type { SeatView as SeatViewPublic }
 // 教练局：教练每步先说、一手结束亮全部底牌并复盘；自由局只有概率面板
 export type Mode = 'coach' | 'free'
@@ -46,6 +46,8 @@ export interface ChatMessage {
   act?: string
   // 系统消息附带的公共牌（翻牌、转牌、河牌）
   cards?: Card[]
+  // 只在 kind === 'sys' 时有值：Agent 按它挑出分手与重新买入，不依赖文字语言
+  sysKind?: 'hand' | 'rebuy' | 'street' | 'seat' | 'win'
   at: number
 }
 
@@ -178,7 +180,7 @@ export interface TableView {
   runout: boolean
   result: { text: string; sub: string; heroWon: boolean; net: number } | null
   heroBust: boolean
-  nums: { eq: number; need: number; outs: number | null; handName: string; stale: boolean } | null
+  nums: { eq: number; need: number; outs: number | null; handCat: HandCat; stale: boolean } | null
   // 对手模型调用失败，牌局停下
   stalled: { name: string; error: string; settings: boolean } | null
   coach: CoachState | null

@@ -2,19 +2,19 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { best, equity, FULL, handName, outs, Table, type LogEntry } from '../src'
+import { best, equity, FULL, handCat, outs, Table, type HandCat, type LogEntry } from '../src'
 import { act, cards, checkDown, finish, mulberry32, rigged, stacks, table } from './helpers'
 
 describe('牌型', () => {
   it('皇家同花顺', () => {
-    expect(handName(cards('As Ks Qs Js Ts 2d 3c'))).toBe('皇家同花顺')
+    expect(handCat(cards('As Ks Qs Js Ts 2d 3c'))).toBe('royalFlush')
   })
   it('同花顺胜过四条', () => {
-    expect(handName(cards('9h 8h 7h 6h 5h 9d 9c'))).toBe('同花顺')
+    expect(handCat(cards('9h 8h 7h 6h 5h 9d 9c'))).toBe('straightFlush')
     expect(best(cards('9h 8h 7h 6h 5h 9d 9c'))).toBeGreaterThan(best(cards('9s 9h 9d 9c Kd')))
   })
   it('A-5 顺子是最小顺子', () => {
-    expect(handName(cards('Ah 2d 3c 4s 5h'))).toBe('顺子')
+    expect(handCat(cards('Ah 2d 3c 4s 5h'))).toBe('straight')
     expect(best(cards('Ah 2d 3c 4s 5h'))).toBeLessThan(best(cards('2d 3c 4s 5h 6d')))
     expect(best(cards('Ah 2d 3c 4s 5h'))).toBeGreaterThan(best(cards('Ah Ad Ac Ks Qd')))
   })
@@ -156,7 +156,7 @@ describe('规则修正', () => {
     act(t, 'fold')
     finish(t)
     // 座位 0 赢得盲注 15，退回自己多出的 290
-    expect(t.winners()).toEqual([{ pot: 0, seat: 0, amount: 25, handName: null }])
+    expect(t.winners()).toEqual([{ pot: 0, seat: 0, amount: 25, handCat: null }])
     expect(stacks(t)).toEqual([1015, 995, 990])
     expect(t.handLog().filter((e): e is Extract<LogEntry, { seat: number }> => 'seat' in e && e.type === 'return')).toEqual([
       { street: 'preflop', seat: 0, type: 'return', amount: 290, allIn: false }
@@ -170,7 +170,7 @@ describe('规则修正', () => {
     act(t, 'raise', 10000)
     act(t, 'call')
     finish(t)
-    expect(t.winners()).toEqual([{ pot: 0, seat: 1, amount: 4000, handName: '一对' }])
+    expect(t.winners()).toEqual([{ pot: 0, seat: 1, amount: 4000, handCat: 'pair' }])
     expect(stacks(t)).toEqual([8000, 4000, 1000])
   })
 
@@ -186,7 +186,7 @@ describe('规则修正', () => {
     // 底池 14*3 + 2 = 44，三人平分：每人 14，余 2 从按钮左侧（座位 2、再座位 0）逐枚分
     const won = new Map(t.winners().map((w) => [w.seat, w.amount]))
     expect([won.get(0), won.get(1), won.get(2)]).toEqual([15, 14, 15])
-    expect(t.winners().every((w) => w.handName === '顺子')).toBe(true)
+    expect(t.winners().every((w) => w.handCat === 'straight')).toBe(true)
   })
 
   it('边池：三人全下 100/300/600', () => {
@@ -197,8 +197,8 @@ describe('规则修正', () => {
     act(t, 'call')
     finish(t)
     expect(t.winners()).toEqual([
-      { pot: 0, seat: 0, amount: 300, handName: '一对' },
-      { pot: 1, seat: 1, amount: 400, handName: '一对' }
+      { pot: 0, seat: 0, amount: 300, handCat: 'pair' },
+      { pot: 1, seat: 1, amount: 400, handCat: 'pair' }
     ])
     // 座位 2 超出 300 的部分无人跟注，退回
     expect(stacks(t)).toEqual([300, 400, 300])
@@ -320,14 +320,19 @@ describe('与原型对照（牌型评估）', () => {
   const ctx = vm.createContext({ window: {} })
   vm.runInContext(src, ctx)
   const P = ctx.window.RiverPoker
+  // 原型返回中文牌型名；本地映射，不引用 @river/i18n（i18n 依赖 engine）
+  const ZH: Record<HandCat, string> = {
+    highCard: '高牌', pair: '一对', twoPair: '两对', trips: '三条', straight: '顺子', flush: '同花', fullHouse: '葫芦',
+    quads: '四条', straightFlush: '同花顺', royalFlush: '皇家同花顺', pocketPair: '口袋对子', suitedHole: '同花底牌'
+  }
 
-  it('2000 组随机 2–7 张牌：handName、outs 一致；equity 在相同随机序列下一致', () => {
+  it('2000 组随机 2–7 张牌：牌型、outs 一致；equity 在相同随机序列下一致', () => {
     const rng = mulberry32(2026)
     for (let k = 0; k < 2000; k++) {
       const deck = FULL.slice().sort(() => rng() - 0.5)
       const hole = deck.slice(0, 2)
       const board = deck.slice(2, 2 + [0, 3, 4, 5][(rng() * 4) | 0])
-      expect(handName(hole.concat(board))).toBe(P.handName(hole.concat(board)))
+      expect(ZH[handCat(hole.concat(board))]).toBe(P.handName(hole.concat(board)))
       if (k % 100 === 0) {
         const seed = 9000 + k
         const mine = equity(hole, board, 2, 200, mulberry32(seed))

@@ -1,4 +1,6 @@
 // 每个牌桌 Agent（对手或教练）在本桌的对话线：本手按组原样保留，往手由代码压缩成摘要（ADR-006）
+import { dict } from '@river/i18n'
+import { settingsCache } from '../db'
 import type { Msg } from './llm'
 
 const PAST_HANDS = 5
@@ -18,7 +20,7 @@ export class Thread {
   // 新一手里第一次被调用时压缩往手；onCompress 收到被压缩的手号，用来中止那一手还在进行的赛后发言
   messagesFor(hand: number, observation: string, onCompress?: (hand: number) => void): Msg[] {
     this.enter(hand, onCompress)
-    const recap = this.groups.length === 0 && this.past.length ? `【往手回顾】\n${this.past.join('\n')}\n\n` : ''
+    const recap = this.groups.length === 0 && this.past.length ? `${dict(settingsCache.locale).desktop.model.pastHands}\n${this.past.join('\n')}\n\n` : ''
     return [...this.groups.flat(), { role: 'user', content: recap + observation }]
   }
 
@@ -52,7 +54,8 @@ export class Thread {
     if (this.hand === hand) return
     if (this.hand !== null) {
       onCompress?.(this.hand)
-      this.past.push(`[第 ${this.hand} 手] ${this.summary ?? ''}\n你本手：${this.digest.join('；') || '无'}`)
+      const M = dict(settingsCache.locale).desktop.model
+      this.past.push(M.pastHand(this.hand, this.summary ?? '', this.digest.join(M.semi) || M.none))
       this.past = this.past.slice(-PAST_HANDS)
     }
     this.hand = hand

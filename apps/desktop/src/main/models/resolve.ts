@@ -2,6 +2,7 @@ import { Agent } from '@mastra/core/agent'
 import type { MastraModelConfig } from '@mastra/core/llm'
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
+import { dict } from '@river/i18n'
 import { getProviderSecret, providersCache, setSupportsRequired, settingsCache, type ProviderRow } from '../db'
 
 export type Role = 'opponent' | 'coach'
@@ -64,27 +65,29 @@ export function supportsRequired(role: Role): boolean {
 
 const TEST_TIMEOUT_MS = 20_000
 
-const ping = createTool({
-  id: 'ping',
-  description: '连接测试：请调用此工具',
-  inputSchema: z.object({}),
-  execute: async () => ({ ok: true })
-})
+const ping = () =>
+  createTool({
+    id: 'ping',
+    description: dict(settingsCache.locale).prompt.ping.description,
+    inputSchema: z.object({}),
+    execute: async () => ({ ok: true })
+  })
 
 export async function testProvider(providerId: string, modelId: string): Promise<{ ok: boolean; supportsRequired?: boolean; error?: string }> {
+  const d = dict(settingsCache.locale)
   const p = providersCache.get(providerId)
-  if (!p) return { ok: false, error: '提供方不存在' }
+  if (!p) return { ok: false, error: d.desktop.error.noProvider }
   let apiKey: string | undefined
   try {
     apiKey = secretOf(p)
   } catch {
-    return { ok: false, error: '无法解密 API key，请重新输入' }
+    return { ok: false, error: d.desktop.error.cantDecrypt }
   }
-  const agent = new Agent({ id: 'provider-test', name: 'provider-test', instructions: '调用 ping 工具。', model: configFor(p, modelId, apiKey), tools: { ping } })
+  const agent = new Agent({ id: 'provider-test', name: 'provider-test', instructions: d.prompt.ping.instructions, model: configFor(p, modelId, apiKey), tools: { ping: ping() } })
   const attempt = async (toolChoice: 'required' | 'auto') => {
     try {
       const r = await agent.generate('ping', { toolChoice, maxSteps: 1, abortSignal: AbortSignal.timeout(TEST_TIMEOUT_MS) })
-      if (r.finishReason === 'aborted') return '连接超时'
+      if (r.finishReason === 'aborted') return d.desktop.error.connectTimeout
       return r.error ? String((r.error as Error).message ?? r.error) : undefined
     } catch (e) {
       return e instanceof Error ? e.message : String(e)

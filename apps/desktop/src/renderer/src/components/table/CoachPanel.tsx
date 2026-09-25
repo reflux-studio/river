@@ -18,7 +18,7 @@ export function ProbPanel({ nums }: { nums: NonNullable<TableView['nums']> }) {
   // 只并列事实：胜率按随机手牌估算，与所需胜率口径不同，不做 ±EV 判断
   const stats = [
     ['所需胜率（底池赔率）', nums.need === 0 ? '—' : (nums.need * 100).toFixed(1) + '%'],
-    ['当前牌型', nums.handName],
+    ['当前牌型', dict('zh').poker.hand[nums.handCat]],
     ['改进牌', nums.outs == null ? '—' : String(nums.outs)]
   ]
   return (

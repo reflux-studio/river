@@ -4,8 +4,8 @@
 // 2. 平分底池的余数从按钮左侧起逐枚分配
 // 3. 无人跟注的下注在本轮结束时退回，不计入赢得
 
-import type { Card, Street } from './types'
-import { best, FULL, handName, shuffle, type Rng } from './eval'
+import type { Card, HandCat, Street } from './types'
+import { best, FULL, handCat, shuffle, type Rng } from './eval'
 
 export type ActionType = 'fold' | 'check' | 'call' | 'bet' | 'raise'
 
@@ -29,7 +29,7 @@ export interface PotWin {
   seat: number
   amount: number
   // 只有一人争夺的底池没有比牌，为 null
-  handName: string | null
+  handCat: HandCat | null
 }
 
 export interface Legal {
@@ -236,7 +236,7 @@ export class Table {
       ws.forEach((i, k) => {
         const won = share + (k < amount - share * ws.length ? 1 : 0)
         this.seat(i).stack += won
-        this.wins.push({ pot, seat: i, amount: won, handName: elig.length > 1 ? handName(this.seat(i).hole.concat(this.board)) : null })
+        this.wins.push({ pot, seat: i, amount: won, handCat: elig.length > 1 ? handCat(this.seat(i).hole.concat(this.board)) : null })
       })
     })
     if (live.length > 1) this.street = 'showdown'

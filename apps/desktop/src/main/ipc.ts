@@ -1,9 +1,10 @@
 import type { App, IpcMain } from 'electron'
 import { PROVIDER_REGISTRY } from '@mastra/core/llm'
+import { dict } from '@river/i18n'
 import type { Commands, FxRates, Recap } from '../shared/types'
 import {
   clearHistory, clearMemory, completeOnboarding, deletePersona, deleteProvider, getBankroll, getHand, getLobby, handKeyOf, listUsage, getOnboarded, getReview, getSettings, listHands,
-  listProviders, personasCache, resetPersona, resetUsage, restorePersona, saveProvider, savePersona, updateLobby, updateSettings
+  listProviders, personasCache, resetPersona, resetUsage, restorePersona, saveProvider, savePersona, settingsCache, updateLobby, updateSettings
 } from './db'
 import { costTotal, usageSummary } from './models/prices'
 import { clearNeedsKey, needsKey, testProvider } from './models/resolve'
@@ -32,6 +33,7 @@ function parseReview(text: string): Recap | string {
 
 export function commandHandlers(runner: TableRunner, app: AppInfo = { version: () => '0.0.0', update: () => null, install: () => {}, fx: () => null, packaged: false }): Handlers {
   const personasChanged = () => runner.emit('personas', personasCache)
+  const err = () => dict(settingsCache.locale).desktop.error
   return {
     'app.bootstrap': async () => ({
       settings: getSettings(),
@@ -61,7 +63,7 @@ export function commandHandlers(runner: TableRunner, app: AppInfo = { version: (
       return p
     },
     'persona.delete': async (id) => {
-      if (personasCache.filter((p) => !p.deleted && p.id !== id).length < 1) throw new Error('至少保留一位对手')
+      if (personasCache.filter((p) => !p.deleted && p.id !== id).length < 1) throw new Error(err().keepOne)
       await deletePersona(id)
       const lb = getLobby()
       if (lb.picks.includes(id)) await updateLobby({ picks: lb.picks.filter((x) => x !== id) })
@@ -89,7 +91,7 @@ export function commandHandlers(runner: TableRunner, app: AppInfo = { version: (
     'provider.test': ({ providerId, modelId }) => testProvider(providerId, modelId),
     'provider.registry': () => [
       ...Object.entries(PROVIDER_REGISTRY).map(([kind, v]) => ({ kind, name: v.name, models: [...v.models] })),
-      { kind: 'openai-compatible', name: 'OpenAI 兼容接口', models: [] }
+      { kind: 'openai-compatible', name: err().compatibleName, models: [] }
     ],
     'table.start': (o) => runner.start(o),
     'table.heroAct': (a) => runner.heroAct(a),
@@ -124,7 +126,7 @@ export function commandHandlers(runner: TableRunner, app: AppInfo = { version: (
     'data.resetMemory': () => clearMemory(),
     'onboarding.done': (locale) => completeOnboarding(locale),
     'update.install': () => {
-      if (runner.table) throw new Error('请先离桌再更新')
+      if (runner.table) throw new Error(err().leaveFirst)
       app.install()
     }
   }

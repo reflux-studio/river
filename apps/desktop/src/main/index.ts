@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage } from 'electron'
+import { dict, resolveLocale } from '@river/i18n'
 import { initDb } from './db'
 import { guardQuit, registerIpc } from './ipc'
 import { fxRates, loadFx, refreshFx } from './models/fx'
@@ -50,7 +51,8 @@ app.whenReady().then(async () => {
     await loadFx()
     await runner.init()
   } catch (e) {
-    dialog.showErrorBox('River 启动失败', e instanceof Error ? e.message : String(e))
+    // 这时可能读不到库：按系统语言
+    dialog.showErrorBox(dict(resolveLocale(app.getLocale())).desktop.error.startFailed, e instanceof Error ? e.message : String(e))
     app.exit(1)
     return
   }

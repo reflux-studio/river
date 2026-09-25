@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createClient, type Client } from '@libsql/client'
-import { presets, resolveLocale, type Locale } from '@river/i18n'
+import { dict, presets, resolveLocale, type Locale } from '@river/i18n'
 import { CURRENCIES, type Currency } from '../../shared/currency'
 import type { FxRates, HandRecord, HandSummary, Lobby, Persona, PersonaInput, ProviderInput, ProviderPublic, Purpose, Settings } from '../../shared/types'
 
@@ -461,11 +461,11 @@ export function listProviders(needsKeySet: ReadonlySet<string> = new Set()): Pro
 export async function saveProvider(input: ProviderInput): Promise<ProviderPublic> {
   const compatible = input.kind === 'openai-compatible'
   const baseUrl = compatible ? input.baseUrl?.trim() || undefined : undefined
-  if (compatible && !baseUrl) throw new Error('openai-compatible 需要 baseUrl')
+  if (compatible && !baseUrl) throw new Error(dict(settingsCache.locale).desktop.error.needBaseUrl)
   const prev = input.id ? providersCache.get(input.id) : undefined
   const apiKey = input.apiKey?.trim() || undefined
   const apiKeyEnc = apiKey ? encrypt(apiKey) : (prev?.apiKeyEnc ?? null)
-  if (!compatible && !apiKeyEnc) throw new Error('需要 API key')
+  if (!compatible && !apiKeyEnc) throw new Error(dict(settingsCache.locale).desktop.error.needKey)
   const row: ProviderRow = {
     id: input.id ?? randomUUID(),
     name: input.name,

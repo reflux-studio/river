@@ -1,8 +1,9 @@
 // agent 能看到的文字与落库的手牌记录都从这里生成：信息隔离在此处裁剪（对手只见公开信息，教练只见玩家视角）
 import { cardsText as cards, fmt, signed } from '../../shared/format'
 import { dict } from '@river/i18n'
+import { settingsCache } from '../db'
 import type { ChatMessage, HandLogEntry, HandRecord, Mode } from '../../shared/types'
-import { handName, type LogEntry, type Table } from '@river/engine'
+import { handCat, type LogEntry, type Table } from '@river/engine'
 
 export interface SeatInfo {
   id: string
@@ -11,23 +12,26 @@ export interface SeatInfo {
   tag: string
 }
 
-// 一条行动的中文文案；blinds 用于区分大小盲
+const tr = () => dict(settingsCache.locale)
+
+// 一条行动的文案；blinds 用于区分大小盲
 export function label(e: Extract<LogEntry, { seat: number }>, blinds: { sb: number; bb: number }): string {
+  const { act, pos } = tr().poker
   switch (e.type) {
     case 'blind':
-      return (e.seat === blinds.sb && e.seat !== blinds.bb ? '小盲 ' : '大盲 ') + fmt(e.amount)
+      return (e.seat === blinds.sb && e.seat !== blinds.bb ? pos.sb : pos.bb) + ' ' + fmt(e.amount)
     case 'fold':
-      return '弃牌'
+      return act.fold
     case 'check':
-      return '过牌'
+      return act.check
     case 'call':
-      return e.allIn ? '全下 ' + fmt(e.to ?? e.amount) : '跟注 ' + fmt(e.amount)
+      return e.allIn ? act.allin + ' ' + fmt(e.to ?? e.amount) : act.call + ' ' + fmt(e.amount)
     case 'bet':
-      return e.allIn ? '全下 ' + fmt(e.to!) : '下注 ' + fmt(e.to!)
+      return (e.allIn ? act.allin : act.bet) + ' ' + fmt(e.to!)
     case 'raise':
-      return e.allIn ? '全下 ' + fmt(e.to!) : '加注至 ' + fmt(e.to!)
+      return (e.allIn ? act.allin : act.raiseTo) + ' ' + fmt(e.to!)
     case 'return':
-      return '退回 ' + fmt(e.amount)
+      return tr().desktop.table.returned + ' ' + fmt(e.amount)
   }
 }
 
@@ -44,15 +48,17 @@ export function positions(t: Table): { seat: number; pos: string }[] {
   const { sb, bb } = t.blindSeats()
   const order = st.map((_, j) => (sb + j) % st.length).filter((i) => st[i] && !st[i]!.out)
   const mid = order.filter((i) => i !== sb && i !== bb && i !== btn)
+  const P = tr().poker.pos
   const name = (i: number) =>
-    i === btn ? (i === sb ? '按钮/小盲' : '按钮') : i === sb ? '小盲' : i === bb ? '大盲' : mid.indexOf(i) === 0 ? '枪口' : mid.indexOf(i) === mid.length - 1 ? '关煞' : '中位'
+    i === btn ? (i === sb ? P.btnSb : P.btn) : i === sb ? P.sb : i === bb ? P.bb : mid.indexOf(i) === 0 ? P.utg : mid.indexOf(i) === mid.length - 1 ? P.co : P.mp
   return order.map((seat) => ({ seat, pos: name(seat) }))
 }
 
 export function logLines(t: Table, seats: SeatInfo[], you?: number) {
   const log = t.handLog()
   const bl = blindsOf(log)
-  return log.map((e) => ('board' in e ? `【${dict('zh').poker.street[e.street]} ${cards(e.board)}】` : `${e.seat === you ? '你' : seats[e.seat].name} ${label(e, bl)}`))
+  const d = tr()
+  return log.map((e) => ('board' in e ? d.desktop.model.street(d.poker.street[e.street], cards(e.board)) : `${e.seat === you ? d.desktop.table.you : seats[e.seat].name} ${label(e, bl)}`))
 }
 
 // 某座位视角的局面（对手决策、教练讲解共用）；只含该座位自己的底牌
@@ -62,52 +68,57 @@ export function situation(
   seat: number,
   o: { chat?: ChatMessage[]; you?: boolean } = {}
 ) {
+  const d = tr()
+  const M = d.desktop.model
   // 座位 0 的显示名是「你」（玩家界面用）；写给模型时一律称「玩家」，「你」只留给观察者自己
-  seats = seats.map((x, i) => (i === 0 ? { ...x, name: '玩家' } : x))
+  seats = seats.map((x, i) => (i === 0 ? { ...x, name: M.player } : x))
   const me = t.seats()[seat]!
   const hole = t.holeCards()[seat] ?? []
   const L = t.isBettingRoundInProgress() && t.playerToAct() === seat ? t.legalActions() : null
-  const who = (i: number) => (i === seat ? (o.you === false ? '玩家' : '你') : seats[i].name)
+  const you = o.you !== false
+  const who = (i: number) => (i === seat ? (you ? d.desktop.table.you : M.player) : seats[i].name)
   const st = t.seats()
   const pos = positions(t)
   const players = pos.map(({ seat: i, pos: p }) => {
     const s = st[i]!
-    const tags = [s.folded && '已弃牌', s.allIn && '已全下', s.bet && `本轮已下 ${fmt(s.bet)}`, s.totalIn && `本手共投入 ${fmt(s.totalIn)}（含本轮）`]
+    const tags = [s.folded && M.folded, s.allIn && M.allin, s.bet && M.betRound(fmt(s.bet)), s.totalIn && M.inHand(fmt(s.totalIn))]
       .filter(Boolean)
-      .join('，')
-    const tag = [p, i !== seat && seats[i].tag].filter(Boolean).join('，')
-    return `- ${who(i)}（${tag}）：筹码 ${fmt(s.stack)}${tags ? '，' + tags : ''}`
+      .join(M.sep)
+    const tag = [p, i !== seat && seats[i].tag].filter(Boolean).join(M.sep)
+    return M.seat(who(i), tag, fmt(s.stack), tags)
   })
   const opts = L
     ? [
-        L.toCall === 0 ? 'check（过牌）' : `fold（弃牌）/ call（跟注 ${fmt(L.toCall)}）`,
-        ...(L.chipRange ? [`raise（${t.currentBet() === 0 ? '下注' : '加注'}到总额 ${fmt(L.chipRange.min)}~${fmt(L.chipRange.max)}）`] : [])
-      ].join(' / ')
-    : `现在不是${o.you === false ? '玩家' : '你'}行动`
+        L.toCall === 0 ? M.optCheck : M.optCall(fmt(L.toCall)),
+        ...(L.chipRange ? [M.optRaise(t.currentBet() === 0, fmt(L.chipRange.min), fmt(L.chipRange.max))] : [])
+      ].join(M.optSep)
+    : M.notTurn(you)
   const { smallBlind, bigBlind } = t.stakes()
   const board = t.communityCards()
   const pot = t.totalPot()
   const toCall = L?.toCall ?? Math.max(0, t.currentBet() - me.bet)
   const lines = [
-    `无限注 · 盲注 ${smallBlind}/${bigBlind} · ${seats.length} 人桌；第 ${t.handNumber()} 手，阶段：${dict('zh').poker.street[t.roundOfBetting()]}`,
-    `${o.you === false ? '玩家' : '你'}的位置：${pos.find((x) => x.seat === seat)?.pos}；底牌：${cards(hole)}；当前牌型：${hole.length ? handName(hole.concat(board)) : '—'}`,
-    `公共牌：${cards(board) || '无'}`,
-    `底池：${fmt(pot)}；需跟注：${fmt(toCall)}${toCall > 0 && !me.folded && !me.allIn ? `；所需胜率（底池赔率）：${((toCall / (pot + toCall)) * 100).toFixed(1)}%` : ''}；筹码：${fmt(me.stack)}`,
-    `可选行动：${opts}`,
-    `座位（按行动顺序，小盲起、按钮收尾）：\n${players.join('\n')}`,
-    `本手行动：${logLines(t, seats, o.you === false ? undefined : seat).join('，')}`
+    M.head(smallBlind, bigBlind, seats.length, t.handNumber(), d.poker.street[t.roundOfBetting()]),
+    M.me(you, String(pos.find((x) => x.seat === seat)?.pos), cards(hole), hole.length ? d.poker.hand[handCat(hole.concat(board))] : '—'),
+    M.board(cards(board) || M.none),
+    M.pot(fmt(pot), fmt(toCall), toCall > 0 && !me.folded && !me.allIn ? ((toCall / (pot + toCall)) * 100).toFixed(1) : '', fmt(me.stack)),
+    M.opts(opts),
+    M.seats(players.join('\n')),
+    M.actions(logLines(t, seats, you ? seat : undefined).join(M.sep))
   ]
   if (o.chat?.length) lines.push(chatBlock(o.chat, seats))
   return lines.join('\n')
 }
 
 export function chatBlock(chat: ChatMessage[], seats: SeatInfo[]) {
-  return `新发言：\n${chat.map((m) => `${speaker(m, seats)}：${[m.act, m.text].filter(Boolean).join('，')}`).join('\n')}`
+  const M = tr().desktop.model
+  return M.chat(chat.map((m) => M.chatLine(speaker(m, seats), [m.act, m.text].filter(Boolean).join(M.sep))).join('\n'))
 }
 
 function speaker(m: ChatMessage, seats: SeatInfo[]) {
-  if (m.kind === 'sys') return '系统'
-  return m.from === 'hero' ? '玩家' : (seats.find((s) => s.personaId === m.from)?.name ?? '？')
+  const M = tr().desktop.model
+  if (m.kind === 'sys') return M.system
+  return m.from === 'hero' ? M.player : (seats.find((s) => s.personaId === m.from)?.name ?? M.unknown)
 }
 
 // 玩家（hero）的 hole 在记录里恒非空；是否亮过牌只能按“摊牌且未弃牌”判断
@@ -115,46 +126,53 @@ const shown = (rec: HandRecord, p: HandRecord['players'][number]) => rec.showdow
 
 // 对手读到的上一手结果：只含公开信息（不读 holeAfter）
 export function publicHandResult(rec: HandRecord, forPersonaId: string): string {
-  const name = (p: HandRecord['players'][number]) => (p.personaId === forPersonaId ? '你' : p.personaId ? p.name : '玩家')
-  const parts = [`第 ${rec.hand} 手：${rec.showdown ? '摊牌' : '未摊牌'}`]
-  if (rec.board.length) parts.push(`公共牌 ${cards(rec.board)}`)
-  for (const p of rec.players) if (shown(rec, p) && p.id !== 'hero') parts.push(`${name(p)}亮出 ${cards(p.hole!)}${p.handName ? `（${p.handName}）` : ''}`)
+  const d = tr()
+  const M = d.desktop.model
+  const name = (p: HandRecord['players'][number]) => (p.personaId === forPersonaId ? d.desktop.table.you : p.personaId ? p.name : M.player)
+  const parts = [M.handHead(rec.hand, rec.showdown)]
+  if (rec.board.length) parts.push(M.boardShort(cards(rec.board)))
+  for (const p of rec.players) if (shown(rec, p) && p.id !== 'hero') parts.push(M.showed(name(p), cards(p.hole!), p.handName))
   const hero = rec.players.find((p) => p.id === 'hero')
-  if (hero && shown(rec, hero)) parts.push(`玩家亮出 ${cards(hero.hole!)}`)
-  for (const p of rec.players) if (p.won > 0) parts.push(`${name(p)}赢得 ${fmt(p.won)}`)
+  if (hero && shown(rec, hero)) parts.push(M.showed(M.player, cards(hero.hole!), ''))
+  for (const p of rec.players) if (p.won > 0) parts.push(M.seatWon(name(p), fmt(p.won)))
   const me = rec.players.find((p) => p.personaId === forPersonaId)
-  return parts.join('，') + (me ? `；你本手 ${signed(me.net)}` : '')
+  return parts.join(M.sep) + (me ? M.youNet(signed(me.net)) : '')
 }
 
 // 对手的往手摘要：位置、公开行动线与公开结果；不读 holeAfter。「你」只指该对手，玩家称「玩家」
 export function opponentSummary(rec: HandRecord, forPersonaId: string): string {
+  const d = tr()
+  const M = d.desktop.model
+  const you = d.desktop.table.you
   const me = rec.players.find((p) => p.personaId === forPersonaId)
-  const nameOf = (name: string, seat?: number) => (seat === 0 || name === '你' ? '玩家' : name === me?.name ? '你' : name)
-  const pos = rec.players.filter((p) => p.pos).map((p) => `${p.personaId ? nameOf(p.name) : '玩家'}（${p.pos}）`).join('，')
-  const log = rec.log.map((x) => (x.board ? `【${dict('zh').poker.street[x.street]} ${x.label}】` : `${nameOf(x.name, x.seat)}${x.label}`)).join('，')
-  return [`盲注 ${rec.sb}/${rec.bb}`, ...(pos ? [`位置：${pos}`] : []), `行动：${log}`, publicHandResult(rec, forPersonaId)].join('\n')
+  const nameOf = (name: string, seat?: number) => (seat === 0 || name === you ? M.player : name === me?.name ? you : name)
+  const pos = rec.players.filter((p) => p.pos).map((p) => M.posOf(p.personaId ? nameOf(p.name) : M.player, p.pos!)).join(M.sep)
+  const log = rec.log.map((x) => (x.board ? M.street(d.poker.street[x.street], x.label) : M.did(nameOf(x.name, x.seat), x.label))).join(M.sep)
+  return [M.blinds(rec.sb, rec.bb), ...(pos ? [M.posList(pos)] : []), M.actionList(log), publicHandResult(rec, forPersonaId)].join('\n')
 }
 
 // 教练复盘用：玩家底牌可见；教练局一手结束亮出的全部底牌此时玩家也看得到，一并给出
 export function heroHandSummary(rec: HandRecord): string {
-  const log = rec.log.map((x) => (x.board ? `【${dict('zh').poker.street[x.street]} ${x.label}】` : `${x.seat === 0 || x.name === '你' ? '玩家' : x.name}${x.label}`)).join('，')
-  const seatsLine = rec.players.filter((p) => p.pos).map((p) => `${p.personaId ? p.name : '玩家'}（${p.pos}）`).join('，')
+  const d = tr()
+  const M = d.desktop.model
+  const log = rec.log.map((x) => (x.board ? M.street(d.poker.street[x.street], x.label) : M.did(x.seat === 0 || x.name === d.desktop.table.you ? M.player : x.name, x.label))).join(M.sep)
+  const seatsLine = rec.players.filter((p) => p.pos).map((p) => M.posOf(p.personaId ? p.name : M.player, p.pos!)).join(M.sep)
   const opp = rec.players
     .filter((p) => p.personaId)
     .map((p) => {
       const c = p.holeAfter ?? (shown(rec, p) ? p.hole : null)
-      return c ? `${p.name} ${cards(c)}${p.folded ? '（已弃牌）' : ''}` : ''
+      return c ? `${p.name} ${cards(c)}${p.folded ? M.foldedMark : ''}` : ''
     })
     .filter(Boolean)
-    .join('；')
+    .join(M.semi)
   return [
-    `第 ${rec.hand} 手，盲注 ${rec.sb}/${rec.bb}`,
-    ...(seatsLine ? [`位置：${seatsLine}`] : []),
-    `玩家底牌：${cards(rec.hero)}`,
-    `公共牌：${cards(rec.board) || '无'}`,
-    `行动：${log}`,
-    `结果：玩家${rec.net >= 0 ? '赢' : '输'} ${fmt(Math.abs(rec.net))}`,
-    `${rec.mode === 'coach' ? '一手结束亮出的底牌' : '摊牌'}：${opp || '无'}`
+    M.heroHead(rec.hand, rec.sb, rec.bb),
+    ...(seatsLine ? [M.posList(seatsLine)] : []),
+    M.heroHole(cards(rec.hero)),
+    M.board(cards(rec.board) || M.none),
+    M.actionList(log),
+    M.result(rec.net >= 0, fmt(Math.abs(rec.net))),
+    M.revealed(rec.mode === 'coach', opp || M.none)
   ].join('\n')
 }
 

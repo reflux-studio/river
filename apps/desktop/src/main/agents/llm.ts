@@ -3,6 +3,8 @@
 import { Agent } from '@mastra/core/agent'
 import { createTool } from '@mastra/core/tools'
 import type { z } from 'zod'
+import { dict } from '@river/i18n'
+import { settingsCache } from '../db'
 import type { Purpose } from '../../shared/types'
 import { modelFor, selectedModel, supportsRequired, type Role } from '../models/resolve'
 
@@ -123,7 +125,7 @@ export async function callModel<S extends z.ZodTypeAny>(o: CallOpts<S>): Promise
     handNo: o.tag?.handNo ?? null
   })
   const ok = !aborted && !error
-  const msg = timedOut ? '调用超时' : error != null ? errorText(error) : undefined
+  const msg = timedOut ? dict(settingsCache.locale).desktop.error.callTimeout : error != null ? errorText(error) : undefined
   return { ok, aborted: aborted && !timedOut, text, ...(args !== undefined && { args }), ...(msg && { error: msg }) }
 }
 
