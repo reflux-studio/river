@@ -231,7 +231,7 @@ export const setOnboarded = (v: boolean) => setKv('onboarded', v)
 export async function completeOnboarding(locale: Locale): Promise<{ settings: Settings; personas: Persona[] }> {
   if (await getOnboarded()) return { settings: settingsCache, personas: personasCache }
   // 来自渲染进程；存进库的非法值会让之后每次加载预设都失败
-  if (!(locale in presets)) throw new Error(`unknown locale: ${locale}`)
+  if (!Object.hasOwn(presets, locale)) throw new Error(`unknown locale: ${locale}`)
   const patch: Partial<Settings> = { locale }
   if (locale === 'en' && settingsCache.currency === 'cny') Object.assign(patch, { currency: 'usd', fxRate: null })
   await updateSettings(patch)

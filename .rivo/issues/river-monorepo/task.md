@@ -319,6 +319,9 @@ export async function completeOnboarding(locale: Locale) {
   - 从设置页重新打开规则介绍时，没有语言页。
 
 **结果**：
+- 已完成：实现提交 `07c48e5`，F1 修复见后续提交（非法 locale 校验改用 `Object.hasOwn`，先写了失败用例）。
+- 独立审阅：`reviews/T4-1.md`，结论为可以完成。F2（英文牌型表第一行略超出分隔线）转给 T6；F3 已改 plan 的措辞。
+- 渲染进程用 `useT()` hook，T6 可以直接用它。
 
 ## 任务 5：主进程与 Agent 双语
 
@@ -397,7 +400,11 @@ export async function completeOnboarding(locale: Locale) {
 3. 币种名称从字典中取。
 4. 删掉 T3 中临时加的牌桌色名称映射。
 
-**工程注意事项**：用户数据（对手名称和提示词、提问、模型输出、回放内容）原样显示，不翻译。
+**工程注意事项**：
+- 用户数据（对手名称和提示词、提问、模型输出、回放内容）原样显示，不翻译。
+- 用 `useT()`（T4 已提供）取字典。
+- 顺便修正引导页英文牌型表第一行略超出分隔线的问题（T4 审阅 F2）。
+- 模拟英文系统：dev 启动时加 `-- --lang=en-US -AppleLanguages "(en-US)"`。
 
 **验证与完成标准**：
 - `rg -n '\p{Han}' apps/desktop/src/renderer/src -g '*.ts' -g '*.tsx'` 只能命中注释；

@@ -194,6 +194,7 @@ describe('语言', () => {
     const cmd = commandHandlers({ broadcast: () => {} } as unknown as TableRunner)
     await expect(cmd['settings.update']({ locale: 'en' })).rejects.toThrow('locale is fixed after onboarding')
     await expect(cmd['onboarding.done']('fr' as never)).rejects.toThrow('unknown locale')
+    await expect(cmd['onboarding.done']('constructor' as never)).rejects.toThrow('unknown locale')
     expect(db.getSettings().locale).toBe('zh')
     expect((await cmd['onboarding.done']('en')).settings.locale).toBe('en')
     await expect(cmd['settings.update']({ locale: 'zh' })).rejects.toThrow('locale is fixed after onboarding')

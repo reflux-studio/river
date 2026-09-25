@@ -290,7 +290,7 @@ export const en: typeof zh = {
 }
 ```
 
-主进程通过 `dict(settings.locale)` 取字典。渲染进程用一个 React context 提供 `t`，它的值随 `settings.locale` 变化。
+主进程通过 `dict(settings.locale)` 取字典。渲染进程用 `useT()` hook 取 `t`：它的实现是 `dict(useRiver(s => s.settings.locale))`，不需要 Provider，随 `settings.locale` 变化。
 
 ### 语言入口：引导页
 
