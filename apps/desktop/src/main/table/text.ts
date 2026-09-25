@@ -1,6 +1,6 @@
 // agent 能看到的文字与落库的手牌记录都从这里生成：信息隔离在此处裁剪（对手只见公开信息，教练只见玩家视角）
 import { cardsText as cards, fmt, signed } from '../../shared/format'
-import { STREET } from '../../shared/personas'
+import { dict } from '@river/i18n'
 import type { ChatMessage, HandLogEntry, HandRecord, Mode } from '../../shared/types'
 import { handName, type LogEntry, type Table } from '@river/engine'
 
@@ -52,7 +52,7 @@ export function positions(t: Table): { seat: number; pos: string }[] {
 export function logLines(t: Table, seats: SeatInfo[], you?: number) {
   const log = t.handLog()
   const bl = blindsOf(log)
-  return log.map((e) => ('board' in e ? `【${STREET[e.street]} ${cards(e.board)}】` : `${e.seat === you ? '你' : seats[e.seat].name} ${label(e, bl)}`))
+  return log.map((e) => ('board' in e ? `【${dict('zh').poker.street[e.street]} ${cards(e.board)}】` : `${e.seat === you ? '你' : seats[e.seat].name} ${label(e, bl)}`))
 }
 
 // 某座位视角的局面（对手决策、教练讲解共用）；只含该座位自己的底牌
@@ -89,7 +89,7 @@ export function situation(
   const pot = t.totalPot()
   const toCall = L?.toCall ?? Math.max(0, t.currentBet() - me.bet)
   const lines = [
-    `无限注 · 盲注 ${smallBlind}/${bigBlind} · ${seats.length} 人桌；第 ${t.handNumber()} 手，阶段：${STREET[t.roundOfBetting()]}`,
+    `无限注 · 盲注 ${smallBlind}/${bigBlind} · ${seats.length} 人桌；第 ${t.handNumber()} 手，阶段：${dict('zh').poker.street[t.roundOfBetting()]}`,
     `${o.you === false ? '玩家' : '你'}的位置：${pos.find((x) => x.seat === seat)?.pos}；底牌：${cards(hole)}；当前牌型：${hole.length ? handName(hole.concat(board)) : '—'}`,
     `公共牌：${cards(board) || '无'}`,
     `底池：${fmt(pot)}；需跟注：${fmt(toCall)}${toCall > 0 && !me.folded && !me.allIn ? `；所需胜率（底池赔率）：${((toCall / (pot + toCall)) * 100).toFixed(1)}%` : ''}；筹码：${fmt(me.stack)}`,
@@ -131,13 +131,13 @@ export function opponentSummary(rec: HandRecord, forPersonaId: string): string {
   const me = rec.players.find((p) => p.personaId === forPersonaId)
   const nameOf = (name: string, seat?: number) => (seat === 0 || name === '你' ? '玩家' : name === me?.name ? '你' : name)
   const pos = rec.players.filter((p) => p.pos).map((p) => `${p.personaId ? nameOf(p.name) : '玩家'}（${p.pos}）`).join('，')
-  const log = rec.log.map((x) => (x.board ? `【${STREET[x.street]} ${x.label}】` : `${nameOf(x.name, x.seat)}${x.label}`)).join('，')
+  const log = rec.log.map((x) => (x.board ? `【${dict('zh').poker.street[x.street]} ${x.label}】` : `${nameOf(x.name, x.seat)}${x.label}`)).join('，')
   return [`盲注 ${rec.sb}/${rec.bb}`, ...(pos ? [`位置：${pos}`] : []), `行动：${log}`, publicHandResult(rec, forPersonaId)].join('\n')
 }
 
 // 教练复盘用：玩家底牌可见；教练局一手结束亮出的全部底牌此时玩家也看得到，一并给出
 export function heroHandSummary(rec: HandRecord): string {
-  const log = rec.log.map((x) => (x.board ? `【${STREET[x.street]} ${x.label}】` : `${x.seat === 0 || x.name === '你' ? '玩家' : x.name}${x.label}`)).join('，')
+  const log = rec.log.map((x) => (x.board ? `【${dict('zh').poker.street[x.street]} ${x.label}】` : `${x.seat === 0 || x.name === '你' ? '玩家' : x.name}${x.label}`)).join('，')
   const seatsLine = rec.players.filter((p) => p.pos).map((p) => `${p.personaId ? p.name : '玩家'}（${p.pos}）`).join('，')
   const opp = rec.players
     .filter((p) => p.personaId)

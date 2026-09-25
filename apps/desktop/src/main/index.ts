@@ -45,7 +45,7 @@ app.whenReady().then(async () => {
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(iconPath)
   try {
     const url = 'file:' + join(app.getPath('userData'), 'river.db')
-    await initDb({ url, encrypt: (t) => safeStorage.encryptString(t), decrypt: (b) => safeStorage.decryptString(b) })
+    await initDb({ url, encrypt: (t) => safeStorage.encryptString(t), decrypt: (b) => safeStorage.decryptString(b), systemLocale: app.getLocale() })
     await loadPrices()
     await loadFx()
     await runner.init()
@@ -56,7 +56,7 @@ app.whenReady().then(async () => {
   }
   void refreshPrices()
   void refreshFx().then((fx) => fx && runner.emit('fx', fx))
-  registerIpc(ipcMain, runner, { version: () => app.getVersion(), update: readyVersion, install: installUpdate, fx: fxRates })
+  registerIpc(ipcMain, runner, { version: () => app.getVersion(), update: readyVersion, install: installUpdate, fx: fxRates, packaged: app.isPackaged })
   guardQuit(app, runner)
   // 默认菜单带 Ctrl+R 刷新、Ctrl+Shift+I DevTools 等快捷键，正式包不应暴露；开发时保留
   if (process.platform !== 'darwin' && app.isPackaged) Menu.setApplicationMenu(null)

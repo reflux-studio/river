@@ -2,8 +2,8 @@ import type { App, IpcMain } from 'electron'
 import { PROVIDER_REGISTRY } from '@mastra/core/llm'
 import type { Commands, FxRates, Recap } from '../shared/types'
 import {
-  clearHistory, clearMemory, deletePersona, deleteProvider, getBankroll, getHand, getLobby, handKeyOf, listUsage, getOnboarded, getReview, getSettings, listHands,
-  listProviders, personasCache, resetPersona, resetUsage, restorePersona, saveProvider, savePersona, setOnboarded, updateLobby, updateSettings
+  clearHistory, clearMemory, completeOnboarding, deletePersona, deleteProvider, getBankroll, getHand, getLobby, handKeyOf, listUsage, getOnboarded, getReview, getSettings, listHands,
+  listProviders, personasCache, resetPersona, resetUsage, restorePersona, saveProvider, savePersona, updateLobby, updateSettings
 } from './db'
 import { costTotal, usageSummary } from './models/prices'
 import { clearNeedsKey, needsKey, testProvider } from './models/resolve'
@@ -16,6 +16,7 @@ export interface AppInfo {
   update: () => string | null
   install: () => void
   fx: () => FxRates | null
+  packaged: boolean
 }
 
 // 旧版本存的是纯文本复盘，新版本存 JSON
@@ -29,7 +30,7 @@ function parseReview(text: string): Recap | string {
   return text
 }
 
-export function commandHandlers(runner: TableRunner, app: AppInfo = { version: () => '0.0.0', update: () => null, install: () => {}, fx: () => null }): Handlers {
+export function commandHandlers(runner: TableRunner, app: AppInfo = { version: () => '0.0.0', update: () => null, install: () => {}, fx: () => null, packaged: false }): Handlers {
   const personasChanged = () => runner.emit('personas', personasCache)
   return {
     'app.bootstrap': async () => ({
@@ -44,9 +45,11 @@ export function commandHandlers(runner: TableRunner, app: AppInfo = { version: (
       chat: runner.chat,
       version: app.version(),
       update: app.update(),
-      fx: app.fx()
+      fx: app.fx(),
+      packaged: app.packaged
     }),
     'settings.update': async (patch) => {
+      if ('locale' in patch) throw new Error('locale is fixed after onboarding')
       const s = await updateSettings(patch)
       runner.broadcast()
       return s
@@ -119,7 +122,7 @@ export function commandHandlers(runner: TableRunner, app: AppInfo = { version: (
       runner.emit('hands:changed', undefined)
     },
     'data.resetMemory': () => clearMemory(),
-    'onboarding.done': () => setOnboarded(true),
+    'onboarding.done': (locale) => completeOnboarding(locale),
     'update.install': () => {
       if (runner.table) throw new Error('请先离桌再更新')
       app.install()

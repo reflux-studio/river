@@ -1,4 +1,5 @@
 import type { Card, Street } from '@river/engine'
+import type { Locale, PersonaSeed } from '@river/i18n'
 import type { Back, Felt, Fx, SeatView } from '@river/ui/types'
 import type { Currency } from './currency'
 
@@ -26,6 +27,8 @@ export interface Settings {
   // 手动汇率（1 美元 = fxRate 当前货币）；null 为自动
   fxRate: number | null
   models: { opponent?: ModelRef; coach?: ModelRef }
+  // 只在引导页选一次（onboarding.done），之后不能改
+  locale: Locale
 }
 
 export interface Lobby {
@@ -46,14 +49,7 @@ export interface ChatMessage {
   at: number
 }
 
-export interface Persona {
-  id: string
-  name: string
-  tag: string
-  ini: string
-  hue: number
-  desc: string
-  prompt: string
+export interface Persona extends PersonaSeed {
   builtin: boolean
   // 内置角色被改过（可“恢复默认”）
   edited: boolean
@@ -233,6 +229,7 @@ export interface Bootstrap {
   version: string
   update: string | null
   fx: FxRates | null
+  packaged: boolean
 }
 
 // 以美元为基准的汇率（只保留可选币种）
@@ -277,7 +274,7 @@ export interface Commands {
   'usage.reset': () => void
   'data.clearHistory': () => void
   'data.resetMemory': () => void
-  'onboarding.done': () => void
+  'onboarding.done': (locale: Locale) => { settings: Settings; personas: Persona[] }
   'update.install': () => void
 }
 

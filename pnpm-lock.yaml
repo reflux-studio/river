@@ -60,6 +60,9 @@ importers:
       '@river/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@river/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@river/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -95,6 +98,12 @@ importers:
         version: 7.3.6(@types/node@24.13.6)(jiti@2.7.0)(lightningcss@1.32.0)
 
   packages/engine: {}
+
+  packages/i18n:
+    dependencies:
+      '@river/engine':
+        specifier: workspace:*
+        version: link:../engine
 
   packages/ui:
     dependencies:

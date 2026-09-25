@@ -4,7 +4,7 @@ import { RecapRows } from '@/components/table/CoachPanel'
 import { costText, fmt, netColor, signed, useMoney } from '@/lib/format'
 import { configured, go, invoke, toastError, useEvent, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
-import { STREET } from '../../../shared/personas'
+import { dict } from '@river/i18n'
 import type { Card, Cost, HandRecord, HandSummary, Recap } from '../../../shared/types'
 
 type Detail = { id: number; record: HandRecord; review?: Recap | string; cost?: Cost }
@@ -14,7 +14,7 @@ const card = 'rounded-[14px] border bg-white'
 function streetsOf(log: HandRecord['log']) {
   const out: { name: string; board: string; cards?: Card[]; items: HandRecord['log'] }[] = []
   for (const x of log) {
-    if (x.board || !out.length) out.push({ name: STREET[x.street], board: x.board ? x.label : '', cards: x.cards, items: [] })
+    if (x.board || !out.length) out.push({ name: dict('zh').poker.street[x.street], board: x.board ? x.label : '', cards: x.cards, items: [] })
     if (!x.board) out[out.length - 1].items.push(x)
   }
   return out

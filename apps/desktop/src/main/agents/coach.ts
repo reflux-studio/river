@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { COACHES } from '../../shared/personas'
+import { dict } from '@river/i18n'
 import type { Recap } from '../../shared/types'
 import { settingsCache } from '../db'
 import { callModel, type CallResult, type Msg, type UsageTag } from './llm'
@@ -13,7 +13,7 @@ export interface CoachBase {
 // 讲解、提问、复盘共用一份 system；各自的要求写在当次 user 消息里（ADR-006）
 function system(memory: string[]) {
   const st = settingsCache
-  const c = COACHES[st.coachPersona]
+  const c = dict('zh').prompt.coaches[st.coachPersona]
   return [
     `你是德州扑克教学 App「River」里的教练，人设：${c.n}。${c.s}`,
     '你站在玩家这一边，只知道玩家能看到的信息：绝不假装知道对手底牌，只能根据行动推测范围。',

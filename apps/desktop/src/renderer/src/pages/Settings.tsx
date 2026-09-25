@@ -11,7 +11,7 @@ import { deleteProvider, invoke, openRules, testProvider, toastError, updateSett
 import { rateText, useMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { CURRENCIES, currencyOf } from '../../../shared/currency'
-import { COACHES } from '../../../shared/personas'
+import { dict } from '@river/i18n'
 import type { ProviderPublic, Settings as SettingsT } from '../../../shared/types'
 
 type Role = 'opponent' | 'coach'
@@ -313,7 +313,7 @@ export function Settings() {
         <Group title="教练">
           <Row label="教练模型" desc="教练局需要它：每步讲解、提问与每手复盘。自由局不用。" below={<ModelPicker role="coach" />} />
           <Row label="人设" desc="教练说话的风格。">
-            <Seg k="coachPersona" labels={COACHES.map((c) => c.n)} values={[0, 1, 2]} />
+            <Seg k="coachPersona" labels={dict('zh').prompt.coaches.map((c) => c.n)} values={[0, 1, 2]} />
           </Row>
           <Row label="讲解深度" desc="新手模式会解释术语；进阶模式会谈范围和 EV。">
             <Seg k="level" labels={['新手', '进阶']} values={['novice', 'pro']} />

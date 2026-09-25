@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createClient, type Client } from '@libsql/client'
-import { PERSONAS } from '../../shared/personas'
+import { presets, resolveLocale, type Locale } from '@river/i18n'
 import { CURRENCIES, type Currency } from '../../shared/currency'
 import type { FxRates, HandRecord, HandSummary, Lobby, Persona, PersonaInput, ProviderInput, ProviderPublic, Purpose, Settings } from '../../shared/types'
 
@@ -15,7 +15,7 @@ export interface ProviderRow {
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}
+  speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}, locale: 'zh'
 }
 const DEFAULT_LOBBY: Lobby = { size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'coach' }
 const MEMORY_KEEP = 10
@@ -51,6 +51,7 @@ let url = ''
 let client: Client | null = null
 let encrypt: (text: string) => Buffer
 let decrypt: (enc: Buffer) => string
+let systemLocale = 'zh'
 
 export let settingsCache: Settings = DEFAULT_SETTINGS
 export const providersCache = new Map<string, ProviderRow>()
@@ -124,9 +125,10 @@ function write<T>(fn: (c: Client) => Promise<T>): Promise<T> {
   return p
 }
 
-export async function initDb(opts: { url: string; encrypt: (text: string) => Buffer; decrypt: (enc: Buffer) => string }) {
+export async function initDb(opts: { url: string; encrypt: (text: string) => Buffer; decrypt: (enc: Buffer) => string; systemLocale?: string }) {
   encrypt = opts.encrypt
   decrypt = opts.decrypt
+  systemLocale = opts.systemLocale ?? 'zh'
   closeDb()
   url = opts.url
   client = createClient({ url })
@@ -144,7 +146,11 @@ export async function initDb(opts: { url: string; encrypt: (text: string) => Buf
 const pick = <T extends object>(base: T, v: T): T => Object.fromEntries(Object.keys(base).map((k) => [k, v[k as keyof T]])) as T
 
 async function loadCaches() {
-  settingsCache = pick(DEFAULT_SETTINGS, await getKv('settings', DEFAULT_SETTINGS))
+  // getKv 会合并默认值，要看库里有没有存过 locale 只能读原始值
+  const saved = await getKv<Partial<Settings>>('settings', {})
+  settingsCache = pick(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, ...saved })
+  // 预选值只放内存：老用户（已完成引导）固定中文，新用户按系统语言
+  if (!saved.locale) settingsCache.locale = (await getOnboarded()) ? 'zh' : resolveLocale(systemLocale)
   // 不认识的币种（含早期存的大写代码）回到可识别的值
   const cur = String(settingsCache.currency).toLowerCase()
   settingsCache.currency = CURRENCIES.some((c) => c.code === cur) ? (cur as Currency) : DEFAULT_SETTINGS.currency
@@ -221,6 +227,19 @@ export const setBankroll = (n: number) => setKv('bankroll', n)
 export const getOnboarded = () => getKv('onboarded', false)
 export const setOnboarded = (v: boolean) => setKv('onboarded', v)
 
+// 语言只在这里写入；settings.update 的守卫在 ipc.ts，这里直接调用 updateSettings 不受影响
+export async function completeOnboarding(locale: Locale): Promise<{ settings: Settings; personas: Persona[] }> {
+  if (await getOnboarded()) return { settings: settingsCache, personas: personasCache }
+  // 来自渲染进程；存进库的非法值会让之后每次加载预设都失败
+  if (!(locale in presets)) throw new Error(`unknown locale: ${locale}`)
+  const patch: Partial<Settings> = { locale }
+  if (locale === 'en' && settingsCache.currency === 'cny') Object.assign(patch, { currency: 'usd', fxRate: null })
+  await updateSettings(patch)
+  await setOnboarded(true)
+  personasCache = await loadPersonas()
+  return { settings: settingsCache, personas: personasCache }
+}
+
 // ---- 角色 ----
 
 interface PersonaRow {
@@ -236,10 +255,12 @@ interface PersonaRow {
   created_at: number
 }
 
+const seeds = () => presets[settingsCache.locale]
+
 async function loadPersonas(): Promise<Persona[]> {
   const rows = (await db().execute('SELECT * FROM river_personas ORDER BY created_at DESC')).rows as unknown as PersonaRow[]
   const byId = new Map(rows.map((r) => [String(r.persona_id), r]))
-  const builtins = PERSONAS.map((seed): Persona => {
+  const builtins = seeds().map((seed): Persona => {
     const r = byId.get(seed.id)
     const merged = {
       ...seed,
@@ -271,7 +292,7 @@ async function reloadPersonas() {
 
 // 内置角色只存与种子不同的字段；自建角色存全部字段
 export async function savePersona(input: PersonaInput): Promise<Persona> {
-  const seed = PERSONAS.find((p) => p.id === input.id)
+  const seed = seeds().find((p) => p.id === input.id)
   const id = input.id && (seed || personaOf(input.id)) ? input.id : 'c' + randomUUID().slice(0, 8)
   const diff = <K extends keyof PersonaInput>(k: K) => (seed && input[k] === seed[k as keyof typeof seed] ? null : input[k])
   const prev = personaOf(id)
@@ -286,7 +307,7 @@ export async function savePersona(input: PersonaInput): Promise<Persona> {
 }
 
 export async function deletePersona(id: string) {
-  const builtin = PERSONAS.some((p) => p.id === id)
+  const builtin = seeds().some((p) => p.id === id)
   await write((c) => c.batch([
     builtin
       ? { sql: `INSERT INTO river_personas (persona_id, prompt, deleted) VALUES (?, '', 1) ON CONFLICT(persona_id) DO UPDATE SET deleted = 1`, args: [id] }

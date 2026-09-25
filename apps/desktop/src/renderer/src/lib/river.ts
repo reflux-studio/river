@@ -1,5 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
+import { dict, type Locale } from '@river/i18n'
 import type {
   Bootstrap, ChatMessage, CoachEntry, Commands, Events, FxRates, Lobby, Persona, PersonaInput, ProviderInput,
   ProviderPublic, RiverApi, Settings, TableStart, TableView
@@ -38,7 +39,7 @@ export interface RiverState {
 let state: RiverState = {
   ready: false,
   page: 'lobby',
-  settings: { speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} },
+  settings: { speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}, locale: 'zh' },
   lobby: { size: 6, blinds: 1, picks: [], mode: 'coach' },
   bankroll: 0,
   onboarded: true,
@@ -83,6 +84,9 @@ export async function invoke<K extends keyof Commands>(cmd: K, ...args: Paramete
     throw new Error(msg)
   }
 }
+
+// 语言在运行期间不变（只在引导页选一次），所以直接跟随 settings.locale
+export const useT = () => dict(useRiver((s) => s.settings.locale))
 
 export const go = (page: Page) => setState({ page })
 export const openRules = () => setState({ rulesOpen: true })
@@ -173,11 +177,17 @@ export const startGuided = () => startTable({ ...state.lobby, mode: 'coach', gui
 
 export const askCoach = (text: string) => invoke('coach.ask', text).catch(fail)
 
-export async function finishOnboarding() {
+// 所有结束引导的路径都走这里；主进程按所选语言重建对手预设，返回后才能开桌
+export async function finishOnboarding(locale: Locale) {
   setState({ rulesOpen: false })
   if (state.onboarded) return
   setState({ onboarded: true })
-  await invoke('onboarding.done').catch(fail)
+  try {
+    const { settings, personas } = await invoke('onboarding.done', locale)
+    setState({ settings, personas })
+  } catch (e) {
+    fail(e)
+  }
 }
 
 export async function saveProvider(input: ProviderInput) {

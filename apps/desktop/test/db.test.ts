@@ -1,7 +1,10 @@
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createClient } from '@libsql/client'
+import { presets } from '@river/i18n'
 import * as db from '../src/main/db'
+import { commandHandlers } from '../src/main/ipc'
+import type { TableRunner } from '../src/main/table/runner'
 import type { HandRecord } from '../src/shared/types'
 import { dropTempDb, tempDb } from './table-helpers'
 
@@ -57,7 +60,7 @@ describe('迁移', () => {
     ], 'write')
     c.close()
     await db.initDb({ url, ...crypto })
-    expect(db.getSettings()).toEqual({ ...{ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} }, speed: 2 })
+    expect(db.getSettings()).toEqual({ ...{ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}, locale: 'zh' }, speed: 2 })
     const li = db.personaOf('li')!
     expect(li).toMatchObject({ name: '阿狸', prompt: '旧提示词', builtin: true, edited: true, deleted: false })
     expect(db.personasCache.filter((p) => p.builtin)).toHaveLength(8)
@@ -66,7 +69,7 @@ describe('迁移', () => {
 
 describe('kv', () => {
   it('默认值', async () => {
-    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} })
+    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}, locale: 'zh' })
     expect(await db.getLobby()).toEqual({ size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'coach' })
     expect(await db.getBankroll()).toBe(100000)
     expect(await db.getOnboarded()).toBe(false)
@@ -77,7 +80,7 @@ describe('kv', () => {
     await db.updateSettings({ hard: true, models: { opponent: { providerId: 'p', modelId: 'o' } } })
     const want = {
       speed: 2, coachPersona: 0, level: 'novice', hard: true, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null,
-      models: { coach: { providerId: 'p', modelId: 'm' }, opponent: { providerId: 'p', modelId: 'o' } }
+      models: { coach: { providerId: 'p', modelId: 'm' }, opponent: { providerId: 'p', modelId: 'o' } }, locale: 'zh'
     }
     expect(db.getSettings()).toEqual(want)
     expect(db.settingsCache).toEqual(want)
@@ -133,6 +136,80 @@ describe('角色', () => {
     db.closeDb()
     await db.initDb({ url, ...crypto })
     expect(db.personaOf('k')!.deleted).toBe(false)
+  })
+})
+
+describe('语言', () => {
+  const reopen = async (systemLocale?: string) => {
+    db.closeDb()
+    await db.initDb({ url, ...crypto, systemLocale })
+  }
+
+  it('预选值：新库按系统语言，缺省为中文；老库（已完成引导、没存 locale）为中文', async () => {
+    expect(db.getSettings().locale).toBe('zh')
+    await reopen('en-US')
+    expect(db.getSettings().locale).toBe('en')
+    await reopen('zh-TW')
+    expect(db.getSettings().locale).toBe('zh')
+    // 预选值只在内存里：没存过的库换系统语言仍跟着变
+    await db.updateSettings({ speed: 2 })
+    const c = createClient({ url })
+    await c.execute(`UPDATE river_kv SET value = '{"speed":2}' WHERE key = 'settings'`)
+    c.close()
+    await reopen('en-US')
+    expect(db.getSettings()).toMatchObject({ locale: 'en', speed: 2 })
+    await db.setOnboarded(true)
+    await reopen('en-US')
+    expect(db.getSettings().locale).toBe('zh')
+    expect(db.personaOf('li')!.name).toBe('阿狸')
+  })
+
+  it('completeOnboarding：英文把人民币改美元、汇率置空，并换成英文预设；只生效一次', async () => {
+    await db.updateSettings({ fxRate: 7 })
+    const r = await db.completeOnboarding('en')
+    expect(r.settings).toMatchObject({ locale: 'en', currency: 'usd', fxRate: null })
+    expect(r.settings).toBe(db.getSettings())
+    expect(r.personas.find((p) => p.id === 'li')).toMatchObject({ name: 'Foxy', edited: false })
+    expect(r.personas).toBe(db.personasCache)
+    expect(await db.getOnboarded()).toBe(true)
+    await reopen('zh-CN')
+    expect(db.getSettings()).toMatchObject({ locale: 'en', currency: 'usd' })
+    const again = await db.completeOnboarding('zh')
+    expect(again.settings.locale).toBe('en')
+    expect(db.personaOf('li')!.name).toBe('Foxy')
+  })
+
+  it('completeOnboarding：币种不是人民币时不改；选中文不改币种', async () => {
+    await db.updateSettings({ currency: 'eur', fxRate: 0.9 })
+    expect((await db.completeOnboarding('en')).settings).toMatchObject({ locale: 'en', currency: 'eur', fxRate: 0.9 })
+    await reopen()
+    const c = createClient({ url })
+    await c.execute("DELETE FROM river_kv WHERE key IN ('settings', 'onboarded')")
+    c.close()
+    await reopen('en')
+    expect((await db.completeOnboarding('zh')).settings).toMatchObject({ locale: 'zh', currency: 'cny' })
+  })
+
+  it('ipc：settings.update 拒绝改语言；onboarding.done 转发', async () => {
+    const cmd = commandHandlers({ broadcast: () => {} } as unknown as TableRunner)
+    await expect(cmd['settings.update']({ locale: 'en' })).rejects.toThrow('locale is fixed after onboarding')
+    await expect(cmd['onboarding.done']('fr' as never)).rejects.toThrow('unknown locale')
+    expect(db.getSettings().locale).toBe('zh')
+    expect((await cmd['onboarding.done']('en')).settings.locale).toBe('en')
+    await expect(cmd['settings.update']({ locale: 'zh' })).rejects.toThrow('locale is fixed after onboarding')
+    expect((await cmd['settings.update']({ speed: 0 })).locale).toBe('en')
+  })
+
+  it('英文下保存与种子相同的字段存为空，恢复默认回到英文预设', async () => {
+    await db.completeOnboarding('en')
+    const seed = presets.en.find((p) => p.id === 'k')!
+    const k = db.personaOf('k')!
+    await db.savePersona({ ...k, name: 'King' })
+    const row = async () => { const c = createClient({ url }); const r = (await c.execute("SELECT name, tag, prompt, description FROM river_personas WHERE persona_id = 'k'")).rows[0]; c.close(); return r }
+    expect({ ...(await row()) }).toEqual({ name: 'King', tag: null, prompt: '', description: null })
+    expect(db.personaOf('k')).toMatchObject({ name: 'King', tag: seed.tag, edited: true })
+    await db.resetPersona('k')
+    expect(db.personaOf('k')).toMatchObject({ ...seed, edited: false })
   })
 })
 
@@ -338,7 +415,7 @@ describe('写锁冲突', () => {
     // 等锁不能在主线程同步阻塞
     expect(maxGap).toBeLessThan(100)
     expect(results.every((r) => r.status === 'rejected' && /SQLITE_BUSY/.test(String(r.reason)))).toBe(true)
-    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {} })
+    expect(db.getSettings()).toEqual({ speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}, locale: 'zh' })
     expect(db.getLobby().size).toBe(4)
     expect(db.listProviders().map((x) => x.name)).toEqual(['A'])
   }, 15000)

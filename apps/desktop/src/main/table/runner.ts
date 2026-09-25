@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { fmt } from '../../shared/format'
-import { BLINDS, STREET } from '../../shared/personas'
+import { dict } from '@river/i18n'
+import { BLINDS } from '../../shared/personas'
 import type { ChatMessage, CoachEntry, CoachState, Events, HandRecord, HeroAction, Mode, Persona, Recap, TableStart, TableView } from '../../shared/types'
 import { COACH_ASKS, coachAsk, coachRecap, coachSpeak } from '../agents/coach'
 import { setUsageListener, type Msg, type Usage, type UsageTag } from '../agents/llm'
@@ -240,7 +241,7 @@ export class TableRunner {
     const before = t.communityCards().length
     t.endBettingRound()
     const board = t.communityCards()
-    if (board.length > before) this.sys(STREET[t.roundOfBetting()], board)
+    if (board.length > before) this.sys(dict('zh').poker.street[t.roundOfBetting()], board)
     if (t.areBettingRoundsCompleted()) t.showdown()
     this.loop()
   }
@@ -288,7 +289,7 @@ export class TableRunner {
     const note = r.args.note?.trim().slice(0, 30)
     if (note) this.notes.set(pid, note)
     const think = r.args.think?.trim()
-    const digest = `${STREET[e.street]} ${act}${think ? `（想：${think}）` : ''}${say ? `；说：${say}` : ''}`
+    const digest = `${dict('zh').poker.street[e.street]} ${act}${think ? `（想：${think}）` : ''}${say ? `；说：${say}` : ''}`
     if (th.pushTool(hand, observed, 'act', r.args, { 实际: act, ...(say && { 公屏: say }) }, digest)) th.chatSeen = chat.lastId
     this.push({ kind: say ? 'msg' : 'act', from: pid, act, ...(say && { text: say }) })
     if (say) this.bubble(seat, say)
@@ -450,7 +451,7 @@ export class TableRunner {
   }
 
   private at(t: Table) {
-    return `[第 ${t.handNumber()} 手 ${STREET[t.roundOfBetting()]}]`
+    return `[第 ${t.handNumber()} 手 ${dict('zh').poker.street[t.roundOfBetting()]}]`
   }
 
   // 讲解、回答写入教练 thread：成功照写；失败或被跳过但界面已显示文字的，标「被打断」写入，玩家追问时教练能接上

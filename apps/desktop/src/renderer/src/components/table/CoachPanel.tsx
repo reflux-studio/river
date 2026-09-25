@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import { netColor, signed } from '@/lib/format'
 import { askCoach, invoke, toastError, updateSettings, useRiver } from '@/lib/river'
 import { cn } from '@/lib/utils'
-import { COACHES } from '../../../../shared/personas'
+import { dict } from '@river/i18n'
 import type { CoachEntry, Recap, Settings, TableView } from '../../../../shared/types'
 
 const QUICK = {
@@ -72,7 +72,7 @@ function RetryButton({ id }: { id: string }) {
 }
 
 function RecapCard({ e }: { e: CoachEntry }) {
-  const coachName = useRiver((s) => COACHES[s.settings.coachPersona].n)
+  const coachName = useRiver((s) => dict('zh').prompt.coaches[s.settings.coachPersona].n)
   return (
     <div className="shrink-0 overflow-hidden rounded-[14px] border bg-white">
       <div className="flex flex-col gap-2 bg-topbar px-3 py-2.5">
@@ -177,10 +177,10 @@ export function CoachPanel({ view: v }: { view: TableView }) {
       <div className="flex items-center gap-2.5 border-b border-[#f0f0ee] px-4 py-2.5">
         <div className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-[oklch(0.92_0.045_155)] text-xs font-semibold">师</div>
         <button
-          onClick={() => set({ coachPersona: ((st.coachPersona + 1) % COACHES.length) as Settings['coachPersona'] })}
+          onClick={() => set({ coachPersona: ((st.coachPersona + 1) % dict('zh').prompt.coaches.length) as Settings['coachPersona'] })}
           className="flex min-w-0 flex-1 flex-col text-left"
         >
-          <span className="text-sm font-semibold whitespace-nowrap">教练 · {COACHES[st.coachPersona].n} ▾</span>
+          <span className="text-sm font-semibold whitespace-nowrap">教练 · {dict('zh').prompt.coaches[st.coachPersona].n} ▾</span>
           <span className="text-xs whitespace-nowrap text-muted-foreground">{v.guided ? '教学牌局 · 每步详细讲解' : '每步先讲解 · 每手自动复盘'}</span>
         </button>
       </div>
