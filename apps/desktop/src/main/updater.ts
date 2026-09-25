@@ -26,7 +26,9 @@ export function initUpdater(e: Emit, u: Updater = electronUpdater.autoUpdater) {
   })
   // 后台检查或下载失败不打扰用户：下次定时检查再试
   u.on('error', (err) => console.error('updater', err))
-  const check = () => void u.checkForUpdates().catch((err) => console.error('updater', err))
+  const log = (err: unknown) => console.error('updater', err)
+  // 下载失败同样静默：下次定时检查会再下
+  const check = () => void u.checkForUpdates().then((r) => r?.downloadPromise?.catch(log), log)
   setTimeout(check, 10_000)
   setInterval(check, CHECK_MS)
 }

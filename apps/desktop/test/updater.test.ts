@@ -94,6 +94,17 @@ describe('后台检查', () => {
     expect(emit).not.toHaveBeenCalled()
   })
 
+  it('开启自动下载', async () => {
+    const { u } = await setup(async () => null)
+    expect(u.autoDownload).toBe(true)
+  })
+
+  it('定时检查发现新版本、下载失败，不推送', async () => {
+    const { emit } = await setup(async () => ({ isUpdateAvailable: true, updateInfo: { version: '9.9.9' }, downloadPromise: Promise.reject(new Error('download')) }))
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(emit).not.toHaveBeenCalled()
+  })
+
   it('定时检查失败也不推送', async () => {
     const { emit, u } = await setup(async () => {
       throw new Error('offline')
