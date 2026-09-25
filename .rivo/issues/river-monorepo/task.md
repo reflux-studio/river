@@ -577,6 +577,11 @@ export async function completeOnboarding(locale: Locale) {
 - `site.yml` 只在合并后验证（见整体验证）。
 
 **结果**：
+- 本地部分已完成：提交 `4278395`，小修见后续提交。
+  - F2：`site.yml` 的 paths 补上根目录的 `package.json`、`pnpm-workspace.yaml` 和 `site.yml` 本身；
+  - F3：`ci.yml` 增加 `pnpm build:site`。
+- 独立审阅：`reviews/T9-1.md`。本地检查全部通过，没有发现缺陷。F4（desktop 重复声明 packageManager）、F5（README 措辞）是可选改进，不做。
+- **未完成**：F1，推送分支后 `ci.yml` 的结果，以及手动触发 `build.yml` 时三个平台是否都能打包。这两项要用户同意推送后才能做，Windows 和 Linux 在 workspace 布局下打包还没有实测过。
 
 ## 整体验证与交接
 

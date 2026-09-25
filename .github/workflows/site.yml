@@ -7,6 +7,9 @@ on:
       - 'apps/site/**'
       - 'packages/**'
       - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.github/workflows/site.yml'
   workflow_dispatch:
 
 permissions:
