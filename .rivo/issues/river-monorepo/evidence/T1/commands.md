@@ -4,7 +4,7 @@
 
 | 命令 | 结果 |
 |---|---|
-| `rm -rf node_modules && pnpm install` | 通过；lockfile 只改了 importers 部分（+13/−22），没有依赖版本变化 |
+| `rm -rf node_modules && pnpm install` | 通过；lockfile 主要改动在 importers；`@types/ws` 依赖的 `@types/node` 从 26.6.2 变为 24.13.6（只影响类型，见 reviews/T1-1.md F3） |
 | `pnpm typecheck` | exit 0（apps/desktop：`tsc -p tsconfig.node.json` 和 `tsc -p tsconfig.web.json`） |
 | `pnpm test` | 8 个文件、132 个用例全部通过（含 engine.test.ts 与原型的对照，读取 `../../../.rivo/...`） |
 | `pnpm --filter ./apps/desktop exec pwd` | 解析到 `apps/desktop`（根目录 dev/dist 脚本用的就是这个 filter） |

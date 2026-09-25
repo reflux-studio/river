@@ -525,7 +525,7 @@ async function checkNow(): Promise<UpdateCheck> {
 
 **已批准延后验证的事项**：
 
-- **打包布局**：pnpm workspace 下 libsql 的打包在第一阶段实测。如果需要改用 hoisted 布局（`pnpm-workspace.yaml` 中写 `nodeLinker: hoisted`，以 pnpm 文档为准），只改变安装布局，不影响本方案的其他部分，届时把结果写回本节。
+- **打包布局**：第一阶段已经实测（T1，`evidence/T1/commands.md`）。pnpm 默认的 isolated 布局可行：迁移前后 `app.asar` 的文件列表完全相同，`app.asar.unpacked` 中的 libsql 文件也一致，所以不需要 hoisted。
 - **官网上线**：只能在合并后验证。失败只影响官网，不影响 app。
 
 **AI 建议、沿用现有行为的规则**：已完成引导的老用户语言为中文（这一点已在 plan 中向用户说明，用户回复“可以，开干吧”）。
