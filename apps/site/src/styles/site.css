@@ -1,0 +1,27 @@
+@import 'tailwindcss';
+@import '@river/ui/tokens.css';
+/* ui 包的组件类名要被 Tailwind 扫到 */
+@source '../../../../packages/ui/src';
+
+@theme {
+  --color-brand: oklch(0.45 0.1 158);
+  --color-brand-hover: oklch(0.47 0.1 158);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  /* 设计稿按浏览器默认行高排版；牌桌舞台内部另设 1.5，与 app 一致 */
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    line-height: normal;
+  }
+  a {
+    @apply text-foreground no-underline hover:text-brand-hover;
+  }
+}

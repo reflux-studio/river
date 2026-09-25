@@ -30,6 +30,7 @@ mac:
   identity: '-'
   # hardened runtime 只在公证时需要；ad-hoc 签名下开启它会让库校验拦下 libsql 的 .node
   hardenedRuntime: false
+  # 官网下载区按这三处 artifactName 匹配安装包（apps/site/src/lib/store.ts 的 ASSET），改名时同步
   artifactName: ${productName}-${version}-${arch}.${ext}
 win:
   icon: build/icon.ico
