@@ -44,7 +44,9 @@ function load() {
     .then((j: { tag_name: string; assets?: { name: string; browser_download_url: string }[] } | null) => {
       if (!j) return
       const rel: Release = { v: j.tag_name }
-      for (const os of Object.keys(ASSET) as Os[]) rel[os] = j.assets?.find((a) => ASSET[os].test(a.name))?.browser_download_url
+      // 响应内容不可信：只接受 GitHub 的下载地址，否则保持 releases/latest
+      const safe = (u?: string) => (u?.startsWith('https://github.com/reflux-studio/river/releases/download/') ? u : undefined)
+      for (const os of Object.keys(ASSET) as Os[]) rel[os] = safe(j.assets?.find((a) => ASSET[os].test(a.name))?.browser_download_url)
       setSite({ rel })
     })
     // 请求失败时链接保持 releases/latest，版本号不显示

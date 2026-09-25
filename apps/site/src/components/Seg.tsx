@@ -11,7 +11,7 @@ export function Seg<K extends string>({ opts, value, onChange, className = 'roun
   return (
     <div className={`flex ${className}`}>
       {opts.map(([k, l]) => (
-        <button key={k} type="button" onClick={() => onChange(k)} className={`cursor-pointer rounded-[7px] border-0 whitespace-nowrap ${item} ${value === k ? on : off}`}>
+        <button key={k} type="button" aria-pressed={value === k} onClick={() => onChange(k)} className={`cursor-pointer rounded-[7px] border-0 whitespace-nowrap ${item} ${value === k ? on : off}`}>
           {l}
         </button>
       ))}

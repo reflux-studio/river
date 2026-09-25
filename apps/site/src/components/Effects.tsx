@@ -67,6 +67,7 @@ export default function Effects({ lang }: { lang: Locale }) {
                   type="button"
                   title={D.common.felt[f.k]}
                   aria-label={D.common.felt[f.k]}
+                  aria-pressed={st.felt === f.k}
                   onClick={() => setSite({ felt: f.k })}
                   className="size-6 cursor-pointer rounded-full border-0"
                   style={{ background: f.felt, boxShadow: st.felt === f.k ? ON : OFF }}
@@ -89,11 +90,12 @@ export default function Effects({ lang }: { lang: Locale }) {
           </Row>
           <Row label={E.back}>
             <div className="flex gap-2">
-              {BACKS.map((b) => (
+              {BACKS.map((b, i) => (
                 <button
                   key={b.k}
                   type="button"
-                  aria-label={b.k}
+                  aria-label={`${E.back} ${i + 1}`}
+                  aria-pressed={st.back === b.k}
                   onClick={() => setSite({ back: b.k })}
                   className="box-border h-7 w-5 cursor-pointer rounded-[4px] border-0 bg-white p-0.5"
                   style={{ boxShadow: st.back === b.k ? ON : OFF }}

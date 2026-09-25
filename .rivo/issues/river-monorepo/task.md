@@ -540,6 +540,13 @@ export async function completeOnboarding(locale: Locale) {
 - 语言切换链接能在 `/river/` 和 `/river/en/` 之间往返，并带上 `base`。
 
 **结果**：
+- 已完成：提交 `4c99226`（engine tsconfig 拆分）、`6fe12e5`（官网）、`05395c3`（证据），小修见后续提交。
+  - F3：下载链接只接受 `https://github.com/reflux-studio/river/releases/download/` 开头的地址，已对照真实 release 核实；
+  - F5：分段按钮、牌桌色和牌背按钮加上 `aria-pressed`，牌背按钮的 `aria-label` 改为“牌背 N”。
+- 独立审阅：`reviews/T8-1.md`，结论为通过。
+  - F1：演示桌一手结束后，底池数字保留、弃牌座位保持变灰，都是 TableStage 的现有行为。用户已经决定演示桌复用 app 的实现，所以接受。
+  - F2（文案重复）、F4（演示桌不在可视区时不暂停）是可选改进，不做。
+- 没有给 `TableStage` 加 `className`：外层包裹就能满足布局要求。
 
 ## 任务 9：CI、发布与文档
 
