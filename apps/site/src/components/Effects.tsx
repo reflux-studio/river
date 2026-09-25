@@ -1,4 +1,4 @@
-import { dict, type Locale } from '@river/i18n'
+import { dict, presets, type Locale } from '@river/i18n'
 import { BACKS, backPattern, EmptyCard, feltOf, FELTS, PlayingCard, playAllIn, RAINBOW, Seat } from '@river/ui'
 import type { Fx } from '@river/ui/types'
 import { useEffect, useRef } from 'react'
@@ -22,6 +22,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function Effects({ lang }: { lang: Locale }) {
   const E = site[lang].effects
   const D = dict(lang)
+  const cow = presets[lang].find((p) => p.id === 'cow')!
   const st = useSite()
   const F = feltOf(st)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -94,7 +95,7 @@ export default function Effects({ lang }: { lang: Locale }) {
                 <button
                   key={b.k}
                   type="button"
-                  aria-label={`${E.back} ${i + 1}`}
+                  aria-label={E.backN(i + 1)}
                   aria-pressed={st.back === b.k}
                   onClick={() => setSite({ back: b.k })}
                   className="box-border h-7 w-5 cursor-pointer rounded-[4px] border-0 bg-white p-0.5"
@@ -123,7 +124,7 @@ export default function Effects({ lang }: { lang: Locale }) {
         {/* Seat 以自身中心定位在这个零尺寸点上（i=1、n=2 时极坐标偏移为 0） */}
         <div className="absolute top-[18%] left-1/2 size-0">
           <Seat
-            seat={{ ...E.seat, hue: 95, stack: 0, bet: 0, isDealer: false, isSB: false, isBB: false, folded: false, out: false, allin: true, status: E.allin, statusTone: 'red', thinking: false, winner: false, hasCards: false }}
+            seat={{ name: cow.name, tag: cow.tag, ini: cow.ini, hue: cow.hue, stack: 0, bet: 0, isDealer: false, isSB: false, isBB: false, folded: false, out: false, allin: true, status: E.allin, statusTone: 'red', thinking: false, winner: false, hasCards: false }}
             i={1}
             n={2}
             isHero={false}

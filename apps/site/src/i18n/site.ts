@@ -105,7 +105,7 @@ const zh = {
     back: '牌背',
     custom: '自选颜色',
     fxOpts: [['full', '完整'], ['lite', '精简'], ['off', '关闭']] as [string, string][],
-    seat: { name: '牛仔', tag: '冒险家', ini: '牛' },
+    backN: (n: number) => `牌背 ${n}`,
     allin: '全下 10,000',
     fold: '弃牌'
   },
@@ -270,7 +270,7 @@ const en: typeof zh = {
     back: 'Backs',
     custom: 'Custom color',
     fxOpts: [['full', 'Full'], ['lite', 'Reduced'], ['off', 'Off']],
-    seat: { name: 'Cowboy', tag: 'Gambler', ini: 'C' },
+    backN: (n: number) => `Card back ${n}`,
     allin: 'All-in 10,000',
     fold: 'Fold'
   },
