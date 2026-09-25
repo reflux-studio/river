@@ -166,7 +166,8 @@
 - `Table.tsx` 改为使用 `<TableStage>`，把原来的“公屏”按钮和外观浮层作为 `children` 传入。
 - `index.css` 改为 `@import '@river/ui/tokens.css'`，并加上 `@source` 扫描 `packages/ui/src`。
 - `shared/types.ts`：`SeatViewPublic` 改为 `export type { SeatView as SeatViewPublic }`，同时重新导出 `Felt`、`Back`、`Fx`；`SeatView` 新增 `lastAct?: LastAct`。
-- `main/table/view.ts` 用 `lastActs` 给 `lastAct` 赋值（原来的状态文字计算不变）。当前街为 `'showdown'` 时改为传入 `'river'`，并补一条用例：摊牌时 `lastAct` 等于河牌圈的最后动作。
+- `packages/engine/src/last-acts.ts`：传入 `'showdown'` 时按 `'river'` 统计（只改一行）。在 engine 的单元测试中补一条用例：摊牌时，结果等于河牌圈的最后动作。
+- `main/table/view.ts` 用 `lastActs(log, 当前街)` 给 `lastAct` 赋值，原来的状态文字计算不变。
 - 边界情况：全下后多余部分被退回的座位，`lastAct` 仍是 `'allin'`，但 `allin` 状态为 false。全下特效按 `allin` 状态由假变真来判断，不受影响；加注特效要求 `lastAct` 为 bet 或 raise，也不受影响。
 - `Appearance.tsx` 中的牌桌色名称，暂时在 desktop 本地用 key→中文的映射表提供，T6 再改成从 i18n 取。
 - `feltOf` 的参数类型改为 `{ felt: Felt; feltCustom: string }`，不再引用 desktop 的 `Settings`。
@@ -223,7 +224,8 @@
   - 赢家延时收筹码；
   - 气泡；
   - `lite` 和 `off` 两档。
-- 和 `evidence/T1/baseline/` 中的牌桌截图对比，新截图保存到 `evidence/T3/`。这一步要在 dev 下真实开一桌、打过至少一手（补上 T2 审阅 F4）。会调用用户在 dev 数据里配置的模型，一手的费用约 ¥0.01。
+- 和 `evidence/T1/baseline/` 中的牌桌截图对比，新截图保存到 `evidence/T3/`。
+- 真实开桌要调用用户配置的模型，会产生费用：迁移前拍基线时，打一手在界面上显示约 ¥0.0083。这部分由主代理在取得用户同意后自己做，执行者不开桌。开桌后打若干手，逐项核对上面的特效（补上 T2 审阅 F4）。执行者只负责不花钱的检查，包括大厅渲染、组件单元测试和 typecheck。
 - 主进程误引 `@river/ui` 主入口时 typecheck 会失败：临时试一次，确认后撤回。
 
 **结果**：
@@ -465,7 +467,7 @@ export async function completeOnboarding(locale: Locale) {
 
 **前置依赖**：T3、T5（演示桌的英文状态文字需要 T5 提供的 `handCat` 和英文术语）。
 
-**另需处理**（T2 审阅 F3）：engine 的 tsconfig 为了测试开启了 Node 类型，src 里误用 Node API 时类型检查不会报错。官网在浏览器中运行 engine，所以本任务要把 engine 的 src 和 test 拆成两个 tsconfig，src 不带 Node 类型；也可以用 `astro check` 覆盖到 engine 源码。
+**另需处理**（T2 审阅 F3）：engine 的 tsconfig 为了测试开启了 Node 类型，src 里误用 Node API 时类型检查不会报错。官网在浏览器中运行 engine，所以本任务要把 engine 的 src 和 test 拆成两个 tsconfig：`tsconfig.json` 只包含 src，不带 Node 类型；`tsconfig.test.json` 包含 test，带 Node 类型。engine 的 typecheck 脚本改为依次检查这两个配置。验证方法：在 src 里临时写入一个 `Buffer`，确认 typecheck 失败，然后撤回。
 
 **修改位置**：
 - `apps/site/{package.json,astro.config.mjs,tsconfig.json}`；
