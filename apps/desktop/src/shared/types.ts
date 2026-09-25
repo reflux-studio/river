@@ -248,6 +248,12 @@ export interface TableStart {
   guided: boolean
 }
 
+export type UpdateCheck =
+  | { state: 'latest' }
+  | { state: 'downloading'; version: string }
+  | { state: 'ready'; version: string }
+  | { state: 'error'; message: string }
+
 export interface Commands {
   'app.bootstrap': () => Bootstrap
   'settings.update': (patch: Partial<Settings>) => Settings
@@ -278,6 +284,7 @@ export interface Commands {
   'data.resetMemory': () => void
   'onboarding.done': (locale: Locale) => { settings: Settings; personas: Persona[] }
   'update.install': () => void
+  'update.check': () => UpdateCheck
 }
 
 export interface Events {
@@ -292,6 +299,8 @@ export interface Events {
   'hands:changed': void
   'usage:changed': void
   'update:ready': { version: string }
+  // 手动检查发现新版本后，这次下载失败
+  'update:error': { message: string }
   fx: FxRates
 }
 

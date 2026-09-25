@@ -6,7 +6,7 @@ import { guardQuit, registerIpc } from './ipc'
 import { fxRates, loadFx, refreshFx } from './models/fx'
 import { loadPrices, refreshPrices } from './models/prices'
 import { TableRunner } from './table/runner'
-import { initUpdater, installUpdate, readyVersion } from './updater'
+import { checkNow, initUpdater, installUpdate, readyVersion } from './updater'
 
 let win: BrowserWindow | null = null
 
@@ -58,12 +58,12 @@ app.whenReady().then(async () => {
   }
   void refreshPrices()
   void refreshFx().then((fx) => fx && runner.emit('fx', fx))
-  registerIpc(ipcMain, runner, { version: () => app.getVersion(), update: readyVersion, install: installUpdate, fx: fxRates, packaged: app.isPackaged })
+  registerIpc(ipcMain, runner, { version: () => app.getVersion(), update: readyVersion, install: installUpdate, check: checkNow, fx: fxRates, packaged: app.isPackaged })
   guardQuit(app, runner)
   // 默认菜单带 Ctrl+R 刷新、Ctrl+Shift+I DevTools 等快捷键，正式包不应暴露；开发时保留
   if (process.platform !== 'darwin' && app.isPackaged) Menu.setApplicationMenu(null)
   createWindow()
-  initUpdater(runner.emit)
+  if (app.isPackaged) initUpdater(runner.emit)
 })
 
 app.on('window-all-closed', () => app.quit())

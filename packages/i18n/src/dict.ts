@@ -413,6 +413,15 @@ export const zh = {
       cantDecrypt: '无法解密 API key，请重新输入',
       connectTimeout: '连接超时',
       callTimeout: '调用超时'
+    },
+    update: {
+      check: '检查更新',
+      devOnly: '开发版本不检查更新',
+      latest: '已是最新版本',
+      downloading: (v: string) => `发现新版本 ${v}，正在后台下载`,
+      ready: (v: string) => `新版本 ${v} 已就绪，可在顶栏重启更新`,
+      checkFailed: '检查更新失败，请稍后再试',
+      downloadFailed: '下载失败，稍后自动重试'
     }
   },
   prompt: promptZh
@@ -827,6 +836,15 @@ export const en: typeof zh = {
       cantDecrypt: 'Can’t decrypt the API key. Please enter it again',
       connectTimeout: 'Connection timed out',
       callTimeout: 'Call timed out'
+    },
+    update: {
+      check: 'Check for updates',
+      devOnly: 'Development builds don’t check for updates',
+      latest: 'You’re up to date',
+      downloading: (v) => `Downloading ${v} in the background`,
+      ready: (v) => `${v} is ready — restart from the top bar`,
+      checkFailed: 'Couldn’t check for updates',
+      downloadFailed: 'Download failed, will retry later'
     }
   },
   prompt: promptEn

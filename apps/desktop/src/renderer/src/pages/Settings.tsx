@@ -261,9 +261,22 @@ function FxRate() {
 function Data() {
   const view = useRiver((s) => s.view)
   const version = useRiver((s) => s.version)
-  const s = useT().desktop.settings
+  const packaged = useRiver((s) => s.packaged)
+  const t = useT().desktop
+  const s = t.settings
+  const [checking, setChecking] = useState(false)
   const run = (cmd: 'data.clearHistory' | 'data.resetMemory', ok: string) =>
     invoke(cmd).then(() => toast.success(ok), toastError)
+  const checkUpdate = () => {
+    setChecking(true)
+    invoke('update.check')
+      .then((r) => {
+        if (r.state === 'latest') toast.success(t.update.latest)
+        else if (r.state === 'error') toast.error(r.message)
+        else toast.success(r.state === 'ready' ? t.update.ready(r.version) : t.update.downloading(r.version))
+      }, toastError)
+      .finally(() => setChecking(false))
+  }
 
   return (
     <Group title={s.data}>
@@ -280,8 +293,11 @@ function Data() {
           <button className={pillBtn} disabled={!!view}>{s.resetAction}</button>
         </Confirm>
       </Row>
-      <Row label={s.version} desc={s.versionDesc}>
-        <span className="text-sm font-semibold">{version}</span>
+      <Row label={s.version} desc={packaged ? s.versionDesc : t.update.devOnly}>
+        <span className="flex items-center gap-3">
+          <span className="text-sm font-semibold">{version}</span>
+          <button className={pillBtn} disabled={!packaged || checking} onClick={checkUpdate}>{t.update.check}</button>
+        </span>
       </Row>
     </Group>
   )

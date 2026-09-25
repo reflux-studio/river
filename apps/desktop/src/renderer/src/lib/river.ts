@@ -32,6 +32,7 @@ export interface RiverState {
   // 入座被拦下（没配模型）时的提示
   needModel: 'opponent' | 'coach' | null
   version: string
+  packaged: boolean
   update: string | null
   fx: FxRates | null
 }
@@ -51,6 +52,7 @@ let state: RiverState = {
   rulesOpen: false,
   needModel: null,
   version: '',
+  packaged: false,
   update: null,
   fx: null
 }
@@ -103,6 +105,7 @@ function listen() {
   river.on('bankroll', (bankroll) => setState({ bankroll }))
   river.on('personas', (personas) => setState({ personas }))
   river.on('update:ready', ({ version }) => setState({ update: version }))
+  river.on('update:error', ({ message }) => toast.error(message))
   river.on('fx', (fx) => setState({ fx }))
 }
 
@@ -122,6 +125,7 @@ export async function init() {
     coach: b.coachThread,
     rulesOpen: !b.onboarded,
     version: b.version,
+    packaged: b.packaged,
     update: b.update,
     fx: b.fx
   })

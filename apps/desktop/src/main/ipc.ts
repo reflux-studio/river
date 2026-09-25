@@ -1,7 +1,7 @@
 import type { App, IpcMain } from 'electron'
 import { PROVIDER_REGISTRY } from '@mastra/core/llm'
 import { dict } from '@river/i18n'
-import type { Commands, FxRates, Recap } from '../shared/types'
+import type { Commands, FxRates, Recap, UpdateCheck } from '../shared/types'
 import {
   clearHistory, clearMemory, completeOnboarding, deletePersona, deleteProvider, getBankroll, getHand, getLobby, handKeyOf, listUsage, getOnboarded, getReview, getSettings, listHands,
   listProviders, personasCache, resetPersona, resetUsage, restorePersona, saveProvider, savePersona, settingsCache, updateLobby, updateSettings
@@ -16,6 +16,7 @@ export interface AppInfo {
   version: () => string
   update: () => string | null
   install: () => void
+  check: () => Promise<UpdateCheck>
   fx: () => FxRates | null
   packaged: boolean
 }
@@ -31,7 +32,7 @@ function parseReview(text: string): Recap | string {
   return text
 }
 
-export function commandHandlers(runner: TableRunner, app: AppInfo = { version: () => '0.0.0', update: () => null, install: () => {}, fx: () => null, packaged: false }): Handlers {
+export function commandHandlers(runner: TableRunner, app: AppInfo = { version: () => '0.0.0', update: () => null, install: () => {}, check: async () => ({ state: 'latest' }), fx: () => null, packaged: false }): Handlers {
   const personasChanged = () => runner.emit('personas', personasCache)
   const err = () => dict(settingsCache.locale).desktop.error
   return {
@@ -128,7 +129,8 @@ export function commandHandlers(runner: TableRunner, app: AppInfo = { version: (
     'update.install': () => {
       if (runner.table) throw new Error(err().leaveFirst)
       app.install()
-    }
+    },
+    'update.check': () => app.check()
   }
 }
 
