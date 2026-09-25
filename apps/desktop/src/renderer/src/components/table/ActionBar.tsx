@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { fmt } from '@/lib/format'
 import { useHotkeys } from '@/lib/hotkeys'
-import { go, invoke, toastError } from '@/lib/river'
+import { go, invoke, toastError, useT } from '@/lib/river'
 import { cn } from '@/lib/utils'
 import type { TableView } from '../../../../shared/types'
 
@@ -16,14 +16,15 @@ const pill = 'rounded-full border border-input bg-white px-3 py-1 text-[13px] wh
 const ALL_IN = 'linear-gradient(180deg, oklch(0.62 0.21 28), oklch(0.52 0.2 25))'
 
 function Stalled({ s }: { s: NonNullable<TableView['stalled']> }) {
+  const t = useT()
   return (
     <div className="flex items-center gap-2.5 rounded-[10px] bg-[oklch(0.97_0.02_25)] px-3.5 py-2.5 text-[13px]">
       <span className="size-1.5 shrink-0 rounded-full bg-lose" />
       <span className="min-w-0 flex-1 truncate">
-        <b className="font-semibold">{s.name}</b> 的模型调用失败，牌局已停下：{s.error}
+        <b className="font-semibold">{s.name}</b>{t.desktop.action.stalled(s.error)}
       </span>
-      {s.settings && <button onClick={() => go('settings')} className={pill}>去设置</button>}
-      <button onClick={() => cmd(invoke('table.retry'))} className="rounded-full bg-foreground px-3 py-1 text-[13px] whitespace-nowrap text-white">重试</button>
+      {s.settings && <button onClick={() => go('settings')} className={pill}>{t.desktop.btn.goSettings}</button>}
+      <button onClick={() => cmd(invoke('table.retry'))} className="rounded-full bg-foreground px-3 py-1 text-[13px] whitespace-nowrap text-white">{t.desktop.btn.retry}</button>
     </div>
   )
 }
@@ -33,6 +34,9 @@ export function ActionBar({ view: v }: { view: TableView }) {
   const { legal: L, isTurn, defaultRaiseTo, presets, toCall } = v.hero
   const hero = v.seats[0]
   const coach = v.coach
+  const t = useT()
+  const a = t.desktop.action
+  const pa = t.poker.act
   const clamp = (x: number) => Math.max(L.minTo, Math.min(L.maxTo, x))
   const [raiseTo, setRaiseTo] = useState(defaultRaiseTo)
   // 每个新的决策点回到主进程算好的默认加注额
@@ -65,14 +69,14 @@ export function ActionBar({ view: v }: { view: TableView }) {
 
   const thinking = v.seats.find((s) => s.thinking)
   const status = v.stalled
-    ? '牌局已停下'
-    : coach?.busy === 'ask' ? '教练回答中，牌局暂停'
-      : isTurn ? (coach?.locked ? '教练正在看牌…' : `轮到你 · 需跟注 ${fmt(toCall)}`)
-        : hero.folded ? `你已弃牌${thinking ? ` · ${thinking.name} 正在思考…` : ''}`
-          : thinking ? `等待 ${thinking.name} 行动…` : v.runout ? '发牌中…' : ''
+    ? a.stopped
+    : coach?.busy === 'ask' ? a.coachAnswering
+      : isTurn ? (coach?.locked ? t.desktop.coachPanel.looking : a.yourTurn(fmt(toCall)))
+        : hero.folded ? a.youFolded + (thinking ? a.thinking(thinking.name) : '')
+          : thinking ? a.waiting(thinking.name) : v.runout ? a.dealing : ''
   const isAllIn = canRaise && raiseTo >= L.maxTo
-  const callLabel = toCall === 0 ? '过牌' : toCall >= hero.stack ? `全下 ${fmt(toCall)}` : `跟注 ${fmt(toCall)}`
-  const raiseLabel = isAllIn ? `全下 ${fmt(L.maxTo)}` : L.bet + L.toCall === 0 ? '下注' : '加注至'
+  const callLabel = toCall === 0 ? pa.check : `${toCall >= hero.stack ? pa.allin : pa.call} ${fmt(toCall)}`
+  const raiseLabel = isAllIn ? `${pa.allin} ${fmt(L.maxTo)}` : L.bet + L.toCall === 0 ? pa.bet : pa.raiseTo
   const ctrl = cn('flex gap-1.5', !canAct && 'pointer-events-none opacity-40')
 
   return (
@@ -95,12 +99,12 @@ export function ActionBar({ view: v }: { view: TableView }) {
             <div className="flex-1" />
             <span className={cn('text-[13px] whitespace-nowrap', isTurn && !coach?.locked ? 'text-blue' : 'text-muted-foreground')}>{status}</span>
             {isTurn && coach?.busy === 'speak' && (
-              <button onClick={() => cmd(invoke('coach.skip'))} className={pill}>不等了</button>
+              <button onClick={() => cmd(invoke('coach.skip'))} className={pill}>{a.skipWait}</button>
             )}
           </div>
           <div className={cn(ctrl, 'items-stretch gap-2')}>
             <button onClick={() => act('fold')} className={cn(btn, 'border border-input bg-white hover:bg-accent')}>
-              弃牌<Key k="F" />
+              {pa.fold}<Key k="F" />
             </button>
             <button onClick={() => act('call')} className={cn(btn, 'border border-input bg-white hover:bg-accent')}>
               {callLabel}<Key k="C" />
@@ -143,15 +147,15 @@ export function ActionBar({ view: v }: { view: TableView }) {
           </div>
           {coach?.busy === 'recap' && (
             <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-              教练复盘中…
-              <button onClick={() => cmd(invoke('coach.skip'))} className={pill}>跳过</button>
+              {a.recapping}
+              <button onClick={() => cmd(invoke('coach.skip'))} className={pill}>{a.skip}</button>
             </div>
           )}
-          {coach?.busy === 'ask' && <span className="text-[13px] text-muted-foreground">教练回答中…</span>}
+          {coach?.busy === 'ask' && <span className="text-[13px] text-muted-foreground">{a.answering}</span>}
           {v.heroBust ? (
-            <button onClick={next} disabled={!canNext} className={primary}>重新买入 {fmt(bb * 100)}</button>
+            <button onClick={next} disabled={!canNext} className={primary}>{a.rebuy(fmt(bb * 100))}</button>
           ) : (
-            <button onClick={next} disabled={!canNext} className={cn(primary, 'flex items-center gap-2')}>下一手<Key k="N" dark /></button>
+            <button onClick={next} disabled={!canNext} className={cn(primary, 'flex items-center gap-2')}>{a.next}<Key k="N" dark /></button>
           )}
         </div>
       )}

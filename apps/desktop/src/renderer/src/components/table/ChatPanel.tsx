@@ -1,25 +1,27 @@
 import { Avatar, MiniCards } from '@river/ui'
 import { useEffect, useRef } from 'react'
-import { useRiver } from '@/lib/river'
+import { useRiver, useT } from '@/lib/river'
 import type { ChatMessage } from '../../../../shared/types'
 
 export function useSpeaker() {
   const personas = useRiver((s) => s.personas)
   const seats = useRiver((s) => s.view?.seats)
+  const t = useT()
   // 先按本桌入座快照解析：牌局中删除的对手照常显示
   return (from?: string) => {
-    if (!from || from === 'hero') return { name: '你', ini: '你', hue: undefined as number | undefined }
+    if (!from || from === 'hero') return { name: t.desktop.table.you, ini: t.desktop.table.youIni, hue: undefined as number | undefined }
     const p = seats?.find((x) => x.personaId === from) ?? personas.find((x) => x.id === from)
-    return p ? { name: p.name, ini: p.ini, hue: p.hue as number | undefined } : { name: '？', ini: '？', hue: undefined }
+    return p ? { name: p.name, ini: p.ini, hue: p.hue as number | undefined } : { name: t.desktop.model.unknown, ini: t.desktop.model.unknown, hue: undefined }
   }
 }
 
-export const lastSaid = (chat: ChatMessage[]) => [...chat].reverse().find((m) => m.kind === 'msg' && m.text)
+export const lastSaid = (chat: ChatMessage[]) => [...chat].reverse().find((m): m is ChatMessage & { text: string } => m.kind === 'msg' && !!m.text)
 
 // 公屏只读：对手只在自己回合随行动说一句，玩家不发言（U1）
 export function ChatPanel({ onCollapse }: { onCollapse: () => void }) {
   const chat = useRiver((s) => s.chat)
   const who = useSpeaker()
+  const c = useT().desktop.chat
   const listRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = listRef.current
@@ -29,8 +31,8 @@ export function ChatPanel({ onCollapse }: { onCollapse: () => void }) {
   return (
     <aside className="flex min-h-0 w-[248px] shrink-0 flex-col border-r min-[1100px]:w-72">
       <div className="flex items-center gap-2 border-b border-[#f0f0ee] px-4 py-3">
-        <span className="text-[15px] font-semibold">公屏</span>
-        <button onClick={onCollapse} className="text-xs whitespace-nowrap text-muted-foreground">收起</button>
+        <span className="text-[15px] font-semibold">{c.title}</span>
+        <button onClick={onCollapse} className="text-xs whitespace-nowrap text-muted-foreground">{c.collapse}</button>
       </div>
       <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-4 py-3.5">
         {chat.map((m) => {
@@ -63,7 +65,7 @@ export function ChatPanel({ onCollapse }: { onCollapse: () => void }) {
             </div>
           )
         })}
-        {!chat.length && <div className="text-[13px] text-muted-foreground">对手轮到自己时会随行动说一句。</div>}
+        {!chat.length && <div className="text-[13px] text-muted-foreground">{c.empty}</div>}
       </div>
     </aside>
   )

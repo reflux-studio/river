@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { getRegistry, saveProvider } from '@/lib/river'
+import { getRegistry, saveProvider, useT } from '@/lib/river'
 import type { ProviderPublic } from '../../../shared/types'
 
 type Registry = Awaited<ReturnType<typeof getRegistry>>
@@ -17,6 +17,8 @@ export function useRegistry() {
 
 function Form({ provider, onDone }: { provider?: ProviderPublic; onDone: () => void }) {
   const reg = useRegistry()
+  const t = useT()
+  const P = t.desktop.provider
   const [kind, setKind] = useState(provider?.kind ?? '')
   const [name, setName] = useState(provider?.name ?? '')
   const [apiKey, setApiKey] = useState('')
@@ -67,14 +69,14 @@ function Form({ provider, onDone }: { provider?: ProviderPublic; onDone: () => v
       }}
     >
       <DialogHeader>
-        <DialogTitle className="text-lg font-semibold">{provider ? '编辑提供方' : '添加提供方'}</DialogTitle>
-        <DialogDescription>API key 只保存在本机，用系统钥匙串加密。</DialogDescription>
+        <DialogTitle className="text-lg font-semibold">{provider ? P.editTitle : P.addTitle}</DialogTitle>
+        <DialogDescription>{P.desc}</DialogDescription>
       </DialogHeader>
       <div className="flex flex-col gap-1.5">
-        <Label>类型{provider && <span className="font-normal text-muted-foreground">（换类型请新建提供方）</span>}</Label>
+        <Label>{P.kind}{provider && <span className="font-normal text-muted-foreground">{P.kindLocked}</span>}</Label>
         <Select value={kind} onValueChange={pickKind} disabled={!!provider}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="选择提供方类型" />
+            <SelectValue placeholder={P.kindPh} />
           </SelectTrigger>
           <SelectContent className="max-h-72">
             {kinds.map((r) => (
@@ -87,7 +89,7 @@ function Form({ provider, onDone }: { provider?: ProviderPublic; onDone: () => v
         </Select>
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="pv-name">名称</Label>
+        <Label htmlFor="pv-name">{P.name}</Label>
         <Input id="pv-name" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       {compatible && (
@@ -97,20 +99,20 @@ function Form({ provider, onDone }: { provider?: ProviderPublic; onDone: () => v
         </div>
       )}
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="pv-key">API key{compatible && <span className="font-normal text-muted-foreground">（可选）</span>}</Label>
+        <Label htmlFor="pv-key">API key{compatible && <span className="font-normal text-muted-foreground">{P.optional}</span>}</Label>
         <Input
           id="pv-key"
           type="password"
           autoComplete="off"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder={provider?.keyTail ? `已保存 ····${provider.keyTail}，留空则不修改` : ''}
+          placeholder={provider?.keyTail ? P.keyKeep(provider.keyTail) : ''}
         />
       </div>
       {error && <p className="text-[13px] text-lose">{error}</p>}
       <DialogFooter>
-        <Button type="button" variant="outline" className="rounded-full" onClick={onDone}>取消</Button>
-        <Button type="submit" className="rounded-full" disabled={!valid || saving}>{saving ? '保存中…' : '保存'}</Button>
+        <Button type="button" variant="outline" className="rounded-full" onClick={onDone}>{t.desktop.btn.cancel}</Button>
+        <Button type="submit" className="rounded-full" disabled={!valid || saving}>{saving ? P.saving : P.save}</Button>
       </DialogFooter>
     </form>
   )

@@ -7,15 +7,15 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { BackSwatches, FeltSwatches, FxSegment } from '@/components/Appearance'
-import { deleteProvider, invoke, openRules, testProvider, toastError, updateSettings, useRiver } from '@/lib/river'
+import { deleteProvider, invoke, openRules, testProvider, toastError, updateSettings, useRiver, useT } from '@/lib/river'
 import { rateText, useMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { CURRENCIES, currencyOf } from '../../../shared/currency'
-import { dict } from '@river/i18n'
+import { CURRENCIES } from '../../../shared/currency'
+import type { Dict } from '@river/i18n'
 import type { ProviderPublic, Settings as SettingsT } from '../../../shared/types'
 
 type Role = 'opponent' | 'coach'
-const ROLE_NAME: Record<Role, string> = { opponent: '对手', coach: '教练' }
+const ROLES: Role[] = ['opponent', 'coach']
 const NONE = '__none'
 const pillBtn = 'rounded-full border border-input bg-white px-3.5 py-1.5 text-[13px] whitespace-nowrap hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50'
 
@@ -43,22 +43,22 @@ function Row({ label, desc, children, below }: { label: string; desc?: ReactNode
   )
 }
 
-const testLabel = (p: ProviderPublic) =>
-  p.supportsRequired === null ? '未测试' : p.supportsRequired ? '已测试 · 支持强制工具调用' : '已测试 · 工具调用降级为自动'
+const testLabel = (p: ProviderPublic, s: Dict['desktop']['settings']) =>
+  p.supportsRequired === null ? s.untested : p.supportsRequired ? s.testedRequired : s.testedAuto
 
 function Providers() {
   const providers = useRiver((s) => s.providers)
   const models = useRiver((s) => s.settings.models)
   const reg = useRegistry()
+  const t = useT()
+  const s = t.desktop.settings
   const [dialog, setDialog] = useState<{ open: boolean; provider?: ProviderPublic }>({ open: false })
 
   return (
-    <Group title="模型提供方">
-      {!providers.length && (
-        <Row label="还没有提供方" desc="添加一个模型提供方后，才能为对手和教练选择模型。" />
-      )}
+    <Group title={s.providers}>
+      {!providers.length && <Row label={s.noProviders} desc={s.noProvidersDesc} />}
       {providers.map((p) => {
-        const users = (Object.keys(ROLE_NAME) as Role[]).filter((r) => models[r]?.providerId === p.id)
+        const users = ROLES.filter((r) => models[r]?.providerId === p.id)
         return (
           <Row
             key={p.id}
@@ -68,31 +68,27 @@ function Providers() {
                 {reg.find((r) => r.kind === p.kind)?.name ?? p.kind}
                 {p.baseUrl && ` · ${p.baseUrl}`}
                 {' · '}
-                {p.keyTail ? `已保存 ····${p.keyTail}` : '未设置 API key'}
+                {p.keyTail ? s.keySaved(p.keyTail) : s.noKey}
                 {' · '}
-                {testLabel(p)}
-                {p.needsKey && <span className="block text-lose">无法解密已保存的 API key，请点“编辑”重新输入。</span>}
+                {testLabel(p, s)}
+                {p.needsKey && <span className="block text-lose">{s.cantDecrypt}</span>}
               </>
             }
           >
-            <button className={pillBtn} onClick={() => setDialog({ open: true, provider: p })}>编辑</button>
+            <button className={pillBtn} onClick={() => setDialog({ open: true, provider: p })}>{t.desktop.btn.edit}</button>
             <Confirm
-              title={`删除提供方“${p.name}”？`}
-              description={
-                users.length
-                  ? `${users.map((r) => ROLE_NAME[r]).join('和')}模型正在使用它，删除后对应的模型选择会被清空。`
-                  : '删除后需要重新添加并输入 API key。'
-              }
-              action="删除"
+              title={s.deleteTitle(p.name)}
+              description={users.length ? s.deleteInUse(users.map((r) => s.roles[r]).join(s.roleSep)) : s.deleteDesc}
+              action={t.desktop.btn.delete}
               onConfirm={() => deleteProvider(p.id)}
             >
-              <button className={cn(pillBtn, 'text-lose')}>删除</button>
+              <button className={cn(pillBtn, 'text-lose')}>{t.desktop.btn.delete}</button>
             </Confirm>
           </Row>
         )
       })}
       <div className="flex py-3.5">
-        <button className={pillBtn} onClick={() => setDialog({ open: true })}>添加提供方</button>
+        <button className={pillBtn} onClick={() => setDialog({ open: true })}>{s.addProvider}</button>
       </div>
       <ProviderDialog open={dialog.open} provider={dialog.provider} onOpenChange={(open) => setDialog((d) => ({ ...d, open }))} />
     </Group>
@@ -105,6 +101,7 @@ function ModelPicker({ role }: { role: Role }) {
   const providers = useRiver((s) => s.providers)
   const sel = useRiver((s) => s.settings.models[role])
   const reg = useRegistry()
+  const s = useT().desktop.settings
   const [providerId, setProviderId] = useState(sel?.providerId ?? '')
   const [modelId, setModelId] = useState(sel?.modelId ?? '')
   const [testing, setTesting] = useState(false)
@@ -135,7 +132,7 @@ function ModelPicker({ role }: { role: Role }) {
     }
   }
 
-  if (!providers.length) return <span className="text-xs text-muted-foreground">先在上方添加模型提供方。</span>
+  if (!providers.length) return <span className="text-xs text-muted-foreground">{s.addFirst}</span>
   const kind = providers.find((p) => p.id === providerId)?.kind
   const suggestions = reg.find((r) => r.kind === kind)?.models ?? []
 
@@ -154,7 +151,7 @@ function ModelPicker({ role }: { role: Role }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>不使用</SelectItem>
+            <SelectItem value={NONE}>{s.noModel}</SelectItem>
             {providers.map((p) => (
               <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
             ))}
@@ -162,7 +159,7 @@ function ModelPicker({ role }: { role: Role }) {
         </Select>
         <Input
           className="min-w-0 flex-1"
-          placeholder="模型 ID，例如 claude-sonnet-4-5"
+          placeholder={s.modelPh}
           list={`models-${role}`}
           value={modelId}
           disabled={!providerId}
@@ -174,15 +171,13 @@ function ModelPicker({ role }: { role: Role }) {
           {suggestions.map((m) => <option key={m} value={m} />)}
         </datalist>
         <button className={pillBtn} disabled={!providerId || !modelId.trim() || testing} onClick={test}>
-          {testing ? '测试中…' : '测试连接'}
+          {testing ? s.testing : s.test}
         </button>
       </div>
-      {testing && <span className="text-xs text-muted-foreground">正在调用模型，最长约 40 秒。</span>}
+      {testing && <span className="text-xs text-muted-foreground">{s.testingHint}</span>}
       {result && (
         <span className={cn('text-xs break-all', result.ok ? 'text-win' : 'text-lose')}>
-          {result.ok
-            ? `连接成功 · ${result.supportsRequired ? '支持强制工具调用' : '不支持强制工具调用，将改用自动模式'}`
-            : `连接失败：${result.error ?? '未知错误'}`}
+          {result.ok ? s.testOk(!!result.supportsRequired) : s.testFail(result.error ?? s.unknownError)}
         </span>
       )}
     </div>
@@ -213,12 +208,13 @@ function Tog({ k }: { k: 'hard' }) {
 
 function Currency() {
   const v = useRiver((s) => s.settings.currency)
+  const names = useT().common.currency
   return (
     // 换币种时手动汇率作废，回到自动
     <Select value={v} onValueChange={(currency) => updateSettings({ currency: currency as SettingsT['currency'], fxRate: null })}>
       <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
       <SelectContent>
-        {CURRENCIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.name} · {c.code.toUpperCase()}</SelectItem>)}
+        {CURRENCIES.map((c) => <SelectItem key={c.code} value={c.code}>{names[c.code]} · {c.code.toUpperCase()}</SelectItem>)}
       </SelectContent>
     </Select>
   )
@@ -227,27 +223,29 @@ function Currency() {
 function FxRate() {
   const m = useMoney()
   const manual = useRiver((s) => s.settings.fxRate)
+  const t = useT()
+  const s = t.desktop.settings
   const [text, setText] = useState(rateText(m.rate))
   useEffect(() => setText(rateText(m.rate)), [m.rate])
   if (m.currency === 'usd') return null
-  const unit = currencyOf(m.currency).unit
+  const unit = t.common.currencyUnit[m.currency]
   // 失焦时保存；非正数恢复原值
   const save = () => {
     const x = Number(text)
     if (x > 0 && x !== manual) void updateSettings({ fxRate: Math.round(x * 10000) / 10000 })
     else setText(rateText(m.rate))
   }
-  const desc = m.source === 'auto' ? `自动：每天更新${m.date ? `，数据日期 ${m.date}` : ''}。` : m.source === 'approx' ? '自动：还没拉到汇率，暂用内置估值，联网后自动更新。' : '手动：按你填的汇率换算。'
+  const desc = m.source === 'auto' ? s.fxAuto(m.date ?? '') : m.source === 'approx' ? s.fxApprox : s.fxManual
   return (
-    <Row label="汇率" desc={`${desc}用量按美元记录，改汇率后历史花费一并换算。`}>
+    <Row label={s.fx} desc={desc + s.fxNote}>
       <span className="flex items-center gap-3 text-sm text-label">
         <Segmented
           value={manual ? 'manual' : 'auto'}
-          options={[{ label: '自动', value: 'auto' }, { label: '手动', value: 'manual' }]}
+          options={[{ label: s.auto, value: 'auto' }, { label: s.manual, value: 'manual' }]}
           onChange={(x) => void updateSettings({ fxRate: x === 'auto' ? null : Number(rateText(m.rate)) })}
         />
         <span className="flex items-center gap-2 whitespace-nowrap">
-          1 美元 =
+          {s.oneUsd}
           {manual ? (
             <Input value={text} inputMode="decimal" onChange={(e) => setText(e.target.value)} onBlur={save} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="h-8 w-20 rounded-[9px] border-input text-right shadow-none" />
           ) : (
@@ -263,35 +261,26 @@ function FxRate() {
 function Data() {
   const view = useRiver((s) => s.view)
   const version = useRiver((s) => s.version)
+  const s = useT().desktop.settings
   const run = (cmd: 'data.clearHistory' | 'data.resetMemory', ok: string) =>
     invoke(cmd).then(() => toast.success(ok), toastError)
 
   return (
-    <Group title="牌局与数据">
-      <Row label="规则介绍" desc="重新看一遍首次进入时的规则卡片。">
-        <button className={pillBtn} onClick={openRules}>打开</button>
+    <Group title={s.data}>
+      <Row label={s.rules} desc={s.rulesDesc}>
+        <button className={pillBtn} onClick={openRules}>{s.open}</button>
       </Row>
-      <Row label="清空记录" desc="清除手牌历史和复盘，筹码重置为 100,000。用量统计在“数据统计”里单独清零。">
-        <Confirm
-          title="清空全部记录？"
-          description="手牌历史、统计和教练复盘都会被删除，筹码重置为 100,000。此操作无法撤销。"
-          action="清空"
-          onConfirm={() => run('data.clearHistory', '已清空记录')}
-        >
-          <button className={pillBtn}>清空</button>
+      <Row label={s.clear} desc={s.clearDesc}>
+        <Confirm title={s.clearTitle} description={s.clearConfirm} action={s.clearAction} onConfirm={() => run('data.clearHistory', s.cleared)}>
+          <button className={pillBtn}>{s.clearAction}</button>
         </Confirm>
       </Row>
-      <Row label="重置 AI 记忆" desc="清除对手记下的印象和教练的学员档案。">
-        <Confirm
-          title="重置 AI 记忆？"
-          description="对手记下的印象和教练的学员档案都会被清除，此操作无法撤销。"
-          action="重置"
-          onConfirm={() => run('data.resetMemory', '已重置 AI 记忆')}
-        >
-          <button className={pillBtn} disabled={!!view}>重置</button>
+      <Row label={s.resetMemory} desc={s.resetMemoryDesc}>
+        <Confirm title={s.resetMemoryTitle} description={s.resetMemoryConfirm} action={s.resetAction} onConfirm={() => run('data.resetMemory', s.resetDone)}>
+          <button className={pillBtn} disabled={!!view}>{s.resetAction}</button>
         </Confirm>
       </Row>
-      <Row label="版本" desc="有新版本时会在后台下载，下载完在顶栏提示重启更新。">
+      <Row label={s.version} desc={s.versionDesc}>
         <span className="text-sm font-semibold">{version}</span>
       </Row>
     </Group>
@@ -299,42 +288,45 @@ function Data() {
 }
 
 export function Settings() {
+  const t = useT()
+  const s = t.desktop.settings
+  const a = t.desktop.appearance
   return (
     <div className="min-h-0 flex-1 overflow-auto">
       <div className="mx-auto flex max-w-[760px] flex-col gap-[22px] px-8 pt-10 pb-16">
-        <div className="text-[28px] font-semibold">设置</div>
+        <div className="text-[28px] font-semibold">{t.desktop.nav.settings}</div>
         <Providers />
-        <Group title="AI 对手">
-          <Row label="对手模型" desc="所有对手共用这个模型，各自按性格提示词行动。开桌必需。" below={<ModelPicker role="opponent" />} />
-          <Row label="思考速度" desc="AI 行动的最短停顿：模型返回太快时补足再落子。">
-            <Seg k="speed" labels={['慢', '中', '快']} values={[0, 1, 2]} />
+        <Group title={t.desktop.nav.opponents}>
+          <Row label={s.opponentModel} desc={s.opponentModelDesc} below={<ModelPicker role="opponent" />} />
+          <Row label={s.speed} desc={s.speedDesc}>
+            <Seg k="speed" labels={s.speeds} values={[0, 1, 2]} />
           </Row>
         </Group>
-        <Group title="教练">
-          <Row label="教练模型" desc="教练局需要它：每步讲解、提问与每手复盘。自由局不用。" below={<ModelPicker role="coach" />} />
-          <Row label="人设" desc="教练说话的风格。">
-            <Seg k="coachPersona" labels={dict('zh').prompt.coaches.map((c) => c.n)} values={[0, 1, 2]} />
+        <Group title={s.coach}>
+          <Row label={s.coachModel} desc={s.coachModelDesc} below={<ModelPicker role="coach" />} />
+          <Row label={s.persona} desc={s.personaDesc}>
+            <Seg k="coachPersona" labels={t.prompt.coaches.map((c) => c.n)} values={[0, 1, 2]} />
           </Row>
-          <Row label="讲解深度" desc="新手模式会解释术语；进阶模式会谈范围和 EV。">
-            <Seg k="level" labels={['新手', '进阶']} values={['novice', 'pro']} />
+          <Row label={s.depth} desc={s.depthDesc}>
+            <Seg k="level" labels={s.levels} values={['novice', 'pro']} />
           </Row>
-          <Row label="硬核模式" desc="教练局中隐藏胜率、底池赔率和改进牌。">
+          <Row label={s.hard} desc={s.hardDesc}>
             <Tog k="hard" />
           </Row>
         </Group>
-        <Group title="牌桌外观">
-          <Row label="桌布" desc="五种预设，或点最后一个自选颜色。">
+        <Group title={s.look}>
+          <Row label={a.felt} desc={s.feltDesc}>
             <FeltSwatches size={24} />
           </Row>
-          <Row label="牌背" desc="对手手牌背面的颜色。">
+          <Row label={a.back} desc={s.backDesc}>
             <BackSwatches />
           </Row>
-          <Row label="动效" desc="完整：发牌、筹码飞行、加注与全下特效；精简：只保留发牌、翻牌和气泡。">
+          <Row label={a.fx} desc={s.fxDesc}>
             <FxSegment />
           </Row>
         </Group>
-        <Group title="用量计价">
-          <Row label="货币" desc="价格来自 models.dev（美元），按下面的汇率换算成所选货币。">
+        <Group title={s.pricing}>
+          <Row label={s.currency} desc={s.currencyDesc}>
             <Currency />
           </Row>
           <FxRate />

@@ -3,6 +3,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog'
+import { useT } from '@/lib/river'
 
 export function Confirm({
   title, description, action, onConfirm, children
@@ -13,6 +14,7 @@ export function Confirm({
   onConfirm: () => void
   children: ReactNode
 }) {
+  const t = useT()
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
@@ -22,7 +24,7 @@ export function Confirm({
           <AlertDialogDescription className="leading-relaxed">{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="rounded-full">取消</AlertDialogCancel>
+          <AlertDialogCancel className="rounded-full">{t.desktop.btn.cancel}</AlertDialogCancel>
           <AlertDialogAction className="rounded-full bg-destructive text-white hover:bg-destructive/90" onClick={onConfirm}>
             {action}
           </AlertDialogAction>

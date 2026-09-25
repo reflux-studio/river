@@ -1,3 +1,4 @@
+import type { Dict } from '@river/i18n'
 import { useRiver } from '@/lib/river'
 import { currencyOf, type Currency } from '../../../shared/currency'
 import type { FxRates, Settings } from '../../../shared/types'
@@ -39,12 +40,14 @@ export const useMoney = (): Money => {
   return resolveMoney({ currency, fxRate }, fx)
 }
 
+export const useLangTag = () => (useRiver((s) => s.settings.locale) === 'zh' ? 'zh-CN' : 'en-US')
+
 export const tokens = (x: number) => (x >= 1e6 ? (x / 1e6).toFixed(2) + 'M' : x >= 1e3 ? (x / 1e3).toFixed(1) + 'k' : String(Math.round(x)))
 
 // 有价格的部分折算成花费；没有价格的 token 单独列出（discussion §6）
-export function costText(c: { usd: number; tokens: number; unpriced: number }, m: Money) {
+export function costText(c: { usd: number; tokens: number; unpriced: number }, m: Money, t: Dict) {
   const usd = (x: number) => money(x, m)
   if (c.tokens === 0) return usd(0)
   if (c.unpriced === c.tokens) return `${tokens(c.tokens)} token`
-  return c.unpriced ? `${usd(c.usd)} + ${tokens(c.unpriced)} token 未计价` : usd(c.usd)
+  return c.unpriced ? `${usd(c.usd)} + ${t.desktop.unpriced(tokens(c.unpriced))}` : usd(c.usd)
 }

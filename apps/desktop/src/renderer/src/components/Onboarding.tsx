@@ -6,7 +6,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { dict, type Locale } from '@river/i18n'
-import { finishOnboarding, go, modelOf, setState, startGuided, useRiver, type RiverState } from '@/lib/river'
+import { finishOnboarding, go, modelOf, setState, startGuided, useRiver, useT, type RiverState } from '@/lib/river'
 import { cn } from '@/lib/utils'
 
 const RANKS = [
@@ -65,7 +65,7 @@ function Pages({ locale, onLocale, onFinish }: { locale: Locale; onLocale: (l: L
           {RANKS.map(([k, ex], n) => (
             <div key={k} className="flex items-center gap-2.5 border-b border-divider py-[5px] text-[13px]">
               <span className="w-4 shrink-0 text-[#a1a1a6]">{n + 1}</span>
-              <span className={cn('shrink-0 font-semibold whitespace-nowrap', locale === 'en' ? 'w-[98px]' : 'w-[74px]')}>{t.poker.hand[k]}</span>
+              <span className={cn('shrink-0 font-semibold whitespace-nowrap', locale === 'en' ? 'min-w-[104px]' : 'min-w-[74px]')}>{t.poker.hand[k]}</span>
               <span className="whitespace-nowrap text-label">{ex}</span>
             </div>
           ))}
@@ -134,7 +134,11 @@ export function Onboarding() {
     <Dialog open={open} onOpenChange={(o) => !o && finish()}>
       <DialogContent
         showCloseButton={false}
-        className="flex max-h-[calc(100%-40px)] w-[580px] max-w-[calc(100%-40px)] flex-col gap-[18px] overflow-auto rounded-[20px] px-8 pt-[30px] pb-6 shadow-[0_30px_80px_rgba(0,0,0,0.18)] ring-0 sm:max-w-[580px]"
+        // 英文牌型名和例子更长，放不进 580 宽的两栏
+        className={cn(
+          'flex max-h-[calc(100%-40px)] max-w-[calc(100%-40px)] flex-col gap-[18px] overflow-auto rounded-[20px] px-8 pt-[30px] pb-6 shadow-[0_30px_80px_rgba(0,0,0,0.18)] ring-0',
+          locale === 'en' ? 'w-[620px] sm:max-w-[620px]' : 'w-[580px] sm:max-w-[580px]'
+        )}
       >
         <Pages locale={locale} onLocale={setPicked} onFinish={finish} />
       </DialogContent>
@@ -146,20 +150,20 @@ export function Onboarding() {
 export function NeedModelDialog() {
   const need = useRiver((s) => s.needModel)
   const close = () => setState({ needModel: null })
+  const t = useT()
+  const n = t.desktop.needModel
   return (
     <AlertDialog open={need !== null} onOpenChange={(o) => !o && close()}>
       <AlertDialogContent className="rounded-2xl">
         <AlertDialogHeader>
-          <AlertDialogTitle className="font-semibold">{need === 'coach' ? '教练模型还没有配置' : '对手模型还没有配置'}</AlertDialogTitle>
+          <AlertDialogTitle className="font-semibold">{need === 'coach' ? n.coachTitle : n.opponentTitle}</AlertDialogTitle>
           <AlertDialogDescription className="leading-relaxed">
-            {need === 'coach'
-              ? '教练局靠教练每步讲解、每手复盘。先在设置里为教练选一个模型；或者回到大厅改开自由局。'
-              : '对手由大模型驱动。先在设置里添加模型提供方，并为对手选一个模型。'}
+            {need === 'coach' ? n.coachDesc : n.opponentDesc}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="rounded-full">取消</AlertDialogCancel>
-          <AlertDialogAction className="rounded-full" onClick={() => go('settings')}>去设置</AlertDialogAction>
+          <AlertDialogCancel className="rounded-full">{t.desktop.btn.cancel}</AlertDialogCancel>
+          <AlertDialogAction className="rounded-full" onClick={() => go('settings')}>{t.desktop.btn.goSettings}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

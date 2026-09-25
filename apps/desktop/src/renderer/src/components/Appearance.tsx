@@ -1,11 +1,8 @@
 import { BACKS, backPattern, FELTS, RAINBOW } from '@river/ui'
 import { useEffect, useState } from 'react'
 import { Segmented } from '@/components/Segmented'
-import { updateSettings, useRiver } from '@/lib/river'
-import type { Felt, Fx } from '../../../shared/types'
-
-// ponytail: 临时的中文名，T6 改从 i18n 取
-const FELT_NAME: Record<Exclude<Felt, 'custom'>, string> = { green: '经典绿', blue: '深海蓝', wine: '酒红', graphite: '石墨', paper: '素白' }
+import { updateSettings, useRiver, useT } from '@/lib/river'
+import type { Fx } from '../../../shared/types'
 
 const ON = '0 0 0 2px #fff, 0 0 0 4px #1d1d1f'
 const OFF = '0 0 0 1px rgba(0,0,0,0.14)'
@@ -21,14 +18,15 @@ export function FeltSwatches({ size = 26 }: { size?: number }) {
   const felt = useRiver((s) => s.settings.felt)
   const saved = useRiver((s) => s.settings.feltCustom)
   const [draft, setDraft] = useState<string | null>(null)
+  const t = useT()
   const custom = draft ?? saved
   useEffect(() => setDraft(null), [saved])
   return (
     <div className="flex flex-wrap gap-2">
       {FELTS.map((f) => (
-        <button key={f.k} title={FELT_NAME[f.k]} onClick={() => updateSettings({ felt: f.k })} className="rounded-full" style={{ width: size, height: size, background: f.felt, boxShadow: felt === f.k ? ON : OFF }} />
+        <button key={f.k} title={t.common.felt[f.k]} onClick={() => updateSettings({ felt: f.k })} className="rounded-full" style={{ width: size, height: size, background: f.felt, boxShadow: felt === f.k ? ON : OFF }} />
       ))}
-      <label title="自定义颜色" className="relative block cursor-pointer rounded-full" style={{ width: size, height: size, background: felt === 'custom' ? custom : RAINBOW, boxShadow: felt === 'custom' ? ON : OFF }}>
+      <label title={t.desktop.appearance.custom} className="relative block cursor-pointer rounded-full" style={{ width: size, height: size, background: felt === 'custom' ? custom : RAINBOW, boxShadow: felt === 'custom' ? ON : OFF }}>
         <input
           type="color"
           value={custom}
@@ -55,11 +53,12 @@ export function BackSwatches() {
 
 export function FxSegment({ full }: { full?: boolean }) {
   const fx = useRiver((s) => s.settings.fx)
+  const o = useT().desktop.appearance.fxOpts
   return (
     <Segmented<Fx>
       full={full}
       value={fx}
-      options={[{ label: '完整', value: 'full' }, { label: '精简', value: 'lite' }, { label: '关闭', value: 'off' }]}
+      options={[{ label: o.full, value: 'full' }, { label: o.lite, value: 'lite' }, { label: o.off, value: 'off' }]}
       onChange={(v) => updateSettings({ fx: v })}
     />
   )
@@ -67,18 +66,19 @@ export function FxSegment({ full }: { full?: boolean }) {
 
 // 牌桌右上角的“桌面外观”浮层
 export function AppearancePopover() {
+  const a = useT().desktop.appearance
   return (
     <div className="box-border flex w-[250px] flex-col gap-3.5 rounded-[14px] border bg-white px-4 py-3.5 shadow-[0_16px_40px_rgba(0,0,0,0.14)]">
       <div className="flex flex-col gap-2">
-        <span className="text-xs text-muted-foreground">桌布</span>
+        <span className="text-xs text-muted-foreground">{a.felt}</span>
         <FeltSwatches />
       </div>
       <div className="flex flex-col gap-2">
-        <span className="text-xs text-muted-foreground">牌背</span>
+        <span className="text-xs text-muted-foreground">{a.back}</span>
         <BackSwatches />
       </div>
       <div className="flex flex-col gap-2">
-        <span className="text-xs text-muted-foreground">动效</span>
+        <span className="text-xs text-muted-foreground">{a.fx}</span>
         <FxSegment full />
       </div>
     </div>

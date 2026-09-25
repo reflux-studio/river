@@ -4,7 +4,7 @@ import { AppearancePopover } from '@/components/Appearance'
 import { ActionBar } from '@/components/table/ActionBar'
 import { ChatPanel, lastSaid, useSpeaker } from '@/components/table/ChatPanel'
 import { CoachPanel } from '@/components/table/CoachPanel'
-import { useRiver } from '@/lib/river'
+import { useRiver, useT } from '@/lib/river'
 import type { TableView } from '../../../shared/types'
 
 const CHAT_KEY = 'river.chatShown'
@@ -32,6 +32,7 @@ function Screen({ v }: { v: TableView }) {
   const chat = useRiver((s) => s.chat)
   const st = useRiver((s) => s.settings)
   const who = useSpeaker()
+  const t = useT()
   const width = useWidth()
   const [saved, setSaved] = useState(readChatShown)
   const [feltOpen, setFeltOpen] = useState(false)
@@ -68,18 +69,18 @@ function Screen({ v }: { v: TableView }) {
           felt={F}
           back={st.back}
           fx={st.fx}
-          labels={{ pot: '底池', sb: '小盲', bb: '大盲' }}
+          labels={{ pot: t.poker.pot, sb: t.poker.pos.sb, bb: t.poker.pos.bb }}
         >
           {!showChat && (
             <button onClick={toggleChat} className={`${floating} absolute top-3.5 left-3.5 z-[9]`}>
-              公屏
-              {last && <span className="max-w-[180px] truncate text-muted-foreground">{who(last.from).name}：{last.text}</span>}
+              {t.desktop.chat.title}
+              {last && <span className="max-w-[180px] truncate text-muted-foreground">{t.desktop.chat.last(who(last.from).name, last.text)}</span>}
             </button>
           )}
           <div data-felt-popover className="absolute top-3.5 right-3.5 z-10 flex flex-col items-end gap-2">
             <button onClick={() => setFeltOpen((x) => !x)} className={floating}>
               <span className="size-3 rounded-full shadow-[0_0_0_1px_rgba(0,0,0,0.15)]" style={{ background: F.felt }} />
-              桌面外观
+              {t.desktop.appearance.title}
             </button>
             {feltOpen && <AppearancePopover />}
           </div>

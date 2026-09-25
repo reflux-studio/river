@@ -1,6 +1,8 @@
 import { Toaster } from '@/components/ui/sonner'
 import { NeedModelDialog, Onboarding } from '@/components/Onboarding'
 import { TopBar } from '@/components/TopBar'
+import { useEffect } from 'react'
+import { useLangTag } from '@/lib/format'
 import { useRiver, type Page } from '@/lib/river'
 import { Lobby } from '@/pages/Lobby'
 import { Opponents } from '@/pages/Opponents'
@@ -15,6 +17,8 @@ export function App() {
   const ready = useRiver((s) => s.ready)
   const hasTable = useRiver((s) => s.view !== null)
   const want = useRiver((s) => s.page)
+  const lang = useLangTag()
+  useEffect(() => void (document.documentElement.lang = lang), [lang])
   const page = want === 'table' && !hasTable ? 'lobby' : want
   const Page = PAGES[page]
 
