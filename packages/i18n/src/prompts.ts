@@ -51,8 +51,8 @@ export const promptZh = {
     note: '对某位玩家的新观察，不超过 30 字；没有留空'
   },
   ping: { description: '连接测试：请调用此工具', instructions: '调用 ping 工具。' },
-  // 模型写出的发言与印象的截断长度（字符）
-  limits: { say: 40, note: 30 }
+  // 截断长度（字符）：模型写出的发言与印象，以及写入教练往手摘要的讲解
+  limits: { say: 40, note: 30, digest: 60 }
 }
 
 export const promptEn: typeof promptZh = {
@@ -107,5 +107,5 @@ export const promptEn: typeof promptZh = {
     note: 'A new observation about a player, under 20 words; leave empty if none'
   },
   ping: { description: 'Connection test: please call this tool', instructions: 'Call the ping tool.' },
-  limits: { say: 120, note: 120 }
+  limits: { say: 120, note: 120, digest: 180 }
 }

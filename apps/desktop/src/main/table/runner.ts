@@ -467,9 +467,10 @@ export class TableRunner {
   // 讲解、回答写入教练 thread：成功照写；失败或被跳过但界面已显示文字的，标「被打断」写入，玩家追问时教练能接上
   private writeCoach(hand: number, messages: Msg[], text: string, ok: boolean, kind: string) {
     if (!text) return false
-    const M = tr().desktop.model
+    const d = tr()
+    const M = d.desktop.model
     const mark = ok ? '' : M.interrupted
-    return this.thread('coach').pushText(hand, messages.at(-1)!.content as string, text + mark, M.coachDigest(kind, text.slice(0, 60) + mark))
+    return this.thread('coach').pushText(hand, messages.at(-1)!.content as string, text + mark, M.coachDigest(kind, text.slice(0, d.prompt.limits.digest) + mark))
   }
 
   private async runRecap() {

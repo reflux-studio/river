@@ -382,6 +382,8 @@ export async function completeOnboarding(locale: Locale) {
 - engine 测试通过，差分对照也通过。
 
 **结果**：
+- 已完成：实现提交 `d172b9b`；小修见后续提交（F1 字典测试用真值、假值各调用一次函数词条，F4 改为 `current made hand`，F5 往手摘要截断改为按语言取 `limits.digest`）。
+- 独立审阅：`reviews/T5-1.md`，通过。审阅者对比了中文模式下 461 次模型调用，除末尾新增的“请用中文回复。”外逐字相同。F2（`ProbPanel` 牌型）转给 T6。F3 截断长度按语言区分：中文不变，英文放宽，交接时向用户说明。
 
 ## 任务 6：渲染进程界面双语
 
@@ -404,6 +406,7 @@ export async function completeOnboarding(locale: Locale) {
 - 用户数据（对手名称和提示词、提问、模型输出、回放内容）原样显示，不翻译。
 - 用 `useT()`（T4 已提供）取字典。
 - 顺便修正引导页英文牌型表第一行略超出分隔线的问题（T4 审阅 F2）。
+- 教练面板和 `ProbPanel` 的牌型改用 `t.poker.hand[nums.handCat]`，替换 T5 留下的临时写法 `dict('zh')`（T5 审阅 F2）。
 - 模拟英文系统：`cd apps/desktop && npx electron-vite dev -- --lang=en-US -AppleLanguages "(en-US)"`。
 
 **验证与完成标准**：
