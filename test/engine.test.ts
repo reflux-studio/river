@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { disp } from '../src/shared/format'
 import { best, equity, FULL, handName, outs } from '../src/main/engine/eval'
 import { Table, type ActionType, type LogEntry } from '../src/main/engine/table'
+import { handRecord, heroHandSummary, opponentSummary, positions, situation } from '../src/main/table/text'
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0
@@ -141,6 +142,80 @@ describe('发牌与盲注', () => {
     expect(t.button()).toBe(2)
     expect(t.seats()[1]!.out).toBe(true)
     expect(t.holeCards()[1]).toBeNull()
+  })
+})
+
+describe('改进牌', () => {
+  const n = (h: string, b: string) => outs(cards(h), b ? cards(b) : [])
+  it('按「我的牌型领先公共牌」增加计数', () => {
+    expect(n('Ah 5h', 'Kh 9h 2s')).toBe(15)
+    expect(n('8s 7d', '6c 5h Ks')).toBe(14)
+    expect(n('Ah 5d', 'Kh 9h 2s 7h')).toBe(14)
+    expect(n('2c 3d', 'Kh 9h 5h 7h')).toBe(4)
+    expect(n('2h 3d', 'Kh 9h 5h 7h')).toBe(0)
+    expect(n('7s 7d', '7c Kh 2s')).toBe(7)
+    // 旧口径（只看我的牌型升级）这里是 11：公共牌成对让我「升级」成两对也被算进去
+    expect(n('7s 7d', 'Kc 9h 2s')).toBe(2)
+    expect(n('5h 5d', '9c 9d 2s')).toBe(4)
+  })
+  it('翻牌前和河牌不计算', () => {
+    expect(n('Ah 5h', '')).toBeNull()
+    expect(n('Ah 5h', 'Kh 9h 2s 7c 3d')).toBeNull()
+  })
+})
+
+describe('局面文本', () => {
+  const seats = ['你', '阿狸', '老K', '石头'].map((name, i) => ({ id: String(i), name, tag: i ? '标签' : '' }))
+  const t = () => table([1000, 1000, 1000, 1000], { button: 0 })
+  it('对手视角：「你」只指自己，玩家写作「玩家」，带盲注、投入与所需胜率', () => {
+    const s = situation(t(), seats, 1)
+    expect(s).toContain('无限注 · 盲注 5/10 · 4 人桌')
+    expect(s).toContain('你的位置：小盲')
+    expect(s).toContain('当前牌型：')
+    expect(s).toContain('- 你（小盲）：筹码 995，本轮已下 5，本手共投入 5（含本轮）')
+    expect(s).toContain('- 玩家（按钮）：')
+    expect(s).toMatch(/- 石头（枪口，标签）：筹码 1,000\n/)
+    expect(s).toContain('所需胜率（底池赔率）：25.0%')
+    expect(s).not.toContain('胜率约')
+    expect(s).toContain('本手行动：你 小盲 5，老K 大盲 10')
+    expect(s).not.toMatch(/你（按钮|你 大盲/)
+  })
+  it('教练视角：称玩家', () => {
+    const s = situation(t(), seats, 0, { you: false })
+    expect(s).toContain('玩家的位置：按钮')
+    expect(s).not.toContain('你')
+  })
+})
+
+describe('往手摘要称呼', () => {
+  it('对手摘要：玩家写「玩家」、自己写「你」；教练摘要：玩家写「玩家」', () => {
+    const seats = ['你', '阿狸', '老K'].map((name, i) => ({ id: i ? `p${i}` : 'hero', ...(i && { personaId: `p${i}` }), name, tag: '' }))
+    const t = table([1000, 1000, 1000], { button: 0 })
+    while (t.isHandInProgress()) {
+      if (t.isBettingRoundInProgress()) t.actionTaken(t.legalActions().toCall ? 'call' : 'check')
+      else if (t.areBettingRoundsCompleted()) t.showdown()
+      else t.endBettingRound()
+    }
+    const rec = handRecord(t, seats, 'coach', { sb: 5, bb: 10 }, () => '')
+    const s = opponentSummary(rec, 'p1')
+    expect(s).toContain('玩家（按钮）')
+    expect(s).toContain('你（小盲）')
+    expect(s).toContain('老K（大盲）')
+    expect(s).toMatch(/行动：你小盲 5，老K大盲 10，玩家跟注 10/)
+    expect(heroHandSummary(rec)).toMatch(/行动：阿狸小盲 5，老K大盲 10，玩家跟注 10/)
+  })
+})
+
+describe('位置', () => {
+  const pos = (t: Table) => positions(t).map((x) => `${x.seat}:${x.pos}`).join(' ')
+  it('六人桌按小盲起排到按钮', () => {
+    expect(pos(table([1000, 1000, 1000, 1000, 1000, 1000], { button: 0 }))).toBe('1:小盲 2:大盲 3:枪口 4:中位 5:关煞 0:按钮')
+  })
+  it('跳过没筹码的座位', () => {
+    expect(pos(table([1000, 0, 1000, 1000, 1000], { button: 0 }))).toBe('2:小盲 3:大盲 4:枪口 0:按钮')
+  })
+  it('单挑时按钮即小盲', () => {
+    expect(pos(table([1000, 1000], { button: 0 }))).toBe('0:按钮/小盲 1:大盲')
   })
 })
 
@@ -383,7 +458,6 @@ describe('与原型对照（牌型评估）', () => {
       const hole = deck.slice(0, 2)
       const board = deck.slice(2, 2 + [0, 3, 4, 5][(rng() * 4) | 0])
       expect(handName(hole.concat(board))).toBe(P.handName(hole.concat(board)))
-      expect(outs(hole, board)).toBe(P.outs(hole, board))
       expect(disp(hole[0])).toEqual(plain(P.disp(hole[0])))
       if (k % 100 === 0) {
         const seed = 9000 + k

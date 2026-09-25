@@ -77,16 +77,13 @@ export function equity(hole: Card[], board: Card[], nOpp: number, iters?: number
   }
   return win / iters
 }
+// 改进牌：下一张能让「我的牌型大类」领先「公共牌自身牌型大类」更多的牌；只让公共牌和我一起变强的牌不算
 export function outs(hole: Card[], board: Card[]): number | null {
   if (board.length < 3 || board.length >= 5) return null
   const known = new Set(hole.concat(board))
-  const cur = looseCat(hole.concat(board))
+  const rel = (b: Card[]) => looseCat(hole.concat(b)) - looseCat(b)
+  const cur = rel(board)
   let n = 0
-  for (const c of FULL) {
-    if (known.has(c)) continue
-    const nb = board.concat([c])
-    const nc = looseCat(hole.concat(nb))
-    if (nc > cur && nc > looseCat(nb)) n++
-  }
+  for (const c of FULL) if (!known.has(c) && rel(board.concat([c])) > cur) n++
   return n
 }

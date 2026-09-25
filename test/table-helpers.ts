@@ -25,6 +25,8 @@ export function delayed<T>(ms: number, signal: AbortSignal, value: () => T, abor
 export const defaultAgents = (): AgentDeps => ({
   modelReady: () => true,
   opponentAct: async () => okCall({ action: 'call' }),
+  // 默认不发言，免得干扰其他用例对公屏的断言
+  opponentTalk: async () => okCall({}),
   coachSpeak: async (_o, onDelta) => (onDelta('好'), { ok: true, aborted: false, text: '好' }),
   coachAsk: async (_o, onDelta) => (onDelta('答'), { ok: true, aborted: false, text: '答' }),
   coachRecap: async () => okCall({ headline: 'h', good: 'g', improve: 'i', tip: 't' })

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { fmt } from '@/lib/format'
 import { useHotkeys } from '@/lib/hotkeys'
 import { go, invoke, toastError } from '@/lib/river'
@@ -38,6 +39,16 @@ export function ActionBar({ view: v }: { view: TableView }) {
   useEffect(() => {
     if (isTurn) setRaiseTo(defaultRaiseTo)
   }, [isTurn, defaultRaiseTo, v.handNo, v.street])
+  const [draft, setDraft] = useState(() => fmt(raiseTo))
+  useEffect(() => setDraft(fmt(raiseTo)), [raiseTo])
+  const commit = () => {
+    const raw = draft.replace(/[,\s]/g, '')
+    const n = Number(raw)
+    const to = raw && Number.isFinite(n) ? clamp(Math.round(n)) : raiseTo
+    setRaiseTo(to)
+    // raiseTo 未变时上面的 effect 不会触发，这里要自己把输入框改回规范格式
+    setDraft(fmt(to))
+  }
 
   const canAct = isTurn && !coach?.locked
   const canRaise = canAct && L.canRaise
@@ -96,7 +107,22 @@ export function ActionBar({ view: v }: { view: TableView }) {
             </button>
             <div className={cn('flex items-center overflow-hidden rounded-[10px] border border-input bg-white', !canRaise && 'opacity-40')}>
               <button onClick={() => setRaiseTo((x) => clamp(x - bb))} className="px-3 text-lg text-label">−</button>
-              <div className="min-w-[76px] px-1.5 text-center text-base font-semibold">{canRaise ? fmt(raiseTo) : '—'}</div>
+              <input
+                inputMode="numeric"
+                disabled={!canRaise}
+                value={canRaise ? draft : '—'}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={commit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.currentTarget.blur()
+                  else if (e.key === 'Escape') {
+                    // 先同步提交恢复值再失焦，否则 onBlur 会拿旧输入去确认
+                    flushSync(() => setDraft(fmt(raiseTo)))
+                    e.currentTarget.blur()
+                  }
+                }}
+                className="field-sizing-content min-w-[76px] bg-transparent px-1.5 text-center text-base font-semibold outline-none focus:bg-divider"
+              />
               <button onClick={() => setRaiseTo((x) => clamp(x + bb))} className="px-3 text-lg text-label">+</button>
             </div>
             <button

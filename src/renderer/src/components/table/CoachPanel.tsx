@@ -14,23 +14,18 @@ const QUICK = {
 }
 
 export function ProbPanel({ nums }: { nums: NonNullable<TableView['nums']> }) {
-  // 所需胜率为 0 当且仅当无需跟注
-  const free = nums.need === 0
-  const good = free || nums.eq >= nums.need
-  const stats = [['当前牌型', nums.handName], ['出路', nums.outs == null ? '—' : String(nums.outs)], ['规则建议', nums.sugg]]
+  // 只并列事实：胜率按随机手牌估算，与所需胜率口径不同，不做 ±EV 判断
+  const stats = [
+    ['所需胜率（底池赔率）', nums.need === 0 ? '—' : (nums.need * 100).toFixed(1) + '%'],
+    ['当前牌型', nums.handName],
+    ['改进牌', nums.outs == null ? '—' : String(nums.outs)]
+  ]
   return (
     <div className="flex flex-col gap-2.5 rounded-xl bg-topbar p-3.5">
-      <div className="flex items-baseline justify-between">
-        <span className="text-[13px] text-label">胜率 vs 所需胜率</span>
-        <span className={cn('text-[13px] font-semibold', good ? 'text-win' : 'text-lose')}>{free ? '可免费看牌' : good ? '跟注 +EV' : '跟注 −EV'}</span>
-      </div>
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-[30px] font-semibold tracking-[-0.02em]">{Math.round(nums.eq * 100)}%</span>
-        <span className="text-sm text-muted-foreground">/ {free ? '0%' : (nums.need * 100).toFixed(1) + '%'}</span>
-      </div>
+      <span className="text-[13px] text-label">对随机牌胜率</span>
+      <span className="text-[30px] leading-none font-semibold tracking-[-0.02em]">{Math.round(nums.eq * 100)}%</span>
       <div className="relative h-2 rounded-full bg-[#e8e8e5]">
         <div className="absolute inset-y-0 left-0 rounded-full bg-blue" style={{ width: `${Math.min(100, nums.eq * 100)}%` }} />
-        <div className="absolute -top-1 h-4 w-0.5 bg-foreground" style={{ left: `${nums.need * 100}%` }} />
       </div>
       <div className="grid grid-cols-3 gap-1.5 text-xs text-muted-foreground">
         {stats.map(([l, v]) => (
@@ -41,7 +36,7 @@ export function ProbPanel({ nums }: { nums: NonNullable<TableView['nums']> }) {
         ))}
       </div>
       <div className="text-xs leading-normal text-muted-foreground">
-        本地计算 · 胜率按对手随机手牌估算{nums.stale && ' · 数据来自你上一次决策'}
+        本地计算 · 胜率按对手随机手牌估算 · 改进牌按牌型大类{nums.stale && ' · 数据来自你上一次决策'}
       </div>
     </div>
   )
@@ -69,10 +64,14 @@ export function RecapRows({ r, big }: { r: Recap; big?: boolean }) {
   )
 }
 
+function RetryButton({ id }: { id: string }) {
+  const can = useRiver((s) => s.view?.coach?.retry === id)
+  if (!can) return null
+  return <button onClick={() => invoke('coach.retry').catch(toastError)} className="rounded-full border border-input bg-white px-2.5 py-0.5 text-foreground hover:bg-accent">重试</button>
+}
+
 function RecapCard({ e }: { e: CoachEntry }) {
   const coachName = useRiver((s) => COACHES[s.settings.coachPersona].n)
-  // 只能重试最近一手的复盘
-  const current = useRiver((s) => s.view?.handNo === e.handNo)
   return (
     <div className="shrink-0 overflow-hidden rounded-[14px] border bg-white">
       <div className="flex flex-col gap-2 bg-topbar px-3 py-2.5">
@@ -99,7 +98,7 @@ function RecapCard({ e }: { e: CoachEntry }) {
         {e.status === 'failed' && (
           <div className="flex items-center gap-2 text-[13px] text-lose">
             <span className="flex-1">复盘失败：{e.error}</span>
-            {current && <button onClick={() => invoke('coach.retry').catch(toastError)} className="rounded-full border border-input bg-white px-2.5 py-0.5 text-foreground hover:bg-accent">重试</button>}
+            <RetryButton id={e.id} />
           </div>
         )}
         {e.status === 'done' && e.recap && (
@@ -124,7 +123,12 @@ function Entry({ e }: { e: CoachEntry }) {
       {e.kind === 'speak' && <div className="text-xs font-semibold text-[oklch(0.5_0.15_255)]">第 {e.handNo} 手 · 教练</div>}
       {text && <div className={cn('text-sm leading-[1.7] whitespace-pre-wrap [text-wrap:pretty]', !e.text && 'text-muted-foreground')}><RichText text={text} /></div>}
       {e.status === 'skipped' && <span className="text-[11px] text-muted-foreground">已跳过</span>}
-      {failed && <span className="text-[12px] text-muted-foreground">{e.kind === 'speak' ? '教练这次没连上' : `教练暂时没连上：${e.error ?? ''}`}</span>}
+      {failed && (
+        <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+          <span className="flex-1">教练暂时没连上：{e.error ?? ''}</span>
+          {e.kind === 'speak' && <RetryButton id={e.id} />}
+        </div>
+      )}
     </div>
   )
 }

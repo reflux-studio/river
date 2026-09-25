@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage } from 'electron'
 import { initDb } from './db'
 import { guardQuit, registerIpc } from './ipc'
 import { fxRates, loadFx, refreshFx } from './models/fx'
@@ -20,9 +20,10 @@ function createWindow() {
     height: 800,
     minWidth: 880,
     minHeight: 600,
-    // 顶栏 52px 高，红绿灯需落在其垂直居中处
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 18, y: 19 },
+    // 顶栏 52px 高，红绿灯/窗口按钮需与其对齐；overlay 颜色须与 renderer index.css 的 --topbar 同步
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 18, y: 19 } }
+      : { titleBarStyle: 'hidden', titleBarOverlay: { color: '#f7f7f5', symbolColor: '#1d1d1f', height: 52 } }),
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -57,6 +58,8 @@ app.whenReady().then(async () => {
   void refreshFx().then((fx) => fx && runner.emit('fx', fx))
   registerIpc(ipcMain, runner, { version: () => app.getVersion(), update: readyVersion, install: installUpdate, fx: fxRates })
   guardQuit(app, runner)
+  // 默认菜单带 Ctrl+R 刷新、Ctrl+Shift+I DevTools 等快捷键，正式包不应暴露；开发时保留
+  if (process.platform !== 'darwin' && app.isPackaged) Menu.setApplicationMenu(null)
   createWindow()
   initUpdater(runner.emit)
 })

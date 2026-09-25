@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { cardsText, fmt } from '../../shared/format'
+import { fmt } from '../../shared/format'
 import { BLINDS, STREET } from '../../shared/personas'
 import type { ChatMessage, CoachEntry, CoachState, Events, HandRecord, HeroAction, Mode, Persona, Recap, TableStart, TableView } from '../../shared/types'
-import { coachAsk, coachRecap, coachSpeak } from '../agents/coach'
+import { COACH_ASKS, coachAsk, coachRecap, coachSpeak } from '../agents/coach'
 import { setUsageListener, type Msg, type Usage, type UsageTag } from '../agents/llm'
-import { opponentAct, type RawAct } from '../agents/opponent'
+import { opponentAct, opponentTalk, type RawAct } from '../agents/opponent'
+import { Thread } from '../agents/thread'
 import {
   addMemory, getBankroll, getHand, handKeyOf, insertHand, insertUsage, memoryOf, personasCache, personaOf, saveReview, setBankroll, settingsCache, type UsageRow
 } from '../db'
@@ -12,18 +13,19 @@ import { equity, handName, outs } from '../engine/eval'
 import { Table, type ActionType } from '../engine/table'
 import { costTotal } from '../models/prices'
 import { modelReady } from '../models/resolve'
-import { handRecord, heroHandSummary, label, logLines, publicHandResult, situation } from './text'
+import { chatBlock, handRecord, heroHandSummary, label, opponentSummary, situation } from './text'
 import { buildTableView, heroLegal, type Nums, type SeatDisplay } from './view'
 
 export interface AgentDeps {
   modelReady: typeof modelReady
   opponentAct: typeof opponentAct
+  opponentTalk: typeof opponentTalk
   coachSpeak: typeof coachSpeak
   coachAsk: typeof coachAsk
   coachRecap: typeof coachRecap
 }
 
-const realAgents: AgentDeps = { modelReady, opponentAct, coachSpeak, coachAsk, coachRecap }
+const realAgents: AgentDeps = { modelReady, opponentAct, opponentTalk, coachSpeak, coachAsk, coachRecap }
 
 export type Emit = <K extends keyof Events>(event: K, payload: Events[K]) => void
 
@@ -32,7 +34,6 @@ const MIN_SHOW_MS = [1500, 900, 400]
 const STREET_MS = 900
 const BUBBLE_MS = 5000
 const MAX_CHAT = 300
-const ASK_ROUNDS = 6
 const GUIDED_PICKS = ['bai', 'zen']
 
 type Rng = () => number
@@ -70,9 +71,11 @@ export class TableRunner {
   private recap: 'none' | 'pending' | 'running' | 'done' | 'failed' | 'skipped' = 'none'
   private recapEntry: CoachEntry | null = null
   private lastRecord: { id: number | null; rec: HandRecord } | null = null
-  private askHistory: Msg[] = []
+  private speakEntry: CoachEntry | null = null
   private notes = new Map<string, string>()
-  private results: HandRecord[] = []
+  // 每个 Agent 的本桌对话线：key 为 personaId，教练为 'coach'（ADR-006）
+  private threads = new Map<string, Thread>()
+  private talkCtrl = new Map<string, AbortController>()
   private endKey: number | null = null
   private stepTimer?: ReturnType<typeof setTimeout>
   private usage: UsageRow[] = []
@@ -163,11 +166,13 @@ export class TableRunner {
     this.started = false
     this.chat = []
     this.coachThread = []
-    this.askHistory = []
+    this.speakEntry = null
     this.bubbles.clear()
     this.coachBusy = null
     this.coachCtrl = null
-    this.results = []
+    for (const c of this.talkCtrl.values()) c.abort()
+    this.talkCtrl.clear()
+    this.threads.clear()
     this.usage = []
     this.lastRecord = null
   }
@@ -252,23 +257,16 @@ export class TableRunner {
     const started = Date.now()
     const pid = this.seats[seat].personaId!
     const persona = personaOf(pid) ?? this.snapshots.get(pid)!
+    const th = this.thread(pid)
+    const chat = this.newChat(th, pid)
+    let observed = ''
     let r: Awaited<ReturnType<AgentDeps['opponentAct']>>
     if (!this.agents.modelReady('opponent')) r = { ok: false, aborted: false, text: '', error: 'model not configured' }
     else {
-      const eq = this.equityFor(t, seat, 150)
-      const recent = this.results.slice(-3).map((rec) => publicHandResult(rec, pid))
+      const messages = th.messagesFor(hand, situation(t, this.seats, seat, { chat: chat.msgs }), () => this.abortTalk(pid))
+      observed = messages.at(-1)!.content as string
       r = await this.agents.opponentAct(
-        {
-          name: persona.name,
-          prompt: persona.prompt,
-          memory: await memoryOf(pid),
-          tag: this.tag(t),
-          situation: situation(t, this.seats, seat, {
-            chat: this.chat.filter((m) => m.kind !== 'sys').slice(-8),
-            equity: eq,
-            extra: recent.length ? `本桌最近几手：\n${recent.join('\n')}` : undefined
-          })
-        },
+        { name: persona.name, prompt: persona.prompt, memory: await memoryOf(pid), tag: this.tag(t), messages },
         this.leaveCtrl.signal
       )
     }
@@ -290,6 +288,9 @@ export class TableRunner {
     const say = r.args.say?.trim().slice(0, 40)
     const note = r.args.note?.trim().slice(0, 30)
     if (note) this.notes.set(pid, note)
+    const think = r.args.think?.trim()
+    const digest = `${STREET[e.street]} ${act}${think ? `（想：${think}）` : ''}${say ? `；说：${say}` : ''}`
+    if (th.pushTool(hand, observed, 'act', r.args, { 实际: act, ...(say && { 公屏: say }) }, digest)) th.chatSeen = chat.lastId
     this.push({ kind: say ? 'msg' : 'act', from: pid, act, ...(say && { text: say }) })
     if (say) this.bubble(seat, say)
     this.thinking = null
@@ -342,7 +343,7 @@ export class TableRunner {
     if (key !== this.heroKey) {
       this.heroKey = key
       this.thinking = null
-      this.nums = this.numsFor(t, 0, 400)
+      this.nums = this.numsFor(t, 0)
       this.numsKey = key
     }
     if (this.mode === 'coach' && this.spokenKey !== key && this.coachBusy === null) void this.speak(t, key)
@@ -351,21 +352,29 @@ export class TableRunner {
 
   // ---- 教练 ----
 
-  private async speak(t: Table, key: string) {
+  private async speak(t: Table, key: string, retry?: CoachEntry) {
     const rid = this.runId
-    const entry = this.addCoach({ kind: 'speak', text: '', status: 'pending' })
+    const entry = retry ?? this.addCoach({ kind: 'speak', text: '', status: 'pending' })
+    if (retry) this.patchCoach(entry, { text: '', status: 'pending', error: undefined })
+    this.speakEntry = entry
     this.coachBusy = 'speak'
     const ctrl = (this.coachCtrl = new AbortController())
     this.broadcast()
+    const th = this.thread('coach')
+    const hand = t.handNumber()
+    const sit = this.heroSituation(t)
+    const chat = this.newChat(th)
+    const messages = th.messagesFor(hand, [sit, chat.msgs.length ? chatBlock(chat.msgs, this.seats) : '', this.guided ? COACH_ASKS.guided : COACH_ASKS.plain].filter(Boolean).join('\n'))
     const r = this.agents.modelReady('coach')
       ? await this.agents.coachSpeak(
-          { memory: await memoryOf('hero'), tag: this.tag(t), guided: this.guided, situation: this.heroSituation(t) },
+          { memory: await memoryOf('hero'), tag: this.tag(t), messages },
           (d) => rid === this.runId && this.patchCoach(entry, { text: entry.text + d }),
           AbortSignal.any([ctrl.signal, this.leaveCtrl.signal])
         )
       : { ok: false, aborted: false, text: '', error: '教练模型未配置' }
     if (rid !== this.runId) return
-    this.patchCoach(entry, r.ok ? { status: 'done' } : ctrl.signal.aborted ? { status: 'skipped' } : { status: 'failed', error: r.error })
+    this.patchCoach(entry, r.ok ? { status: 'done' } : ctrl.signal.aborted ? { status: 'skipped' } : { status: 'failed', error: r.error ?? '教练暂时没连上' })
+    if (this.writeCoach(hand, messages, entry.text, r.ok, '讲解')) Object.assign(th, { lastSituation: sit, chatSeen: chat.lastId })
     this.coachBusy = null
     this.coachCtrl = null
     this.spokenKey = key
@@ -387,16 +396,26 @@ export class TableRunner {
     const ctrl = (this.coachCtrl = new AbortController())
     clearTimeout(this.stepTimer)
     this.broadcast()
+    const th = this.thread('coach')
+    const hand = t.handNumber()
+    const sit = this.heroSituation(t)
+    const chat = this.newChat(th)
+    const obs = [
+      sit !== th.lastSituation ? `当前局面（玩家视角）：\n${sit}\n` : '',
+      chat.msgs.length ? chatBlock(chat.msgs, this.seats) + '\n' : '',
+      `${this.at(t)} ${q}\n${COACH_ASKS.ask}`
+    ].filter(Boolean).join('\n')
+    const messages = th.messagesFor(hand, obs)
     const r = this.agents.modelReady('coach')
       ? await this.agents.coachAsk(
-          { memory: await memoryOf('hero'), tag: this.tag(t), situation: this.heroSituation(t), history: this.askHistory.slice(-ASK_ROUNDS * 2), question: q },
+          { memory: await memoryOf('hero'), tag: this.tag(t), messages },
           (d) => rid === this.runId && this.patchCoach(entry, { text: entry.text + d }),
           AbortSignal.any([ctrl.signal, this.leaveCtrl.signal])
         )
       : { ok: false, aborted: false, text: '', error: '教练模型未配置' }
     if (rid !== this.runId) return
     this.patchCoach(entry, r.ok ? { status: 'done' } : { status: 'failed', error: r.error ?? '教练暂时没连上' })
-    if (r.ok) this.askHistory.push({ role: 'user', content: q }, { role: 'assistant', content: entry.text })
+    if (this.writeCoach(hand, messages, entry.text, r.ok, '答玩家')) Object.assign(th, { lastSituation: sit, chatSeen: chat.lastId })
     this.coachBusy = null
     this.coachCtrl = null
     // 回答期间积压的事：轮到玩家时的讲解、一手结束的复盘，然后继续推进牌局
@@ -409,8 +428,37 @@ export class TableRunner {
     if (this.coachBusy === 'speak' || this.coachBusy === 'recap') this.coachCtrl?.abort()
   }
 
-  retryRecap() {
-    if (this.recap === 'failed' && this.coachBusy === null && this.lastRecord) void this.runRecap()
+  // 重试失败的复盘，或当前决策点失败的讲解（重试期间操作区照常锁定）
+  retryCoach() {
+    if (this.coachBusy !== null) return
+    if (this.recap === 'failed' && this.lastRecord) return void this.runRecap()
+    const key = this.speakRetryKey()
+    if (key) {
+      this.spokenKey = null
+      void this.speak(this.table!, key, this.speakEntry!)
+    }
+  }
+
+  // 界面上可以点“重试”的那一条
+  private retryId() {
+    if (this.coachBusy !== null) return null
+    if (this.recap === 'failed') return this.recapEntry?.id ?? null
+    return this.speakRetryKey() ? this.speakEntry!.id : null
+  }
+
+  private speakRetryKey() {
+    return this.speakEntry?.status === 'failed' && this.spokenKey === this.heroKey && this.isHeroPoint() ? this.heroKey : null
+  }
+
+  private at(t: Table) {
+    return `[第 ${t.handNumber()} 手 ${STREET[t.roundOfBetting()]}]`
+  }
+
+  // 讲解、回答写入教练 thread：成功照写；失败或被跳过但界面已显示文字的，标「被打断」写入，玩家追问时教练能接上
+  private writeCoach(hand: number, messages: Msg[], text: string, ok: boolean, kind: string) {
+    if (!text) return false
+    const mark = ok ? '' : '（被打断）'
+    return this.thread('coach').pushText(hand, messages.at(-1)!.content as string, text + mark, `${kind}：${text.slice(0, 60)}${mark}`)
   }
 
   private async runRecap() {
@@ -424,12 +472,16 @@ export class TableRunner {
     this.coachBusy = 'recap'
     const ctrl = (this.coachCtrl = new AbortController())
     this.broadcast()
-    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), tag: { tableId: this.tableId, handNo: last.rec.hand }, summary: heroHandSummary(last.rec) }, AbortSignal.any([ctrl.signal, this.leaveCtrl.signal]))
+    const hand = last.rec.hand
+    const th = this.thread('coach')
+    const messages = th.messagesFor(hand, `${heroHandSummary(last.rec)}\n${COACH_ASKS.recap}`)
+    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), tag: { tableId: this.tableId, handNo: hand }, messages }, AbortSignal.any([ctrl.signal, this.leaveCtrl.signal]))
     if (rid !== this.runId) return
     if (r.ok && r.args) {
       const { note, ...recap } = r.args
       this.patchCoach(entry, { status: 'done', recap: pickRecap(recap) })
       this.recap = 'done'
+      th.pushTool(hand, messages.at(-1)!.content as string, 'recap', r.args, { ok: true }, `复盘：${recap.headline}；下次记住：${recap.tip}`)
       if (note?.trim()) await addMemory('hero', note.trim().slice(0, 30))
       // 提问恰在落库前发生时，开始复盘那一刻还没有 id：以结束时的为准
       const id = this.lastRecord?.rec === last.rec ? this.lastRecord.id : last.id
@@ -455,7 +507,8 @@ export class TableRunner {
     if (!this.agents.modelReady('coach')) return done({ error: 'not_configured' })
     const rec = await getHand(handId)
     if (!rec) return done({ error: 'not_found' })
-    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), tag: await handKeyOf(handId), summary: heroHandSummary(rec) }, new AbortController().signal)
+    const messages: Msg[] = [{ role: 'user', content: `${heroHandSummary(rec)}\n${COACH_ASKS.recap}` }]
+    const r = await this.agents.coachRecap({ memory: await memoryOf('hero'), tag: await handKeyOf(handId), messages }, new AbortController().signal)
     if (!r.ok || !r.args) return done({ error: r.error ?? 'failed' })
     const recap = pickRecap(r.args)
     await saveReview(handId, JSON.stringify(recap))
@@ -476,11 +529,7 @@ export class TableRunner {
   }
 
   private heroSituation(t: Table) {
-    const n = this.nums
-    const extra = n
-      ? `本地计算：胜率约 ${Math.round(n.eq * 100)}%（对在手对手的随机手牌），所需胜率 ${(n.need * 100).toFixed(1)}%，出路 ${n.outs ?? '—'}，当前牌型 ${n.handName}，简单规则建议 ${n.sugg}`
-      : undefined
-    return situation(t, this.seats, 0, { you: false, extra })
+    return situation(t, this.seats, 0, { you: false })
   }
 
   // ---- 一手结束 ----
@@ -497,8 +546,16 @@ export class TableRunner {
     const board = t.communityCards()
     const holes = t.holeCards()
     const rec = handRecord(t, this.seats, this.mode, { sb, bb }, (i) => handName(holes[i]!.concat(board)))
-    this.results.push(rec)
-    if (this.results.length > 3) this.results.shift()
+    const hand = rec.hand
+    if (this.mode === 'coach') this.thread('coach').setSummary(hand, heroHandSummary(rec))
+    for (const p of rec.players) {
+      const pid = p.personaId
+      if (!pid) continue
+      const summary = opponentSummary(rec, pid)
+      this.thread(pid).setSummary(hand, summary, () => this.abortTalk(pid))
+      const seat = this.seats.findIndex((x) => x.personaId === pid)
+      if (enteredPot(rec, seat)) void this.talk(pid, seat, hand, summary).catch((e) => console.error('talk failed', e))
+    }
     const tableId = this.tableId
     const rid = this.runId
     for (const [pid, note] of this.notes) void addMemory(pid, note).catch((e) => console.error('addMemory failed', e))
@@ -516,6 +573,56 @@ export class TableRunner {
     if (rid !== this.runId) return
     this.lastRecord = { id, rec }
     if (this.mode === 'coach' && this.recap === 'pending' && this.coachBusy === null) void this.runRecap()
+  }
+
+  // 赛后发言：不阻塞牌局；失败、没调用工具或被中止都当作没说（plan「赛后发言」）
+  private async talk(pid: string, seat: number, hand: number, summary: string) {
+    const persona = personaOf(pid) ?? this.snapshots.get(pid)
+    if (!persona || !this.agents.modelReady('opponent')) return
+    const rid = this.runId
+    const th = this.thread(pid)
+    const ctrl = new AbortController()
+    this.talkCtrl.set(pid, ctrl)
+    const messages = th.messagesFor(hand, `${summary}\n\n第 ${hand} 手结束了，说一句赛后的话吧（调用 talk）。`, () => this.abortTalk(pid))
+    const observed = messages.at(-1)!.content as string
+    const r = await this.agents.opponentTalk(
+      { name: persona.name, prompt: persona.prompt, memory: await memoryOf(pid), tag: { tableId: this.tableId, handNo: hand }, messages },
+      AbortSignal.any([ctrl.signal, this.leaveCtrl.signal])
+    )
+    if (rid !== this.runId || this.talkCtrl.get(pid) !== ctrl) return
+    this.talkCtrl.delete(pid)
+    if (!r.ok || !r.args) return
+    const say = r.args.say?.trim().slice(0, 40)
+    if (!th.pushTool(hand, observed, 'talk', r.args, say ? { 公屏: say } : {}, say ? `赛后说：${say}` : '赛后没说话')) return
+    if (say) {
+      this.push({ kind: 'msg', from: pid, text: `[第 ${hand} 手赛后] ${say}` })
+      this.bubble(seat, say)
+      this.broadcast()
+    }
+    const note = r.args.note?.trim().slice(0, 30)
+    if (note) void addMemory(pid, note).catch((e) => console.error('addMemory failed', e))
+  }
+
+  private abortTalk(pid: string) {
+    this.talkCtrl.get(pid)?.abort()
+    this.talkCtrl.delete(pid)
+  }
+
+  private thread(key: string) {
+    let th = this.threads.get(key)
+    if (!th) this.threads.set(key, (th = new Thread()))
+    return th
+  }
+
+  // 上次成功观察之后的新发言（行动已在「本手行动」里，不重复）；chatSeen 已被截掉时从头取。
+  // 保留公屏上「第 N 手」分隔和重新买入：人能看到发言属于哪一手，模型也要能看到
+  private newChat(th: Thread, self?: string) {
+    const from = this.chat.findIndex((m) => m.id === th.chatSeen)
+    const msgs = this.chat
+      .slice(from + 1)
+      .filter((m) => (m.kind === 'msg' && m.from !== self) || (m.kind === 'sys' && /^第 \d+ 手 · |重新买入/.test(m.text ?? '')))
+      .slice(-8)
+    return { msgs: msgs.some((m) => m.kind === 'msg') ? msgs : [], lastId: this.chat.at(-1)?.id ?? null }
   }
 
   // ---- 公屏与视图 ----
@@ -545,18 +652,14 @@ export class TableRunner {
     return equity(h, t.communityCards(), opp, iters, this.rng)
   }
 
-  // 原型 computeNums
-  private numsFor(t: Table, seat: number, iters: number): Nums | null {
+  // ponytail: 2500 次在 1~5 个对手时约 64~105 ms，阻塞主进程；再慢就挪到 worker
+  private numsFor(t: Table, seat: number): Nums | null {
     const s = t.seats()[seat]!
     const h = t.holeCards()[seat]
     if (s.folded || !h) return null
-    const opp = t.seats().filter((q, j) => j !== seat && q && !q.out && !q.folded).length
-    const eq = this.equityFor(t, seat, iters)
     const L = heroLegal(t)
     const need = L.toCall > 0 ? L.toCall / (t.totalPot() + L.toCall) : 0
-    const fair = 1 / (opp + 1)
-    const sugg = L.toCall === 0 ? (eq > fair * 1.6 ? '下注' : '过牌') : eq >= need ? (eq > fair * 2.2 && L.canRaise ? '加注' : '跟注') : '弃牌'
-    return { eq, need, outs: outs(h, t.communityCards()), handName: handName(h.concat(t.communityCards())), sugg }
+    return { eq: this.equityFor(t, seat, 2500), need, outs: outs(h, t.communityCards()), handName: handName(h.concat(t.communityCards())) }
   }
 
   private recordUsage(u: Usage) {
@@ -577,7 +680,7 @@ export class TableRunner {
     const t = this.table
     if (!t) return null
     const coach: CoachState | null =
-      this.mode === 'coach' ? { busy: this.coachBusy, locked: this.locked(), canNext: this.canNext() } : null
+      this.mode === 'coach' ? { busy: this.coachBusy, locked: this.locked(), canNext: this.canNext(), retry: this.retryId() } : null
     return buildTableView({
       table: t,
       seats: this.seats,
@@ -621,4 +724,11 @@ export function normalize(t: Table, a: RawAct): [ActionType, number?] {
   }
   if (action === 'fold') return L.toCall === 0 ? passive : ['fold']
   return passive
+}
+
+// 入过池：主动投入过筹码（盲注不算），或看到了翻牌
+export function enteredPot(rec: HandRecord, seat: number) {
+  const mine = rec.log.filter((x) => !x.board && x.seat === seat)
+  if (mine.some((x) => x.street === 'preflop' && (x.type === 'call' || x.type === 'bet' || x.type === 'raise'))) return true
+  return rec.board.length >= 3 && !mine.some((x) => x.street === 'preflop' && x.type === 'fold')
 }

@@ -69,6 +69,8 @@ export interface HandPlayer {
   id: string
   personaId?: string
   name: string
+  // 本手位置（按钮、小盲、枪口…）；旧记录没有
+  pos?: string
   // 摊牌亮出的牌（玩家本人恒有）；对手读公开结果只看这一项
   hole: Card[] | null
   // 教练局一手结束时亮出的全部底牌，只给玩家界面、回放与教练
@@ -189,6 +191,8 @@ export interface CoachState {
   locked: boolean
   // 一手结束后可以发下一手（复盘结束、失败或跳过）
   canNext: boolean
+  // 可以重试的教练条目（失败的复盘，或当前决策点失败的讲解）
+  retry: string | null
 }
 
 export interface TableView {
@@ -205,7 +209,7 @@ export interface TableView {
   runout: boolean
   result: { text: string; sub: string; heroWon: boolean; net: number } | null
   heroBust: boolean
-  nums: { eq: number; need: number; outs: number | null; handName: string; sugg: string; stale: boolean } | null
+  nums: { eq: number; need: number; outs: number | null; handName: string; stale: boolean } | null
   // 对手模型调用失败，牌局停下
   stalled: { name: string; error: string; settings: boolean } | null
   coach: CoachState | null
@@ -232,7 +236,7 @@ export interface CoachEntry {
   error?: string
 }
 
-export type Purpose = 'decide' | 'speak' | 'ask' | 'recap'
+export type Purpose = 'decide' | 'speak' | 'ask' | 'recap' | 'talk'
 
 export interface UsageSummary {
   since: number

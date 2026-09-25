@@ -318,7 +318,7 @@ export function Settings() {
           <Row label="讲解深度" desc="新手模式会解释术语；进阶模式会谈范围和 EV。">
             <Seg k="level" labels={['新手', '进阶']} values={['novice', 'pro']} />
           </Row>
-          <Row label="硬核模式" desc="教练局中隐藏胜率、底池赔率和出路。">
+          <Row label="硬核模式" desc="教练局中隐藏胜率、底池赔率和改进牌。">
             <Tog k="hard" />
           </Row>
         </Group>
