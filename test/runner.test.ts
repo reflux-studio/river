@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import * as db from '../src/main/db'
 import { commandHandlers } from '../src/main/ipc'
-import { reportUsage, type CallResult, type UsageTag } from '../src/main/agents/llm'
+import { reportUsage, type CallResult, type Msg, type UsageTag } from '../src/main/agents/llm'
 import { Table } from '../src/main/engine/table'
-import { normalize } from '../src/main/table/runner'
+import { enteredPot, normalize } from '../src/main/table/runner'
+import { usageSummary } from '../src/main/models/prices'
 import { cardsText } from '../src/shared/format'
-import type { Purpose, TableStart, TableView } from '../src/shared/types'
+import type { HandRecord, Purpose, TableStart, TableView } from '../src/shared/types'
 import { delayed, drive, harness, okCall, seeded, setup, teardown, tick, type Harness } from './table-helpers'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -242,7 +243,7 @@ describe('教练局', () => {
     await tick(1100)
     expect(h.runner.view()!.coach!.canNext).toBe(true)
     fail = false
-    h.runner.retryRecap()
+    h.runner.retryCoach()
     expect(h.runner.view()!.coach!.canNext).toBe(false)
     await tick(1100)
     expect(h.runner.view()!.coach!.canNext).toBe(true)
@@ -284,15 +285,20 @@ type Situation = { seat: number; text: string; others: string[] }
 // 记录每次对手决策的输入，以及此刻其他座位的底牌文字
 function spyOpponent(h: () => Harness, act: () => Res = () => okCall({ action: 'call' })) {
   const seen: Situation[] = []
-  const opponentAct = async (i: { situation: string }): Promise<Res> => {
+  const opponentAct = async (i: { messages: Msg[] }): Promise<Res> => {
     const t = h().runner.table!
     const seat = t.playerToAct()
     const others = t.holeCards().flatMap((c, j) => (j !== seat && c ? [cardsText(c)] : []))
-    seen.push({ seat, text: i.situation, others })
+    seen.push({ seat, text: i.messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n'), others })
     return act()
   }
   return { seen, opponentAct }
 }
+
+// 去掉往手回顾：往手摊牌亮出的牌是公开信息，且可能与本手的底牌碰巧相同
+const currentHand = (text: string) => text.replace(/【往手回顾】[\s\S]*?\n\n/, '')
+// 往手回顾里第 n 手那一段
+const pastHand = (text: string, n: number) => text.match(new RegExp(`\\[第 ${n} 手\\][\\s\\S]*?(?=\\n\\[第 |\\n\\n|$)`))?.[0] ?? ''
 
 describe('信息隔离', () => {
   beforeEach(() => setup())
@@ -305,7 +311,7 @@ describe('信息隔离', () => {
     await drive(hh, () => hands(hh) >= 5, () => 'call')
     expect(spy.seen.length).toBeGreaterThan(10)
     for (const s of spy.seen) {
-      const own = s.text.split('本桌最近几手')[0]
+      const own = currentHand(s.text)
       for (const c of s.others) expect(own).not.toContain(c)
     }
   })
@@ -335,8 +341,9 @@ describe('信息隔离', () => {
     const from = spy.seen.length
     await drive(hh, () => hands(hh) >= 3, () => 'call')
     const later = spy.seen.slice(from)
-    expect(later.some((s) => s.text.includes('本桌最近几手'))).toBe(true)
-    for (const s of later) for (const c of shown) expect(s.text).not.toContain(c)
+    const recaps = later.map((s) => pastHand(s.text, 1)).filter(Boolean)
+    expect(recaps.length).toBeGreaterThan(0)
+    for (const r of recaps) for (const c of shown) expect(r).not.toContain(c)
     expect(leaks).toEqual([])
   })
 })
@@ -491,5 +498,307 @@ describe('状态机', () => {
       }
       expect(t.isHandInProgress()).toBe(false)
     }
+  })
+})
+
+// ---- unified-agent T3：对手 thread 与赛后发言 ----
+
+describe('对手 thread', () => {
+  beforeEach(() => setup())
+
+  type Call = { name: string; hand: number; messages: Msg[] }
+  const spyAct = (calls: Call[], h: () => Harness) => async (i: { name: string; messages: Msg[] }): Promise<Res> => {
+    calls.push({ name: i.name, hand: h().runner.table!.handNumber(), messages: i.messages })
+    return okCall({ action: 'call', think: `${i.name}的盘算` })
+  }
+  const toolCalls = (m: Msg[], tool: string) =>
+    m.flatMap((x) => (x.role === 'assistant' && typeof x.content !== 'string' ? x.content.filter((c) => c.toolName === tool) : []))
+
+  it('同一手内后续决策带着自己之前的 act（含 think），不含别人的', async () => {
+    const calls: Call[] = []
+    let hh: Harness
+    hh = await harness({ agents: { opponentAct: spyAct(calls, () => hh) } })
+    await hh.runner.start(free3)
+    await drive(hh, () => hands(hh) >= 3, () => 'call')
+    // 接线：对手收到的局面带位置、牌型，称玩家为「玩家」，不再有随机牌胜率
+    const obs = calls[0].messages.at(-1)!.content as string
+    expect(obs).toContain('你的位置：')
+    expect(obs).toContain('当前牌型：')
+    expect(obs).toMatch(/- 玩家（(按钮|小盲|大盲|枪口|中位|关煞)/)
+    expect(obs).not.toContain('胜率约')
+    const withHistory = calls.filter((c) => toolCalls(c.messages, 'act').length > 0)
+    expect(withHistory.length).toBeGreaterThan(0)
+    for (const c of withHistory) for (const x of toolCalls(c.messages, 'act')) expect((x.input as { think: string }).think).toBe(`${c.name}的盘算`)
+  })
+
+  it('一手结束后入过池的对手赛后发言：公屏带手号前缀，别的对手下次观察能读到，且写进自己的 thread', async () => {
+    const calls: Call[] = []
+    const talks: { name: string; hand: number }[] = []
+    let hh: Harness
+    hh = await harness({
+      agents: {
+        opponentAct: spyAct(calls, () => hh),
+        opponentTalk: async (i) => (talks.push({ name: i.name, hand: hh.runner.table!.handNumber() }), okCall({ say: `${i.name}：好牌` }))
+      }
+    })
+    await hh.runner.start(free3)
+    await drive(hh, () => hands(hh) >= 3, () => 'call')
+    expect(talks.length).toBeGreaterThan(0)
+    expect(hh.chat.some((m) => m.text?.startsWith('[第 1 手赛后] '))).toBe(true)
+    const later = calls.filter((c) => c.hand >= 2)
+    expect(later.some((c) => JSON.stringify(c.messages).includes('新发言') && JSON.stringify(c.messages).includes('[第 1 手赛后]'))).toBe(true)
+    expect(later.some((c) => JSON.stringify(c.messages).includes('赛后说：'))).toBe(true)
+    // 跨手的新发言带公屏上的「第 N 手」分隔，模型分得清哪句是哪一手说的
+    expect(later.some((c) => (c.messages.at(-1)!.content as string).includes('系统：第 2 手 · 翻牌前'))).toBe(true)
+  })
+
+  it('赛后发言失败：牌局照常，不停下、不写公屏', async () => {
+    let hh: Harness
+    hh = await harness({ agents: { opponentTalk: async () => ({ ok: false, aborted: false, text: '', error: 'boom' }) } })
+    await hh.runner.start(free3)
+    await drive(hh, () => hands(hh) >= 3, () => 'call')
+    expect(hh.view().stalled).toBeNull()
+    expect(hh.chat.some((m) => m.text?.includes('赛后'))).toBe(false)
+  })
+
+  it('赛后发言在玩家点下一手后才返回：没被中止的照常写入公屏和自己的 thread', async () => {
+    const pending: { name: string; signal: AbortSignal; resolve: () => void }[] = []
+    const calls: Call[] = []
+    let hh: Harness
+    hh = await harness({
+      agents: {
+        opponentAct: spyAct(calls, () => hh),
+        // 忽略中止信号、由测试决定何时返回成功：写入只看 thread 手号与 ctrl，不看牌桌当前手号
+        opponentTalk: (i, signal) => new Promise<Res>((resolve) => pending.push({ name: i.name, signal, resolve: () => resolve(okCall({ say: `${i.name}晚到` })) }))
+      }
+    })
+    await hh.runner.start(free3)
+    await drive(hh, () => hands(hh) >= 1 && hh.runner.canNext(), () => 'call')
+    expect(pending.length).toBeGreaterThan(0)
+    hh.runner.nextHand()
+    for (const p of pending) p.resolve()
+    await tick(10)
+    const said = (name: string) => hh.chat.some((m) => m.text === `[第 1 手赛后] ${name}晚到`)
+    for (const p of pending) expect(said(p.name)).toBe(!p.signal.aborted)
+    const written = pending.filter((p) => !p.signal.aborted)
+    expect(written.length).toBeGreaterThan(0)
+    await drive(hh, () => calls.some((c) => c.name === written[0].name && c.hand === 2), () => 'call')
+    expect(JSON.stringify(calls.find((c) => c.name === written[0].name && c.hand === 2)!.messages)).toContain(`赛后说：${written[0].name}晚到`)
+  })
+
+  it('赛后发言在该对手下一手被调用后才返回：已被中止，不写公屏', async () => {
+    const pending: { name: string; signal: AbortSignal; resolve: () => void }[] = []
+    const calls: Call[] = []
+    let hh: Harness
+    hh = await harness({
+      agents: {
+        opponentAct: spyAct(calls, () => hh),
+        opponentTalk: (i, signal) => new Promise<Res>((resolve) => pending.push({ name: i.name, signal, resolve: () => resolve(okCall({ say: `${i.name}太晚` })) }))
+      }
+    })
+    await hh.runner.start(free3)
+    await drive(hh, () => hands(hh) >= 1 && hh.runner.canNext(), () => 'call')
+    const names = pending.map((p) => p.name)
+    expect(names.length).toBeGreaterThan(0)
+    await drive(hh, () => names.every((n) => calls.some((c) => c.name === n && c.hand === 2)), () => 'call')
+    for (const p of pending) expect(p.signal.aborted).toBe(true)
+    for (const p of pending) p.resolve()
+    await tick(10)
+    expect(hh.chat.some((m) => m.text?.includes('太晚'))).toBe(false)
+  })
+
+  it('入过池的对手才发言；赛后 note 立即落库；对手读到的新发言不含自己的', async () => {
+    const calls: Call[] = []
+    const talks: { name: string; hand: number }[] = []
+    let hh: Harness
+    hh = await harness({
+      agents: {
+        opponentAct: async (i) => (calls.push({ name: i.name, hand: hh.runner.table!.handNumber(), messages: i.messages }), okCall({ action: i.name === '老K' ? 'fold' : 'call', say: `${i.name}说话` })),
+        opponentTalk: async (i) => (talks.push({ name: i.name, hand: hh.runner.table!.handNumber() }), okCall({ note: `${i.name}的赛后印象` }))
+      }
+    })
+    await hh.runner.start(free3)
+    await drive(hh, () => hands(hh) >= 4, () => 'call')
+    const recs = await Promise.all((await db.listHands()).map((x) => db.getHand(x.id)))
+    for (const rec of recs) {
+      for (const name of ['阿狸', '老K']) {
+        const seat = hh.runner.seats.findIndex((x) => x.name === name)
+        expect(talks.some((t) => t.name === name && t.hand === rec!.hand)).toBe(enteredPot(rec!, seat))
+      }
+    }
+    expect(await db.memoryOf('li')).toContain('阿狸的赛后印象')
+    for (const c of calls) expect((c.messages.at(-1)!.content as string).split('新发言')[1] ?? '').not.toContain(`${c.name}：`)
+  })
+
+  it('还在进行的赛后发言：该对手下一手首次被调用时中止，返回结果不写入', async () => {
+    let aborted = 0
+    let hh: Harness
+    hh = await harness({
+      agents: {
+        opponentTalk: (_i, signal) =>
+          delayed<Res>(60_000, signal, () => okCall({ say: '迟到' }), () => (aborted++, { ok: false, aborted: true, text: '' }))
+      }
+    })
+    await hh.runner.start(free3)
+    await drive(hh, () => hands(hh) >= 3, () => 'call')
+    expect(aborted).toBeGreaterThan(0)
+    expect(hh.chat.some((m) => m.text?.includes('迟到'))).toBe(false)
+  })
+
+  it('入池判定：主动投入或看到翻牌；翻牌前弃牌、只下盲注的不算', () => {
+    const rec = (log: HandRecord['log'], board: string[] = []) => ({ log, board }) as HandRecord
+    const e = (seat: number, type: HandRecord['log'][number]['type'], street: 'preflop' | 'flop' = 'preflop') => ({ street, board: false, name: '', label: '', seat, type })
+    expect(enteredPot(rec([e(1, 'call')]), 1)).toBe(true)
+    expect(enteredPot(rec([e(1, 'blind'), e(1, 'fold')]), 1)).toBe(false)
+    expect(enteredPot(rec([e(1, 'blind'), e(1, 'check', 'flop')], ['As', 'Kd', '2c']), 1)).toBe(true)
+    expect(enteredPot(rec([e(1, 'fold')], ['As', 'Kd', '2c']), 1)).toBe(false)
+  })
+
+  it('用量统计单列 talk', async () => {
+    expect((await usageSummary()).purposes.map((p) => p.purpose)).toContain('talk')
+  })
+})
+
+// ---- unified-agent T4：教练 thread ----
+
+describe('教练 thread', () => {
+  beforeEach(() => setup())
+
+  const text = (m: Msg[]) => m.map((x) => (typeof x.content === 'string' ? x.content : JSON.stringify(x.content))).join('\n')
+  const unlockedTurn = (h: Harness) => () => !!h.runner.view()?.hero.isTurn && !h.runner.view()!.coach!.locked && h.runner.view()!.coach!.busy === null
+
+  it('讲解之后提问：提问带着讲解；局面没变不重复附上', async () => {
+    const asks: Msg[][] = []
+    const h = await harness({
+      agents: {
+        coachSpeak: async (_o, onDelta) => (onDelta('先看赔率'), { ok: true, aborted: false, text: '先看赔率' }),
+        coachAsk: async (o, onDelta) => (asks.push(o.messages), onDelta('答'), { ok: true, aborted: false, text: '答' })
+      }
+    })
+    await h.runner.start(coach3)
+    await drive(h, unlockedTurn(h), () => null)
+    h.runner.ask('为什么')
+    await tick(10)
+    const m = asks[0]
+    expect(m.map((x) => x.role)).toEqual(['user', 'assistant', 'user'])
+    expect(m[1].content).toBe('先看赔率')
+    expect(m[2].content).not.toContain('当前局面（玩家视角）')
+    expect(m[2].content).toContain('为什么')
+  })
+
+  it('讲解被「不等了」打断但已有文字：追问时带着「（被打断）」的半句', async () => {
+    const asks: Msg[][] = []
+    const h = await harness({
+      agents: {
+        coachSpeak: (_o, onDelta, signal) => (onDelta('先看'), delayed<Res>(60_000, signal, () => ({ ok: true, aborted: false, text: 'x' }), () => ({ ok: false, aborted: true, text: '' }))),
+        coachAsk: async (o, onDelta) => (asks.push(o.messages), onDelta('答'), { ok: true, aborted: false, text: '答' })
+      }
+    })
+    await h.runner.start(coach3)
+    await drive(h, () => !!h.runner.view()?.coach?.locked, () => null)
+    h.runner.skip()
+    await tick(10)
+    h.runner.ask('你说的是什么')
+    await tick(10)
+    expect(asks[0][1].content).toBe('先看（被打断）')
+  })
+
+  it('讲解失败且没有文字：不写入；重试成功后只有一组', async () => {
+    let n = 0
+    const asks: Msg[][] = []
+    const h = await harness({
+      agents: {
+        coachSpeak: async (_o, onDelta) => (n++ === 0 ? { ok: false, aborted: false, text: '', error: 'boom' } : (onDelta('好'), { ok: true, aborted: false, text: '好' })),
+        coachAsk: async (o, onDelta) => (asks.push(o.messages), onDelta('答'), { ok: true, aborted: false, text: '答' })
+      }
+    })
+    await h.runner.start(coach3)
+    await drive(h, () => !!h.runner.view()?.coach?.retry, () => null)
+    h.runner.retryCoach()
+    await tick(10)
+    h.runner.ask('然后呢')
+    await tick(10)
+    expect(asks[0].filter((x) => x.role === 'assistant')).toHaveLength(1)
+  })
+
+  it('复盘后同一手提问：历史里有 recap 的 tool-call；下一手第一次讲解只有一条带往手回顾的 user', async () => {
+    const speaks: Msg[][] = []
+    const asks: Msg[][] = []
+    let asked = false
+    const h = await harness({
+      agents: {
+        coachSpeak: async (o, onDelta) => (speaks.push(o.messages), onDelta('讲'), { ok: true, aborted: false, text: '讲' }),
+        coachAsk: async (o, onDelta) => (asks.push(o.messages), onDelta('答'), { ok: true, aborted: false, text: '答' })
+      }
+    })
+    await h.runner.start(coach3)
+    await drive(h, () => h.runner.view()!.done && h.runner.canNext(), () => 'call')
+    h.runner.ask('这手怎么样')
+    asked = true
+    await tick(10)
+    expect(asked).toBe(true)
+    const recapCall = asks[0].find((x) => x.role === 'assistant' && typeof x.content !== 'string')
+    expect(JSON.stringify(recapCall)).toContain('"toolName":"recap"')
+    const before = speaks.length
+    await drive(h, () => speaks.length > before, () => 'call')
+    const first = speaks[before]
+    expect(first).toHaveLength(1)
+    expect(first[0].content as string).toMatch(/^【往手回顾】\n\[第 1 手\] 第 1 手，盲注/)
+    expect(first[0].content as string).toContain('你本手：')
+    expect(first[0].content as string).toContain('复盘：h；下次记住：t')
+  })
+
+  it('对手的发言出现在教练下一次讲解的新发言里', async () => {
+    const speaks: Msg[][] = []
+    const h = await harness({
+      agents: {
+        opponentAct: async () => okCall({ action: 'call', say: '跟了跟了' }),
+        coachSpeak: async (o, onDelta) => (speaks.push(o.messages), onDelta('讲'), { ok: true, aborted: false, text: '讲' })
+      }
+    })
+    await h.runner.start(coach3)
+    await drive(h, () => speaks.some((m) => text(m).includes('新发言') && text(m).includes('跟了跟了')), () => 'call')
+  })
+
+  it('玩家本手没有决策点（大盲、对手全弃）：复盘是本手第一组，带往手回顾', async () => {
+    const recaps: Msg[][] = []
+    const asks: Msg[][] = []
+    const h = await harness({
+      agents: {
+        opponentAct: async () => okCall({ action: 'fold' }),
+        coachAsk: async (o, onDelta) => (asks.push(o.messages), onDelta('答'), { ok: true, aborted: false, text: '答' }),
+        coachRecap: async (o) => (recaps.push(o.messages), okCall({ headline: 'h', good: 'g', improve: 'i', tip: 't' }))
+      }
+    })
+    await h.runner.start(coach3)
+    await drive(h, () => recaps.some((m) => m.length === 1 && (m[0].content as string).startsWith('【往手回顾】')) && h.runner.view()!.coach!.busy === null, () => 'call')
+    // 写回 thread 的也必须是带往手回顾的原文：同一手再提问，第一组就是这次复盘
+    h.runner.ask('这手我没动作')
+    await tick(10)
+    const m = asks.at(-1)!
+    expect(m[0].content as string).toMatch(/^【往手回顾】/)
+    expect(JSON.stringify(m[1])).toContain('"toolName":"recap"')
+  })
+
+  it('局面变了再提问：重新附上当前局面', async () => {
+    const asks: Msg[][] = []
+    const h = await harness({ agents: { coachAsk: async (o, onDelta) => (asks.push(o.messages), onDelta('答'), { ok: true, aborted: false, text: '答' }) } })
+    await h.runner.start(coach3)
+    await drive(h, unlockedTurn(h), () => null)
+    h.runner.heroAct({ type: 'call' })
+    h.runner.ask('刚才跟对了吗')
+    await tick(10)
+    expect(asks[0].at(-1)!.content).toContain('当前局面（玩家视角）')
+  })
+
+  it('回放页复盘不读牌桌 thread', async () => {
+    const recaps: Msg[][] = []
+    const h = await harness({ agents: { coachRecap: async (o) => (recaps.push(o.messages), okCall({ headline: 'h', good: 'g', improve: 'i', tip: 't' })) } })
+    await h.runner.start(coach3)
+    await drive(h, () => hands(h) >= 2, () => 'call')
+    const id = (await db.listHands())[0].id
+    await h.runner.review(id)
+    expect(recaps.at(-1)).toHaveLength(1)
+    expect(recaps.at(-1)![0].content).not.toContain('【往手回顾】')
   })
 })

@@ -10,7 +10,6 @@ export interface Nums {
   need: number
   outs: number | null
   handName: string
-  sugg: string
 }
 
 export type SeatDisplay = SeatInfo & { ini: string; hue: number }

@@ -8,6 +8,7 @@ import type { HandSummary, Purpose, UsageSummary } from '../../../shared/types'
 
 const PURPOSE: Record<Purpose, [string, string]> = {
   decide: ['AI 决策', 'oklch(0.6 0.17 255)'],
+  talk: ['赛后发言', 'oklch(0.65 0.12 20)'],
   speak: ['教练讲解', 'oklch(0.62 0.13 155)'],
   ask: ['教练问答', 'oklch(0.72 0.14 80)'],
   recap: ['每手复盘', 'oklch(0.58 0.16 300)']

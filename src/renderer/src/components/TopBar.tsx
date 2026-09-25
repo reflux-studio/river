@@ -2,6 +2,8 @@ import { costText, fmt, useMoney } from '@/lib/format'
 import { go, invoke, toastError, useRiver, type Page } from '@/lib/river'
 import { cn } from '@/lib/utils'
 
+const mac = navigator.userAgent.includes('Mac')
+
 const NAV: [Page, string][] = [
   ['lobby', '大厅'],
   ['table', '牌桌'],
@@ -19,8 +21,18 @@ export function TopBar({ page }: { page: Page }) {
   const onTable = page === 'table'
 
   return (
-    // 左侧留出 hiddenInset 的系统红绿灯；整条可拖动窗口，交互元素单独取消
-    <header className="flex h-[52px] shrink-0 items-center gap-3 border-b bg-topbar pr-4 pl-[88px] [-webkit-app-region:drag]">
+    // mac 左侧留出系统红绿灯，其他平台右侧留出 titleBarOverlay 的窗口按钮；整条可拖动窗口，交互元素单独取消
+    <header
+      className={cn(
+        'flex h-[52px] shrink-0 items-center gap-3 border-b bg-topbar [-webkit-app-region:drag]',
+        mac ? 'pr-4 pl-[88px]' : 'pl-4'
+      )}
+      style={
+        mac
+          ? undefined
+          : { paddingRight: 'calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 16px)' }
+      }
+    >
       <div className="flex shrink-0 items-center gap-1.5 text-base font-semibold">
         <img src="./river-icon.png" alt="" width={28} height={28} />
         River

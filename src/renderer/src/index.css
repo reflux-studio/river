@@ -65,7 +65,7 @@
   --subtle: #6e6e73;
   --label: #55555a;
   --divider: #f3f3f1;
-  --topbar: #f7f7f5;
+  --topbar: #f7f7f5; /* 须与 main/index.ts 的 titleBarOverlay.color 同步 */
 }
 
 @layer base {

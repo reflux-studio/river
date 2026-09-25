@@ -25,10 +25,11 @@ export const setUsageListener = (fn: (u: Usage) => void) => void (onUsage = fn)
 // 测试替身模拟一次调用产生的用量
 export const reportUsage = (u: Usage) => onUsage(u)
 
-export interface Msg {
-  role: 'user' | 'assistant'
-  content: string
-}
+// 工具产出（出牌、复盘、赛后发言）按真实的 tool-call / tool-result 记入历史，模型才会继续调用工具而不是模仿文本
+export type Msg =
+  | { role: 'user'; content: string }
+  | { role: 'assistant'; content: string | [{ type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }] }
+  | { role: 'tool'; content: [{ type: 'tool-result'; toolCallId: string; toolName: string; output: { type: 'json'; value: unknown } }] }
 
 export interface ToolSpec<S extends z.ZodTypeAny> {
   name: string
@@ -81,8 +82,8 @@ export async function callModel<S extends z.ZodTypeAny>(o: CallOpts<S>): Promise
   let usage: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number } | undefined
   try {
     const agent = new Agent({ id: o.purpose, name: o.purpose, instructions: o.system, model: modelFor(o.role), maxRetries: o.maxRetries, ...(tools && { tools }) })
-    // 按角色拆成判别联合，Mastra 的消息类型才能接受
-    const messages = o.messages.map((m) => (m.role === 'user' ? { role: 'user' as const, content: m.content } : { role: 'assistant' as const, content: m.content }))
+    // Msg 是 AI SDK ModelMessage 的子集；Mastra 原样转给模型
+    const messages = o.messages as Parameters<typeof agent.generate>[0]
     const options = {
       maxSteps: 1,
       abortSignal: signal,

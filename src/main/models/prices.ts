@@ -65,7 +65,7 @@ export function costTotal(rows: UsageRow[]): Cost {
   return { usd, tokens, unpriced }
 }
 
-const PURPOSES: Purpose[] = ['decide', 'speak', 'ask', 'recap']
+const PURPOSES: Purpose[] = ['decide', 'talk', 'speak', 'ask', 'recap']
 
 // 每手柱状图只含已落库的手：作废的手（停下后离桌）计入总量但不单列
 export async function usageSummary(): Promise<UsageSummary> {
