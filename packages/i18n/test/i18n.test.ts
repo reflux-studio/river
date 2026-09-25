@@ -3,13 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { dict, presets, resolveLocale } from '../src'
 
 // 带参数的词条用真值和假值各调一次，两条分支里的固定文字都能被检查到
-const call = (f: (...a: unknown[]) => unknown, a: unknown[]) => {
-  try {
-    return f(...a)
-  } catch {
-    return undefined
-  }
-}
+const call = (f: (...a: unknown[]) => unknown, a: unknown[]) => f(...a)
 const strings = (v: unknown): string[] =>
   typeof v === 'string' ? [v]
     : typeof v === 'function' ? [call(v as never, ['a', 'b', 'c', 'd', 'e']), call(v as never, [0, '', '', '', ''])].flatMap(strings)
