@@ -227,6 +227,14 @@ describe('语言', () => {
     expect(db.personaOf('li')!.name).toBe('阿狸')
   })
 
+  it('换一个没有 presetLocale 的库：不沿用上一个库的预设语言', async () => {
+    await db.completeOnboarding('en')
+    expect(db.personaOf('li')!.name).toBe('Foxy')
+    await dropTempDb()
+    ;({ url, dir } = await tempDb(crypto))
+    expect(db.personaOf('li')!.name).toBe('阿狸')
+  })
+
   it('切换语言后 savePersona / deletePersona 按引导时的预设计算', async () => {
     await db.completeOnboarding('en')
     await db.updateSettings({ locale: 'zh' })

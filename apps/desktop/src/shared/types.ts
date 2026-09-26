@@ -27,7 +27,7 @@ export interface Settings {
   // 手动汇率（1 美元 = fxRate 当前货币）；null 为自动
   fxRate: number | null
   models: { opponent?: ModelRef; coach?: ModelRef }
-  // 只在引导页选一次（onboarding.done），之后不能改
+  // 引导页首次写入，之后可在设置页修改；对手预设的语言另存为 kv presetLocale，不随它变化
   locale: Locale
 }
 

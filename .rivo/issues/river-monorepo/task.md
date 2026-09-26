@@ -629,6 +629,13 @@ export async function completeOnboarding(locale: Locale) {
 - 说明：用 T4 到 T7 期间的构建在本地完成过英文引导的开发库没有 `presetLocale`，对手会退回中文。这些版本没有发布过，只影响开发者本地库，不处理。
 
 **结果**：
+- 已完成，实现提交 `be6e5ea`，小修见后续提交：
+  - F1：`shared/types.ts` 的注释改为新规则；
+  - F2：证据挪到 `.rivo/issues/river-monorepo/evidence/T10/`；
+  - F3：新增一条用例“换一个没有 presetLocale 的库时，不沿用上一个库的预设语言”，并做了变异验证。
+- 独立审阅：`reviews/T10-1.md`，结论为通过。审阅者做了 4 个变异，都能被测试抓住。
+- 实机验证中发现并修复了一个问题：`Onboarding` 组件的 `picked` 状态没有清除，导致从设置页重开规则介绍时不跟随新语言。
+- 待用户确认（F4）：教练的名称和风格目前会随语言切换，这是 AI 按“固定内容”归类的；另外，缺少 presetLocale 时的回退规则也是 AI 补定的。
 
 ## 整体验证与交接
 
