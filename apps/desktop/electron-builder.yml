@@ -1,0 +1,48 @@
+appId: app.river.desktop
+productName: River
+directories:
+  buildResources: build
+files:
+  - out/**
+  - package.json
+extraResources:
+  - from: build/icon.png
+    to: icon.png
+# libsql 为 N-API 原生模块，.node 无法从 asar 内加载
+asarUnpack:
+  - node_modules/@libsql/**
+  - node_modules/libsql/**
+# 自动更新读取 GitHub Releases 上的 latest*.yml（ADR-005）
+publish:
+  provider: github
+  owner: reflux-studio
+  repo: river
+mac:
+  icon: build/icon.icns
+  target:
+    # zip 供自动更新使用，dmg 供首次安装
+    - target: dmg
+      arch: arm64
+    - target: zip
+      arch: arm64
+  # 本地构建用 ad-hoc 签名（不签名会留下残缺签名，被判为“已损坏”）。
+  # CI 发布时改用固定的自签证书（-c.mac.identity、forceCodeSigning），否则新版本无法通过 Squirrel.Mac 的签名校验
+  identity: '-'
+  # hardened runtime 只在公证时需要；ad-hoc 签名下开启它会让库校验拦下 libsql 的 .node
+  hardenedRuntime: false
+  # 官网下载区按这三处 artifactName 匹配安装包（apps/site/src/lib/store.ts 的 ASSET），改名时同步
+  artifactName: ${productName}-${version}-${arch}.${ext}
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: x64
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+linux:
+  icon: build/icons
+  target:
+    - target: AppImage
+      arch: x64
+  category: Game
+  artifactName: ${productName}-${version}-${arch}.${ext}
+npmRebuild: false

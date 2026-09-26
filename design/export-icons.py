@@ -9,9 +9,9 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 source = Image.open(ROOT / 'design/river-icon-source.png').convert('RGBA')
 assert source.width == source.height, 'The app icon must be square'
-build = ROOT / 'build'
+build = ROOT / 'apps/desktop/build'
 (build / 'icons').mkdir(parents=True, exist_ok=True)
-public = ROOT / 'src/renderer/public'
+public = ROOT / 'apps/desktop/src/renderer/public'
 public.mkdir(parents=True, exist_ok=True)
 master = source.resize((1024, 1024), Image.Resampling.LANCZOS)
 master.save(build / 'icon.png')

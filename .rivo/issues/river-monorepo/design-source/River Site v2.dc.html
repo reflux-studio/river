@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>River — 单人对 AI 的德州扑克</title>
+<meta name="description" content="River：开源的 AI 德州扑克桌面应用。每位对手由一段性格提示词驱动，会下注、会嘴炮、会记仇；教练局每步讲解、随时提问、每手复盘。支持 macOS、Windows、Linux。">
+<meta property="og:title" content="River — Hold’em against AIs with attitude">
+<meta property="og:description" content="Open-source AI poker for macOS, Windows and Linux. Bring your own model.">
+<link rel="icon" href="river-icon.png">
+<script src="poker.js"></script>
+<script src="river-site.js"></script>
+<style>
+html,body{margin:0;background:#fbfbfa;}
+html{scroll-behavior:smooth;}
+a{color:#1d1d1f;text-decoration:none;}
+a:hover{color:oklch(0.47 0.1 158);}
+[hidden]{display:none !important;}
+</style>
+</helmet>
+<div style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Hiragino Sans GB','Helvetica Neue',sans-serif;color:#1d1d1f;background:#fbfbfa;-webkit-font-smoothing:antialiased;">
+
+<header style="position:sticky;top:0;z-index:50;background:rgba(251,251,250,0.86);backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid #ebebe9;">
+<div style="max-width:1120px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;gap:28px;">
+<a href="#top" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px;letter-spacing:-0.01em;color:#1d1d1f;"><img src="river-icon.png" alt="" width="28" height="28" style="display:block;">River</a>
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+<nav style="display:flex;gap:22px;font-size:14px;">
+<a href="#regulars"><span hidden="{{ en }}">牌友</span><span hidden="{{ zh }}">Regulars</span></a>
+<a href="#features"><span hidden="{{ en }}">功能</span><span hidden="{{ zh }}">Features</span></a>
+<a href="#models"><span hidden="{{ en }}">模型与花费</span><span hidden="{{ zh }}">Models &amp; cost</span></a>
+<a href="#download"><span hidden="{{ en }}">下载</span><span hidden="{{ zh }}">Download</span></a>
+<a href="#faq">FAQ</a>
+</nav>
+</sc-if>
+<div style="flex:1;"></div>
+<div style="display:flex;padding:3px;background:#f1f1ef;border-radius:9px;">
+<sc-for list="{{ langSeg }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="padding:4px 10px;border-radius:7px;font-size:13px;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.sh }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for>
+</div>
+<a href="https://github.com/reflux-studio/river" style="font-size:14px;font-weight:500;padding:7px 14px;border:1px solid #e3e3e0;border-radius:999px;background:#fff;white-space:nowrap;" style-hover="background:#f5f5f3;">GitHub</a>
+</div>
+</header>
+
+<section id="top" style="padding:80px 24px 0;">
+<div style="max-width:1120px;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:22px;">
+<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid #ebebe9;border-radius:999px;font-size:13px;color:#55555a;background:#fff;"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.55 0.14 155);"></span><span hidden="{{ en }}">开源 · macOS / Windows / Linux · 模型自选</span><span hidden="{{ zh }}">Open source · macOS / Windows / Linux · Bring your own model</span></div>
+<h1 style="margin:0;font-size:clamp(40px,6.6vw,80px);line-height:1.06;letter-spacing:-0.035em;font-weight:700;text-wrap:balance;max-width:920px;"><span hidden="{{ en }}">和一桌有脾气的 AI<br>打德州。</span><span hidden="{{ zh }}">Hold’em against a table<br>of AIs with attitude.</span></h1>
+<p style="margin:0;font-size:clamp(17px,1.6vw,20px);line-height:1.6;color:#55555a;max-width:600px;text-wrap:pretty;"><span hidden="{{ en }}">桌上只有你和 AI。每位对手都有自己的性格，会诈唬、会嘴硬、还会记仇；想学，就开一桌教练局，让教练坐你身后。</span><span hidden="{{ zh }}">It’s just you and the AIs. Every opponent has a personality — they bluff, they trash-talk, they hold grudges. Want to learn? Open a coach table and someone sits behind you.</span></p>
+<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:6px;">
+<a href="{{ primary.url }}" style="display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:999px;background:#1d1d1f;color:#fff;font-size:16px;font-weight:600;white-space:nowrap;" style-hover="background:#3a3a3c;color:#fff;">{{ primary.label }}</a>
+<a href="https://github.com/reflux-studio/river" style="display:inline-flex;align-items:center;padding:13px 24px;border-radius:999px;border:1px solid #d9d9d5;background:#fff;font-size:16px;font-weight:600;white-space:nowrap;" style-hover="background:#f5f5f3;"><span hidden="{{ en }}">在 GitHub 上看源码</span><span hidden="{{ zh }}">View source on GitHub</span></a>
+</div>
+<div style="font-size:13px;color:#6e6e73;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;"><span>{{ verLine }}</span><span>·</span><a href="#download" style="color:#55555a;text-decoration:underline;text-underline-offset:3px;"><span hidden="{{ en }}">其他平台</span><span hidden="{{ zh }}">Other platforms</span></a></div>
+</div>
+
+<div style="max-width:1080px;margin:56px auto 0;border-radius:14px;border:1px solid #e3e3e0;overflow:hidden;background:#fff;box-shadow:0 40px 90px -20px rgba(0,0,0,0.18),0 8px 24px rgba(0,0,0,0.05);">
+<div style="height:52px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #ebebe9;background:#f7f7f5;">
+<div style="display:flex;gap:8px;"><div style="width:12px;height:12px;border-radius:50%;background:#ff5f57;"></div><div style="width:12px;height:12px;border-radius:50%;background:#febc2e;"></div><div style="width:12px;height:12px;border-radius:50%;background:#28c840;"></div></div>
+<div style="display:flex;align-items:center;gap:6px;font-size:16px;font-weight:600;margin-left:10px;"><img src="river-icon.png" alt="" width="24" height="24" style="display:block;">River</div>
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:2px;margin-left:6px;"><sc-for list="{{ appNav }}" as="n" hint-placeholder-count="6"><div style="padding:6px 12px;border-radius:8px;font-size:14px;white-space:nowrap;background:{{ n.bg }};color:{{ n.c }};font-weight:{{ n.w }};">{{ n.l }}</div></sc-for></div></sc-if>
+<div style="flex:1;"></div>
+<div style="font-size:14px;color:#86868b;white-space:nowrap;"><span hidden="{{ en }}">第 {{ t.handNo }} 手</span><span hidden="{{ zh }}">Hand {{ t.handNo }}</span></div>
+<div style="display:flex;align-items:center;gap:6px;font-size:13px;padding:5px 10px;border-radius:999px;background:#fff;border:1px solid #ebebe9;white-space:nowrap;"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.7 0.14 70);"></span><span style="color:#86868b;"><span hidden="{{ en }}">本桌</span><span hidden="{{ zh }}">Table</span></span><span style="font-weight:600;">{{ tableCost }}</span></div>
+</div>
+<div ref="{{ wrapRef }}" style="position:relative;width:100%;height:{{ stageH }};min-height:280px;overflow:hidden;background:#f4f4f1;">
+<div ref="{{ stageRef }}" style="position:absolute;left:0;top:0;width:{{ stageW }};height:{{ stageHpx }};transform:{{ stageTf }};transform-origin:0 0;">
+<div style="position:absolute;left:13%;right:13%;top:15%;bottom:16%;border-radius:999px;background:{{ feltBg }};box-shadow:{{ feltShadow }};"></div>
+<div style="position:absolute;left:calc(13% + 18px);right:calc(13% + 18px);top:calc(15% + 18px);bottom:calc(16% + 18px);border-radius:999px;border:1px solid rgba(255,255,255,0.12);pointer-events:none;"></div>
+<div style="position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:12px;z-index:1;">
+<div style="display:flex;gap:8px;align-items:baseline;padding:5px 14px;background:rgba(0,0,0,0.38);color:#fff;border-radius:999px;font-size:14px;white-space:nowrap;"><span style="opacity:0.75;"><span hidden="{{ en }}">底池</span><span hidden="{{ zh }}">Pot</span></span><span style="font-weight:600;">{{ t.potF }}</span></div>
+<div style="display:flex;gap:7px;perspective:600px;">
+<sc-for list="{{ t.board }}" as="c" hint-placeholder-count="5">
+<sc-if value="{{ c.has }}" hint-placeholder-val="{{ false }}"><div data-anim="{{ c.key }}" data-anim-kind="deal" style="position:relative;width:56px;height:80px;box-sizing:border-box;background:#fff;border-radius:7px;box-shadow:0 1px 0 rgba(0,0,0,0.08),0 5px 12px rgba(0,0,0,0.24);color:{{ c.color }};"><div style="position:absolute;left:6px;top:6px;display:flex;flex-direction:column;align-items:center;gap:3px;"><span style="font-size:21px;font-weight:700;line-height:1;letter-spacing:-0.06em;">{{ c.r }}</span><svg viewBox="0 0 24 24" style="width:13px;height:13px;display:block;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></div><svg viewBox="0 0 24 24" style="position:absolute;right:6px;bottom:7px;width:26px;height:26px;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></div></sc-if>
+<sc-if value="{{ c.empty }}" hint-placeholder-val="{{ true }}"><div style="width:56px;height:80px;box-sizing:border-box;border:1.5px dashed rgba(255,255,255,0.22);border-radius:7px;"></div></sc-if>
+</sc-for>
+</div>
+</div>
+<sc-for list="{{ t.seats }}" as="p" hint-placeholder-count="5">
+<div style="position:absolute;left:{{ p.x }};top:{{ p.y }};transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px;white-space:nowrap;z-index:{{ p.z }};">
+<sc-if value="{{ p.bubUp }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);z-index:3;"><div data-anim="{{ p.bkey }}" style="position:relative;transform-origin:50% 100%;width:max-content;max-width:210px;white-space:normal;padding:8px 13px;background:#fff;font-size:13px;line-height:1.45;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.22),0 0 0 1px rgba(0,0,0,0.04);text-align:left;"><div style="position:absolute;left:50%;bottom:-5px;margin-left:-6px;width:12px;height:12px;background:#fff;transform:rotate(45deg);border-radius:2px;"></div><span style="position:relative;">{{ p.bubble }}</span></div></div></sc-if>
+<sc-if value="{{ p.back }}" hint-placeholder-val="{{ true }}"><div style="display:flex;margin-bottom:-16px;"><div style="width:34px;height:48px;box-sizing:border-box;background:#fff;border-radius:5px;padding:2.5px;box-shadow:0 2px 6px rgba(0,0,0,0.28);transform:rotate(-7deg);"><div style="width:100%;height:100%;border-radius:3px;background:{{ backBg }};"></div></div><div style="width:34px;height:48px;box-sizing:border-box;background:#fff;border-radius:5px;padding:2.5px;box-shadow:0 2px 6px rgba(0,0,0,0.28);transform:rotate(7deg);margin-left:-10px;"><div style="width:100%;height:100%;border-radius:3px;background:{{ backBg }};"></div></div></div></sc-if>
+<sc-if value="{{ p.face }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:3px;margin-bottom:-14px;"><sc-for list="{{ p.cards }}" as="c" hint-placeholder-count="2"><div data-anim="{{ c.key }}" data-anim-kind="deal" style="position:relative;width:44px;height:62px;box-sizing:border-box;background:#fff;border-radius:5px;box-shadow:0 1px 0 rgba(0,0,0,0.08),0 5px 12px rgba(0,0,0,0.24);color:{{ c.color }};"><div style="position:absolute;left:5px;top:5px;display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:16px;font-weight:700;line-height:1;letter-spacing:-0.06em;">{{ c.r }}</span><svg viewBox="0 0 24 24" style="width:10px;height:10px;display:block;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></div><svg viewBox="0 0 24 24" style="position:absolute;right:5px;bottom:5px;width:20px;height:20px;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></div></sc-for></div></sc-if>
+<div data-seat="{{ p.i }}" style="position:relative;display:flex;align-items:center;gap:9px;padding:6px 16px 6px 6px;background:#fff;border-radius:999px;border:{{ p.border }};box-shadow:{{ p.shadow }};opacity:{{ p.op }};filter:{{ p.gray }};">
+<div style="width:36px;height:36px;border-radius:50%;background:{{ p.av }};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;">{{ p.ini }}</div>
+<div style="display:flex;flex-direction:column;text-align:left;"><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:14px;font-weight:600;">{{ p.name }}</span><span style="font-size:11px;color:#6e6e73;background:#f1f1ef;padding:1px 6px;border-radius:5px;">{{ p.tag }}</span></div><span style="font-size:12px;color:#86868b;">{{ p.stackF }}</span></div>
+<div style="position:absolute;left:10px;top:-10px;display:flex;gap:4px;">
+<sc-if value="{{ p.sb }}" hint-placeholder-val="{{ false }}"><span style="padding:2px 7px;border-radius:999px;background:oklch(0.58 0.15 250);color:#fff;font-size:11px;font-weight:700;letter-spacing:0.02em;box-shadow:0 0 0 2px #fff;"><span hidden="{{ en }}">小盲</span><span hidden="{{ zh }}">SB</span></span></sc-if>
+<sc-if value="{{ p.bb }}" hint-placeholder-val="{{ false }}"><span style="padding:2px 7px;border-radius:999px;background:oklch(0.8 0.15 80);color:#1d1d1f;font-size:11px;font-weight:700;letter-spacing:0.02em;box-shadow:0 0 0 2px #fff;"><span hidden="{{ en }}">大盲</span><span hidden="{{ zh }}">BB</span></span></sc-if>
+</div>
+<sc-if value="{{ p.dealer }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:-30px;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1.5px #1d1d1f,0 2px 5px rgba(0,0,0,0.3);">D</div></sc-if>
+</div>
+<sc-if value="{{ p.hasStatus }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:6px;padding:2px 10px;background:{{ p.stBg }};border-radius:999px;font-size:12px;font-weight:{{ p.stW }};color:{{ p.stColor }};box-shadow:0 1px 3px rgba(0,0,0,0.12);"><span style="width:6px;height:6px;border-radius:50%;background:{{ p.stDot }};"></span>{{ p.status }}</div></sc-if>
+<sc-if value="{{ p.bubDown }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%);z-index:3;"><div data-anim="{{ p.bkey }}" style="position:relative;transform-origin:50% 0%;width:max-content;max-width:210px;white-space:normal;padding:8px 13px;background:#fff;font-size:13px;line-height:1.45;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.22),0 0 0 1px rgba(0,0,0,0.04);text-align:left;"><div style="position:absolute;left:50%;top:-5px;margin-left:-6px;width:12px;height:12px;background:#fff;transform:rotate(45deg);border-radius:2px;"></div><span style="position:relative;">{{ p.bubble }}</span></div></div></sc-if>
+</div>
+</sc-for>
+<div ref="{{ fxRef }}" style="position:absolute;inset:0;pointer-events:none;z-index:8;"></div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-top:1px solid #ebebe9;background:#fbfbfa;flex-wrap:wrap;">
+<span style="font-size:13px;color:#86868b;flex:1;min-width:240px;text-wrap:pretty;"><span hidden="{{ en }}">演示桌由浏览器里的规则引擎驱动；在 River 里，每一次下注和每一句台词都来自你配置的大模型。</span><span hidden="{{ zh }}">This demo runs on a rules engine in your browser. In River, every bet and every line comes from the model you configure.</span></span>
+<span style="font-size:13px;color:oklch(0.6 0.17 255);white-space:nowrap;">{{ statusLine }}</span>
+<div onClick="{{ togglePause }}" style="font-size:13px;padding:5px 13px;border:1px solid #e3e3e0;border-radius:999px;background:#fff;cursor:pointer;white-space:nowrap;" style-hover="background:#f5f5f3;">{{ pauseLabel }}</div>
+</div>
+</div>
+</section>
+
+<section id="regulars" style="padding:120px 24px 110px;">
+<div style="max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:40px;">
+<div style="display:flex;flex-wrap:wrap;gap:24px 60px;align-items:flex-end;justify-content:space-between;">
+<div style="display:flex;flex-direction:column;gap:14px;max-width:560px;">
+<div style="font-size:14px;font-weight:600;color:oklch(0.45 0.1 158);"><span hidden="{{ en }}">AI 对手</span><span hidden="{{ zh }}">AI opponents</span></div>
+<h2 style="margin:0;font-size:clamp(32px,4.4vw,52px);line-height:1.1;letter-spacing:-0.03em;font-weight:700;text-wrap:balance;"><span hidden="{{ en }}">八个常驻牌友，八种毛病。</span><span hidden="{{ zh }}">Eight regulars. Eight bad habits.</span></h2>
+</div>
+<p style="margin:0;font-size:17px;line-height:1.6;color:#55555a;max-width:460px;text-wrap:pretty;"><span hidden="{{ en }}">每位对手就是一段性格提示词。轮到它时，一次调用同时决定下注和台词。看谁不顺眼就改，改动从下一次行动生效；还不够，就自己写一个。</span><span hidden="{{ zh }}">Each opponent is a single personality prompt. On its turn, one model call decides both the bet and the line. Edit anyone — changes apply from their next action — or write your own.</span></p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px;">
+<sc-for list="{{ personas }}" as="o" hint-placeholder-count="8">
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;align-items:center;gap:12px;"><div style="width:44px;height:44px;flex-shrink:0;border-radius:50%;background:{{ o.av }};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;">{{ o.ini }}</div><div style="display:flex;flex-direction:column;min-width:0;"><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:16px;font-weight:600;">{{ o.name }}</span><span style="font-size:11px;color:#6e6e73;background:#f1f1ef;padding:1px 6px;border-radius:5px;white-space:nowrap;">{{ o.tag }}</span></div><span style="font-size:13px;color:#86868b;text-wrap:pretty;">{{ o.desc }}</span></div></div>
+<div style="padding:10px 12px;border:1px solid #e3e3e0;border-radius:10px;font-size:13px;line-height:1.55;color:#3a3a3c;text-wrap:pretty;">{{ o.prompt }}</div>
+</div>
+</sc-for>
+<div style="border:1.5px dashed #d4d4cf;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;justify-content:center;">
+<div style="display:flex;align-items:center;gap:12px;"><div style="width:44px;height:44px;border-radius:50%;background:oklch(0.91 0.045 250);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;"><span hidden="{{ en }}">新</span><span hidden="{{ zh }}">+</span></div><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:16px;font-weight:600;"><span hidden="{{ en }}">新对手</span><span hidden="{{ zh }}">New opponent</span></span><span style="font-size:11px;color:oklch(0.5 0.15 255);background:oklch(0.96 0.02 255);padding:1px 6px;border-radius:5px;"><span hidden="{{ en }}">自建</span><span hidden="{{ zh }}">Custom</span></span></div></div>
+<div style="padding:10px 12px;border:1px solid #e3e3e0;border-radius:10px;font-size:13px;line-height:1.55;color:#86868b;"><span hidden="{{ en }}">你是……（描述 TA 的打法：紧还是松、爱不爱诈唬；以及说话方式、口头禅）</span><span hidden="{{ zh }}">You are… (how they play — tight or loose, how often they bluff — and how they talk)</span></div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:28px 64px;align-items:center;padding:28px;border-radius:20px;background:#f3f3f1;">
+<div style="display:flex;flex-direction:column;gap:10px;">
+<span style="font-size:20px;font-weight:700;letter-spacing:-0.01em;"><span hidden="{{ en }}">它们会记仇。</span><span hidden="{{ zh }}">They hold grudges.</span></span>
+<span style="font-size:15px;line-height:1.65;color:#55555a;text-wrap:pretty;"><span hidden="{{ en }}">对手每次行动时，都可以给你记一条印象、或者记下自己的心情。下一手，它们带着这些印象坐回来。想让大家忘掉你上一把的蠢事？设置里一键重置 AI 记忆。</span><span hidden="{{ zh }}">Each time they act, opponents can jot down an impression of you — or how they’re feeling. Next hand, they sit down with those notes. Want them to forget that last blunder? Reset AI memory in settings.</span></span>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;">
+<sc-for list="{{ notes }}" as="n" hint-placeholder-count="3"><div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:#fff;border-radius:12px;border:1px solid #ebebe9;"><div style="width:26px;height:26px;flex-shrink:0;border-radius:50%;background:{{ n.av }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;">{{ n.ini }}</div><div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:12px;color:#86868b;">{{ n.who }}</span><span style="font-size:14px;line-height:1.5;">{{ n.t }}</span></div></div></sc-for>
+</div>
+</div>
+</div>
+</section>
+
+<section id="features" style="padding:110px 24px 120px;background:#fff;border-top:1px solid #ebebe9;">
+<div style="max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:120px;">
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:48px 72px;align-items:center;">
+<div style="display:flex;flex-direction:column;gap:16px;">
+<div style="font-size:14px;font-weight:600;color:oklch(0.45 0.1 158);"><span hidden="{{ en }}">公屏</span><span hidden="{{ zh }}">Table chat</span></div>
+<h3 style="margin:0;font-size:clamp(28px,3.4vw,40px);line-height:1.15;letter-spacing:-0.025em;font-weight:700;text-wrap:balance;"><span hidden="{{ en }}">牌桌上最吵的，永远不是你。</span><span hidden="{{ zh }}">The loudest one at the table is never you.</span></h3>
+<p style="margin:0;font-size:17px;line-height:1.65;color:#55555a;max-width:460px;text-wrap:pretty;"><span hidden="{{ en }}">对手轮到自己时，会随行动说一句：虚张声势、点评牌面、顺便挤兑两句——但绝不老实报出底牌。公屏是它们的地盘，你专心打牌就好。</span><span hidden="{{ zh }}">When it’s their turn, opponents say one line with their action — bluster, board talk, the odd jab — but they’ll never honestly reveal their cards. The chat is theirs; you just play.</span></p>
+</div>
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:16px;box-shadow:0 24px 60px -24px rgba(0,0,0,0.16);overflow:hidden;max-width:420px;width:100%;justify-self:center;">
+<div style="padding:12px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f0f0ee;"><span style="font-size:15px;font-weight:600;"><span hidden="{{ en }}">公屏</span><span hidden="{{ zh }}">Table chat</span></span><span style="font-size:12px;color:#86868b;"><span hidden="{{ en }}">收起</span><span hidden="{{ zh }}">Hide</span></span></div>
+<div style="padding:14px 16px 18px;display:flex;flex-direction:column;gap:12px;">
+<sc-for list="{{ chat }}" as="m" hint-placeholder-count="7">
+<sc-if value="{{ m.isSys }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:#a1a1a6;"><span>— {{ m.t }}</span><div style="display:flex;gap:2px;"><sc-for list="{{ m.cards }}" as="c" hint-placeholder-count="3"><span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:18px;height:25px;box-sizing:border-box;background:#fff;border:1px solid #dcdcd8;border-radius:3.5px;color:{{ c.color }};"><span style="font-size:10.5px;font-weight:700;line-height:1;letter-spacing:-0.05em;">{{ c.r }}</span><svg viewBox="0 0 24 24" style="width:9px;height:9px;display:block;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></span></sc-for></div><span>—</span></div></sc-if>
+<sc-if value="{{ m.isAct }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:6px;align-items:center;font-size:12px;color:#86868b;padding-left:38px;"><span style="font-weight:600;color:#55555a;">{{ m.n }}</span><span>{{ m.act }}</span></div></sc-if>
+<sc-if value="{{ m.isMsg }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:10px;"><div style="width:28px;height:28px;flex-shrink:0;border-radius:50%;background:{{ m.av }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;">{{ m.ini }}</div><div style="display:flex;flex-direction:column;gap:3px;min-width:0;"><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:13px;font-weight:600;">{{ m.n }}</span><span style="font-size:11px;color:#6e6e73;background:#f1f1ef;padding:1px 6px;border-radius:5px;white-space:nowrap;">{{ m.act }}</span></div><div style="font-size:14px;line-height:1.5;text-wrap:pretty;">{{ m.t }}</div></div></div></sc-if>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:48px 72px;align-items:center;">
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:16px;box-shadow:0 24px 60px -24px rgba(0,0,0,0.16);overflow:hidden;max-width:380px;width:100%;justify-self:center;display:flex;flex-direction:column;">
+<div onClick="{{ cycleCoach }}" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #f0f0ee;cursor:pointer;"><div style="width:30px;height:30px;flex-shrink:0;border-radius:50%;background:oklch(0.92 0.045 155);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;"><span hidden="{{ en }}">师</span><span hidden="{{ zh }}">C</span></div><div style="display:flex;flex-direction:column;"><span style="font-size:14px;font-weight:600;white-space:nowrap;">{{ coachTitle }}</span><span style="font-size:12px;color:#86868b;white-space:nowrap;"><span hidden="{{ en }}">每步先讲解 · 每手自动复盘</span><span hidden="{{ zh }}">Speaks first each turn · reviews every hand</span></span></div></div>
+<div style="padding:10px 16px 0;"><div style="display:flex;padding:3px;background:#f1f1ef;border-radius:9px;"><sc-for list="{{ levelSeg }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="flex:1;text-align:center;padding:5px 0;border-radius:7px;font-size:13px;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.sh }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for></div></div>
+<div style="padding:12px 16px 0;">
+<sc-if value="{{ showProb }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:12px;background:#f7f7f5;">
+<div style="display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:13px;color:#55555a;"><span hidden="{{ en }}">胜率 vs 所需胜率</span><span hidden="{{ zh }}">Equity vs required</span></span><span style="font-size:13px;font-weight:600;color:oklch(0.55 0.14 155);"><span hidden="{{ en }}">跟注 +EV</span><span hidden="{{ zh }}">Call +EV</span></span></div>
+<div style="display:flex;align-items:baseline;gap:6px;"><span style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">38%</span><span style="font-size:14px;color:#86868b;">/ 25.0%</span></div>
+<div style="position:relative;height:8px;border-radius:999px;background:#e8e8e5;"><div style="position:absolute;left:0;top:0;bottom:0;width:38%;border-radius:999px;background:oklch(0.6 0.17 255);"></div><div style="position:absolute;top:-4px;left:25%;width:2px;height:16px;background:#1d1d1f;"></div></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;font-size:12px;color:#86868b;"><sc-for list="{{ probStats }}" as="s" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;"><span>{{ s.l }}</span><span style="font-size:15px;font-weight:600;color:#1d1d1f;">{{ s.v }}</span></div></sc-for></div>
+<div style="font-size:12px;color:#86868b;"><span hidden="{{ en }}">本地计算 · 胜率按对手随机手牌估算</span><span hidden="{{ zh }}">Computed locally · vs. random opponent hands</span></div>
+</div>
+</sc-if>
+<sc-if value="{{ hard }}" hint-placeholder-val="{{ false }}"><div style="padding:10px 12px;border:1px dashed #e3e3e0;border-radius:10px;font-size:13px;color:#86868b;"><span hidden="{{ en }}">硬核模式：概率信息已隐藏。</span><span hidden="{{ zh }}">Hardcore mode: odds hidden.</span></div></sc-if>
+</div>
+<div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:12px;background:oklch(0.97 0.015 255);"><span style="font-size:12px;font-weight:600;color:oklch(0.5 0.15 255);"><span hidden="{{ en }}">第 12 手 · 教练</span><span hidden="{{ zh }}">Hand 12 · Coach</span></span><span style="font-size:14px;line-height:1.7;text-wrap:pretty;">{{ coachSays }}</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;padding:12px 16px 16px;border-top:1px solid #ebebe9;">
+<div style="display:flex;flex-wrap:wrap;gap:6px;"><sc-for list="{{ quick }}" as="q" hint-placeholder-count="3"><span style="padding:4px 10px;border:1px solid #ebebe9;border-radius:999px;font-size:12px;color:#55555a;">{{ q }}</span></sc-for></div>
+<div style="display:flex;gap:8px;"><div style="flex:1;padding:9px 12px;border:1px solid #e3e3e0;border-radius:10px;font-size:14px;color:#a1a1a6;"><span hidden="{{ en }}">问问教练…</span><span hidden="{{ zh }}">Ask the coach…</span></div><div style="padding:9px 12px;border-radius:10px;background:#1d1d1f;color:#fff;font-size:14px;white-space:nowrap;"><span hidden="{{ en }}">暂停并提问</span><span hidden="{{ zh }}">Pause &amp; ask</span></div></div>
+<div onClick="{{ toggleHard }}" style="display:flex;align-items:center;gap:8px;font-size:13px;color:#55555a;cursor:pointer;"><span style="flex:1;"><span hidden="{{ en }}">硬核模式 · 隐藏概率</span><span hidden="{{ zh }}">Hardcore · hide odds</span></span><div style="width:32px;height:18px;border-radius:999px;background:{{ hardTrack }};position:relative;transition:background .2s;"><div style="position:absolute;top:2px;left:{{ hardKnob }};width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.2);transition:left .2s;"></div></div></div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;">
+<div style="font-size:14px;font-weight:600;color:oklch(0.45 0.1 158);"><span hidden="{{ en }}">教练局</span><span hidden="{{ zh }}">Coach table</span></div>
+<h3 style="margin:0;font-size:clamp(28px,3.4vw,40px);line-height:1.15;letter-spacing:-0.025em;font-weight:700;text-wrap:balance;"><span hidden="{{ en }}">教练坐你身后，<br>只看你能看到的牌。</span><span hidden="{{ zh }}">A coach behind your chair — who only sees your cards.</span></h3>
+<p style="margin:0;font-size:17px;line-height:1.65;color:#55555a;max-width:460px;text-wrap:pretty;"><span hidden="{{ en }}">每次轮到你，教练先说说局面和建议；有不懂的随时问，提问时牌局会暂停。胜率和所需胜率在本地算好，一眼看出这手跟注是赚是亏。三种人设、两档讲解深度——点左边试试。</span><span hidden="{{ zh }}">Each turn the coach reads the spot and gives advice first. Ask anything — the table pauses while you do. Equity and required equity are computed locally, so you see at a glance whether a call makes money. Three personas, two depth levels — try them on the left.</span></p>
+<div style="display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.6;color:#3a3a3c;padding-top:4px;">
+<div style="display:flex;gap:10px;"><span style="font-weight:600;white-space:nowrap;"><span hidden="{{ en }}">教练局</span><span hidden="{{ zh }}">Coach table</span></span><span style="color:#55555a;"><span hidden="{{ en }}">每步讲解、随时提问、一手结束亮出所有底牌并复盘。</span><span hidden="{{ zh }}">Advice every turn, questions any time, all hole cards revealed and reviewed after each hand.</span></span></div>
+<div style="display:flex;gap:10px;"><span style="font-weight:600;white-space:nowrap;"><span hidden="{{ en }}">自由局</span><span hidden="{{ zh }}">Free table</span></span><span style="color:#55555a;"><span hidden="{{ en }}">没有教练，只留概率面板，自己打。</span><span hidden="{{ zh }}">No coach — just the odds panel. You’re on your own.</span></span></div>
+</div>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:48px 72px;align-items:center;">
+<div style="display:flex;flex-direction:column;gap:16px;">
+<div style="font-size:14px;font-weight:600;color:oklch(0.45 0.1 158);"><span hidden="{{ en }}">复盘</span><span hidden="{{ zh }}">Hand review</span></div>
+<h3 style="margin:0;font-size:clamp(28px,3.4vw,40px);line-height:1.15;letter-spacing:-0.025em;font-weight:700;text-wrap:balance;"><span hidden="{{ en }}">不以结果论英雄。</span><span hidden="{{ zh }}">Judged on decisions, not results.</span></h3>
+<p style="margin:0;font-size:17px;line-height:1.65;color:#55555a;max-width:460px;text-wrap:pretty;"><span hidden="{{ en }}">不论输赢，每手打完都复盘：一句话总结，做得好、可改进、下次记住。反复出现的漏洞，教练会记进你的学员档案。错过的手牌，在手牌回放里随时让教练补上。</span><span hidden="{{ zh }}">Win or lose, every hand gets reviewed: a one-line summary, what went well, what to fix, what to remember. Recurring leaks go into your student file. Missed one? Ask for a review from hand replays any time.</span></p>
+</div>
+<div style="background:#fff;border:1px solid #ebebe9;border-radius:14px;box-shadow:0 24px 60px -24px rgba(0,0,0,0.16);overflow:hidden;max-width:400px;width:100%;justify-self:center;">
+<div style="display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:#f7f7f5;">
+<div style="display:flex;align-items:baseline;gap:8px;"><span style="font-size:13px;font-weight:600;"><span hidden="{{ en }}">第 47 手复盘</span><span hidden="{{ zh }}">Hand 47 review</span></span><div style="flex:1;"></div><span style="font-size:13px;font-weight:600;color:oklch(0.55 0.14 155);">+2,400</span></div>
+<div style="display:flex;align-items:center;gap:8px;">
+<div style="display:flex;gap:2px;"><sc-for list="{{ recapHero }}" as="c" hint-placeholder-count="2"><span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:20px;height:28px;box-sizing:border-box;background:#fff;border:1px solid #dcdcd8;border-radius:4px;color:{{ c.color }};"><span style="font-size:11.5px;font-weight:700;line-height:1;letter-spacing:-0.05em;">{{ c.r }}</span><svg viewBox="0 0 24 24" style="width:10px;height:10px;display:block;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></span></sc-for></div>
+<span style="width:1px;height:18px;background:#e3e3e0;"></span>
+<div style="display:flex;gap:2px;"><sc-for list="{{ recapBoard }}" as="c" hint-placeholder-count="5"><span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:20px;height:28px;box-sizing:border-box;background:#fff;border:1px solid #dcdcd8;border-radius:4px;color:{{ c.color }};"><span style="font-size:11.5px;font-weight:700;line-height:1;letter-spacing:-0.05em;">{{ c.r }}</span><svg viewBox="0 0 24 24" style="width:10px;height:10px;display:block;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></span></sc-for></div>
+</div>
+</div>
+<div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+<div style="font-size:14px;line-height:1.5;font-weight:600;text-wrap:pretty;"><span hidden="{{ en }}">翻牌中暗三条没急着打，河牌一枪打在教授最难弃的尺寸上。</span><span hidden="{{ zh }}">Flopped a set, stayed patient, then fired a river size the Prof couldn’t fold.</span></div>
+<sc-for list="{{ recapRows }}" as="r" hint-placeholder-count="3"><div style="display:flex;gap:8px;font-size:13px;line-height:1.6;"><span style="display:flex;align-items:center;gap:5px;width:68px;height:21px;flex-shrink:0;font-weight:500;color:#6e6e73;"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }};"></span>{{ r.l }}</span><span style="flex:1;min-width:0;text-wrap:pretty;">{{ r.t }}</span></div></sc-for>
+<span style="font-size:11px;color:#a1a1a6;">{{ coachName }}</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section style="padding:0 24px;background:#fff;">
+<div style="max-width:1120px;margin:0 auto;border-radius:28px;background:#121214;color:#f5f5f3;overflow:hidden;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));align-items:stretch;">
+<div style="padding:clamp(32px,5vw,64px);display:flex;flex-direction:column;justify-content:center;gap:18px;">
+<div style="font-size:14px;font-weight:600;color:oklch(0.74 0.17 27);"><span hidden="{{ en }}">动效</span><span hidden="{{ zh }}">Table effects</span></div>
+<h3 style="margin:0;font-size:clamp(30px,3.8vw,46px);line-height:1.12;letter-spacing:-0.03em;font-weight:700;text-wrap:balance;"><span hidden="{{ en }}">有人全下，<br>整张桌子都会抖。</span><span hidden="{{ zh }}">When someone shoves,<br>the whole table shakes.</span></h3>
+<p style="margin:0;font-size:17px;line-height:1.65;color:#c7c7c2;max-width:440px;text-wrap:pretty;"><span hidden="{{ en }}">ALL IN 字样弹出，金红光环一圈圈扩开，筹码四散飞出。发牌、翻牌、筹码入池、赢家收筹码也都有动画。嫌闹？切到精简或关闭。</span><span hidden="{{ zh }}">ALL IN pops up, gold and red rings ripple out, chips scatter. Dealing, flops, bets and pot pushes are animated too. Too much? Switch to reduced or off.</span></p>
+<div style="display:flex;flex-direction:column;gap:14px;padding-top:8px;">
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;"><span style="font-size:13px;color:#a1a1a6;width:44px;"><span hidden="{{ en }}">动效</span><span hidden="{{ zh }}">Effects</span></span><div style="display:flex;padding:3px;background:rgba(255,255,255,0.1);border-radius:9px;"><sc-for list="{{ fxSeg }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.onClick }}" style="padding:5px 14px;border-radius:7px;font-size:13px;cursor:pointer;background:{{ o.bg }};color:{{ o.c }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for></div></div>
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;"><span style="font-size:13px;color:#a1a1a6;width:44px;"><span hidden="{{ en }}">桌布</span><span hidden="{{ zh }}">Felt</span></span><div style="display:flex;gap:8px;flex-wrap:wrap;"><sc-for list="{{ feltSw }}" as="w" hint-placeholder-count="5"><div onClick="{{ w.onClick }}" title="{{ w.n }}" style="width:24px;height:24px;border-radius:50%;background:{{ w.bg }};cursor:pointer;box-shadow:{{ w.ring }};"></div></sc-for><label title="custom" style="position:relative;display:block;width:24px;height:24px;border-radius:50%;background:{{ customBg }};cursor:pointer;box-shadow:{{ customRing }};"><input type="color" value="{{ feltCustom }}" onChange="{{ onPickFelt }}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0;"></label></div></div>
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;"><span style="font-size:13px;color:#a1a1a6;width:44px;"><span hidden="{{ en }}">牌背</span><span hidden="{{ zh }}">Backs</span></span><div style="display:flex;gap:8px;"><sc-for list="{{ backSw }}" as="w" hint-placeholder-count="4"><div onClick="{{ w.onClick }}" style="width:20px;height:28px;box-sizing:border-box;border-radius:4px;background:#fff;padding:2px;cursor:pointer;box-shadow:{{ w.ring }};"><div style="width:100%;height:100%;border-radius:2px;background:{{ w.bg }};"></div></div></sc-for></div></div>
+</div>
+</div>
+<div ref="{{ allinRef }}" style="position:relative;min-height:400px;background:#f4f4f1;overflow:hidden;">
+<div style="position:absolute;left:12%;right:12%;top:18%;bottom:26%;border-radius:999px;background:{{ feltBg }};box-shadow:{{ feltShadow }};"></div>
+<div style="position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);display:flex;gap:5px;">
+<sc-for list="{{ allinBoard }}" as="c" hint-placeholder-count="5">
+<sc-if value="{{ c.has }}" hint-placeholder-val="{{ true }}"><div style="position:relative;width:40px;height:57px;box-sizing:border-box;background:#fff;border-radius:5px;box-shadow:0 4px 10px rgba(0,0,0,0.25);color:{{ c.color }};"><div style="position:absolute;left:4px;top:4px;display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:15px;font-weight:700;line-height:1;letter-spacing:-0.06em;">{{ c.r }}</span><svg viewBox="0 0 24 24" style="width:9px;height:9px;display:block;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></div><svg viewBox="0 0 24 24" style="position:absolute;right:4px;bottom:5px;width:18px;height:18px;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></div></sc-if>
+<sc-if value="{{ c.empty }}" hint-placeholder-val="{{ false }}"><div style="width:40px;height:57px;box-sizing:border-box;border:1.5px dashed rgba(255,255,255,0.22);border-radius:5px;"></div></sc-if>
+</sc-for>
+</div>
+<div style="position:absolute;left:50%;top:18%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px;">
+<div ref="{{ allinSeatRef }}" style="display:flex;align-items:center;gap:9px;padding:6px 16px 6px 6px;background:#fff;color:#1d1d1f;border-radius:999px;border:1px solid #ebebe9;box-shadow:0 4px 14px rgba(0,0,0,0.1);"><div style="width:36px;height:36px;border-radius:50%;background:oklch(0.91 0.045 95);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;"><span hidden="{{ en }}">牛</span><span hidden="{{ zh }}">C</span></div><div style="display:flex;flex-direction:column;"><div style="display:flex;gap:6px;align-items:center;"><span style="font-size:14px;font-weight:600;"><span hidden="{{ en }}">牛仔</span><span hidden="{{ zh }}">Cowboy</span></span><span style="font-size:11px;color:#6e6e73;background:#f1f1ef;padding:1px 6px;border-radius:5px;"><span hidden="{{ en }}">冒险家</span><span hidden="{{ zh }}">Gambler</span></span></div><span style="font-size:12px;color:#86868b;">0</span></div></div>
+<div style="display:flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;background:oklch(0.56 0.2 25);color:#fff;font-size:12px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.12);"><span style="width:6px;height:6px;border-radius:50%;background:#fff;"></span><span hidden="{{ en }}">全下 10,000</span><span hidden="{{ zh }}">All-in 10,000</span></div>
+</div>
+<div style="position:absolute;left:16px;right:16px;bottom:16px;display:flex;gap:8px;">
+<div style="flex:1;display:flex;align-items:center;justify-content:center;padding:11px 0;border-radius:10px;border:1px solid #e3e3e0;background:#fff;color:#1d1d1f;font-size:15px;white-space:nowrap;"><span hidden="{{ en }}">弃牌</span><span hidden="{{ zh }}">Fold</span></div>
+<div style="flex:1.4;display:flex;align-items:center;justify-content:center;padding:11px 0;border-radius:10px;background:linear-gradient(180deg, oklch(0.62 0.21 28), oklch(0.52 0.2 25));color:#fff;font-size:15px;font-weight:500;white-space:nowrap;"><span hidden="{{ en }}">全下 10,000</span><span hidden="{{ zh }}">All-in 10,000</span></div>
+</div>
+<div ref="{{ allinFx }}" style="position:absolute;inset:0;pointer-events:none;z-index:8;"></div>
+</div>
+</div>
+</section>
+
+<section id="models" style="padding:130px 24px 120px;background:#fff;">
+<div style="max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:56px;">
+<div style="display:flex;flex-wrap:wrap;gap:24px 60px;align-items:flex-end;justify-content:space-between;">
+<div style="display:flex;flex-direction:column;gap:14px;max-width:560px;">
+<div style="font-size:14px;font-weight:600;color:oklch(0.45 0.1 158);"><span hidden="{{ en }}">模型与花费</span><span hidden="{{ zh }}">Models &amp; cost</span></div>
+<h2 style="margin:0;font-size:clamp(32px,4.4vw,52px);line-height:1.1;letter-spacing:-0.03em;font-weight:700;text-wrap:balance;"><span hidden="{{ en }}">模型你自己挑，<br>账单你自己看。</span><span hidden="{{ zh }}">Pick your model.<br>Watch your bill.</span></h2>
+</div>
+<p style="margin:0;font-size:17px;line-height:1.6;color:#55555a;max-width:460px;text-wrap:pretty;"><span hidden="{{ en }}">添加任意模型提供方——主流厂商或 OpenAI 兼容接口都行——再分别给对手和教练选一个模型。River 不做中间商：请求从你的电脑直接发出，花了多少实时算给你看。</span><span hidden="{{ zh }}">Add any provider — major vendors or any OpenAI-compatible endpoint — then pick one model for opponents and one for the coach. No middleman: requests go straight from your computer, and the cost is tallied live.</span></p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px;align-items:start;">
+<div style="display:flex;flex-direction:column;gap:8px;">
+<span style="padding-left:4px;font-size:13px;color:#86868b;"><span hidden="{{ en }}">设置 · 模型提供方</span><span hidden="{{ zh }}">Settings · Providers</span></span>
+<div style="border-radius:14px;border:1px solid #ebebe9;background:#fff;padding:0 18px;">
+<div style="display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid #f3f3f1;"><div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;"><span style="font-size:14px;font-weight:500;">Anthropic</span><span style="font-size:12px;line-height:1.5;color:#86868b;"><span hidden="{{ en }}">Anthropic · 已保存 ····7f3a · 已测试 · 支持强制工具调用</span><span hidden="{{ zh }}">Anthropic · saved ····7f3a · tested · forced tool calls supported</span></span></div><span style="padding:6px 14px;border:1px solid #e3e3e0;border-radius:999px;font-size:13px;white-space:nowrap;"><span hidden="{{ en }}">编辑</span><span hidden="{{ zh }}">Edit</span></span></div>
+<div style="display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid #f3f3f1;"><div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;"><span style="font-size:14px;font-weight:500;"><span hidden="{{ en }}">本地模型</span><span hidden="{{ zh }}">Local server</span></span><span style="font-size:12px;line-height:1.5;color:#86868b;"><span hidden="{{ en }}">OpenAI 兼容 · http://localhost:11434/v1 · 未设置 API key · 已测试 · 工具调用降级为自动</span><span hidden="{{ zh }}">OpenAI-compatible · http://localhost:11434/v1 · no API key · tested · tool calls fall back to auto</span></span></div><span style="padding:6px 14px;border:1px solid #e3e3e0;border-radius:999px;font-size:13px;white-space:nowrap;"><span hidden="{{ en }}">编辑</span><span hidden="{{ zh }}">Edit</span></span></div>
+<sc-for list="{{ roles }}" as="r" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;gap:10px;padding:14px 0;border-bottom:1px solid #f3f3f1;"><div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:14px;font-weight:500;">{{ r.l }}</span><span style="font-size:12px;line-height:1.5;color:#86868b;">{{ r.d }}</span></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="display:flex;align-items:center;justify-content:space-between;gap:8px;width:120px;padding:7px 10px;border:1px solid #e3e3e0;border-radius:8px;font-size:13px;">{{ r.p }}<span style="color:#a1a1a6;">▾</span></span><span style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #e3e3e0;border-radius:8px;font-size:13px;font-family:ui-monospace,'SF Mono',Menlo,monospace;">{{ r.m }}</span><span style="padding:6px 14px;border:1px solid #e3e3e0;border-radius:999px;font-size:13px;white-space:nowrap;"><span hidden="{{ en }}">测试连接</span><span hidden="{{ zh }}">Test</span></span></div><span style="font-size:12px;color:oklch(0.55 0.14 155);">{{ r.ok }}</span></div></sc-for>
+<div style="padding:14px 0;"><span style="padding:6px 14px;border:1px solid #e3e3e0;border-radius:999px;font-size:13px;"><span hidden="{{ en }}">添加提供方</span><span hidden="{{ zh }}">Add provider</span></span></div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;">
+<span style="padding-left:4px;font-size:13px;color:#86868b;"><span hidden="{{ en }}">数据统计 · LLM 用量与花费（示例）</span><span hidden="{{ zh }}">Stats · LLM usage &amp; cost (example)</span></span>
+<div style="border-radius:14px;border:1px solid #ebebe9;background:#fff;padding:20px;display:flex;flex-direction:column;gap:18px;">
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span style="font-size:15px;font-weight:600;"><span hidden="{{ en }}">LLM 用量与花费</span><span hidden="{{ zh }}">LLM usage &amp; cost</span></span><div style="flex:1;"></div><div style="display:flex;padding:3px;background:#f1f1ef;border-radius:9px;"><sc-for list="{{ curSeg }}" as="o" hint-placeholder-count="5"><div onClick="{{ o.onClick }}" style="padding:3px 9px;border-radius:7px;font-size:12px;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.sh }};font-weight:{{ o.w }};">{{ o.l }}</div></sc-for></div></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;"><sc-for list="{{ kpis }}" as="k" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:3px;min-width:0;"><span style="font-size:12px;color:#86868b;">{{ k.l }}</span><span style="font-size:22px;font-weight:600;letter-spacing:-0.01em;white-space:nowrap;">{{ k.v }}</span><span style="font-size:12px;color:#a1a1a6;">{{ k.h }}</span></div></sc-for></div>
+<div style="display:flex;flex-direction:column;">
+<sc-for list="{{ purposes }}" as="c" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:96px minmax(0,1fr) 44px 72px;align-items:center;gap:12px;padding:8px 0;border-top:1px solid #f3f3f1;font-size:13px;"><span style="display:flex;align-items:center;gap:7px;white-space:nowrap;"><span style="width:8px;height:8px;border-radius:2px;background:{{ c.c }};"></span>{{ c.l }}</span><div style="position:relative;height:6px;border-radius:999px;background:#f0f0ee;"><div style="position:absolute;left:0;top:0;bottom:0;border-radius:999px;width:{{ c.w }};background:{{ c.c }};"></div></div><span style="text-align:right;color:#55555a;">{{ c.n }}</span><span style="text-align:right;font-weight:600;white-space:nowrap;">{{ c.v }}</span></div></sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;"><span style="font-size:13px;color:#55555a;"><span hidden="{{ en }}">每手花费 · 最近 24 手</span><span hidden="{{ zh }}">Cost per hand · last 24</span></span><div style="display:flex;align-items:flex-end;gap:3px;height:56px;border-bottom:1px solid #ebebe9;"><sc-for list="{{ bars }}" as="b" hint-placeholder-count="24"><div style="flex:1;max-width:22px;height:{{ b.h }};border-radius:3px 3px 0 0;background:oklch(0.75 0.13 70);"></div></sc-for></div></div>
+<div style="font-size:12px;line-height:1.6;color:#86868b;text-wrap:pretty;"><span hidden="{{ en }}">Token 来自提供方返回的用量；价格来自 models.dev，按自动或手动汇率换成 9 种货币。没有公开价格的模型只统计 token。</span><span hidden="{{ zh }}">Tokens come from what the provider reports; prices from models.dev, converted into 9 currencies at an auto or manual rate. Models without public prices are counted in tokens only.</span></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section style="padding:110px 24px;border-top:1px solid #ebebe9;">
+<div style="max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:36px;">
+<h2 style="margin:0;font-size:clamp(28px,3.6vw,40px);line-height:1.15;letter-spacing:-0.025em;font-weight:700;"><span hidden="{{ en }}">还有这些</span><span hidden="{{ zh }}">Also in the box</span></h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:1px;background:#ebebe9;border:1px solid #ebebe9;border-radius:16px;overflow:hidden;">
+<sc-for list="{{ extras }}" as="x" hint-placeholder-count="6"><div style="background:#fff;padding:22px;display:flex;flex-direction:column;gap:6px;"><span style="font-size:16px;font-weight:600;">{{ x.t }}</span><span style="font-size:14px;line-height:1.6;color:#55555a;text-wrap:pretty;">{{ x.d }}</span></div></sc-for>
+</div>
+</div>
+</section>
+
+<section id="download" style="padding:120px 24px;background:#fff;border-top:1px solid #ebebe9;">
+<div style="max-width:680px;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:28px;">
+<div style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+<img src="river-icon.png" alt="" width="80" height="80" style="display:block;">
+<h2 style="margin:0;font-size:clamp(32px,4.4vw,48px);line-height:1.1;letter-spacing:-0.03em;font-weight:700;"><span hidden="{{ en }}">下载 River</span><span hidden="{{ zh }}">Download River</span></h2>
+<a href="https://github.com/reflux-studio/river/releases" style="font-size:14px;color:#86868b;">{{ verLine }} · <span hidden="{{ en }}">全部版本 ›</span><span hidden="{{ zh }}">All releases ›</span></a>
+</div>
+<div style="display:flex;padding:4px;background:#f1f1ef;border-radius:12px;">
+<sc-for list="{{ platSeg }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.onClick }}" style="padding:8px 22px;border-radius:9px;font-size:14px;cursor:pointer;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.sh }};font-weight:{{ o.w }};color:{{ o.c }};">{{ o.l }}</div></sc-for>
+</div>
+<div style="width:100%;box-sizing:border-box;border-radius:20px;border:1px solid #ebebe9;background:#fbfbfa;text-align:left;overflow:hidden;">
+<div style="display:flex;align-items:center;gap:16px;padding:22px 24px;flex-wrap:wrap;">
+<div style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:3px;"><span style="font-size:19px;font-weight:600;letter-spacing:-0.01em;">{{ plat.name }}</span><span style="font-size:13px;color:#86868b;">{{ plat.arch }}</span></div>
+<a href="{{ plat.url }}" style="display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:999px;background:#1d1d1f;color:#fff;font-size:15px;font-weight:600;white-space:nowrap;" style-hover="background:#3a3a3c;color:#fff;"><svg viewBox="0 0 16 16" width="14" height="14" style="display:block;"><path d="M8 2v8.5M4.5 7.5 8 11l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>{{ plat.cta }}</a>
+</div>
+<div style="display:flex;gap:12px;padding:16px 24px 20px;border-top:1px solid #ebebe9;background:#fff;">
+<span style="font-size:13px;font-weight:600;white-space:nowrap;padding-top:1px;"><span hidden="{{ en }}">首次打开</span><span hidden="{{ zh }}">First launch</span></span>
+<span style="font-size:13px;line-height:1.6;color:#55555a;text-wrap:pretty;">{{ plat.note }}</span>
+</div>
+</div>
+<span style="font-size:13px;line-height:1.6;color:#86868b;max-width:560px;text-wrap:pretty;"><span hidden="{{ en }}">安装包用自签证书签名、未经 Apple 公证，所以首次打开会有系统提示，放行一次即可。之后 River 会在后台自动更新。</span><span hidden="{{ zh }}">Builds use a self-signed certificate and aren’t notarized, so the OS asks once on first launch. After that, River updates itself in the background.</span></span>
+</div>
+</section>
+
+<section id="faq" style="padding:110px 24px;">
+<div style="max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:36px;">
+<h2 style="margin:0;font-size:clamp(32px,4.4vw,52px);line-height:1.1;letter-spacing:-0.03em;font-weight:700;"><span hidden="{{ en }}">牌友常问</span><span hidden="{{ zh }}">Questions from the rail</span></h2>
+<div style="display:flex;flex-direction:column;border-top:1px solid #e3e3e0;">
+<sc-for list="{{ faq }}" as="f" hint-placeholder-count="6">
+<div style="border-bottom:1px solid #e3e3e0;">
+<div onClick="{{ f.onClick }}" style="display:flex;align-items:center;gap:16px;padding:20px 0;cursor:pointer;"><span style="flex:1;font-size:18px;font-weight:600;">{{ f.q }}</span><span style="font-size:22px;line-height:1;color:#86868b;transform:{{ f.rot }};transition:transform .2s;">+</span></div>
+<sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}"><div style="padding:0 40px 22px 0;font-size:16px;line-height:1.65;color:#55555a;text-wrap:pretty;">{{ f.a }}</div></sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+
+<section style="padding:120px 24px 120px;background:#fff;border-top:1px solid #ebebe9;">
+<div style="max-width:1120px;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:24px;">
+<div style="display:flex;gap:6px;">
+<sc-for list="{{ endCards }}" as="c" hint-placeholder-count="5"><div style="position:relative;width:48px;height:68px;box-sizing:border-box;background:#fff;border-radius:6px;border:1px solid #e3e3e0;box-shadow:0 6px 16px rgba(0,0,0,0.08);color:{{ c.color }};transform:{{ c.tf }};"><div style="position:absolute;left:5px;top:5px;display:flex;flex-direction:column;align-items:center;gap:2px;"><span style="font-size:18px;font-weight:700;line-height:1;letter-spacing:-0.06em;">{{ c.r }}</span><svg viewBox="0 0 24 24" style="width:11px;height:11px;display:block;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></div><svg viewBox="0 0 24 24" style="position:absolute;right:5px;bottom:6px;width:21px;height:21px;"><path d="{{ c.sp }}" fill="currentColor"></path></svg></div></sc-for>
+</div>
+<h2 style="margin:0;font-size:clamp(36px,5.4vw,64px);line-height:1.08;letter-spacing:-0.035em;font-weight:700;text-wrap:balance;"><span hidden="{{ en }}">位置给你留好了。</span><span hidden="{{ zh }}">Your seat is open.</span></h2>
+<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+<a href="{{ primary.url }}" style="display:inline-flex;align-items:center;padding:13px 24px;border-radius:999px;background:#1d1d1f;color:#fff;font-size:16px;font-weight:600;white-space:nowrap;" style-hover="background:#3a3a3c;color:#fff;">{{ primary.label }}</a>
+<a href="https://github.com/reflux-studio/river" style="display:inline-flex;align-items:center;padding:13px 24px;border-radius:999px;border:1px solid #d9d9d5;background:#fff;font-size:16px;font-weight:600;white-space:nowrap;" style-hover="background:#f5f5f3;"><span hidden="{{ en }}">给个 Star</span><span hidden="{{ zh }}">Star on GitHub</span></a>
+</div>
+</div>
+</section>
+
+<footer style="border-top:1px solid #ebebe9;padding:28px 24px 40px;background:#fff;">
+<div style="max-width:1120px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px 28px;align-items:center;font-size:13px;color:#6e6e73;">
+<span style="font-weight:600;color:#1d1d1f;">River</span>
+<span><span hidden="{{ en }}">reflux studio 出品 · 纯娱乐，筹码不涉及真钱</span><span hidden="{{ zh }}">Made by reflux studio · For fun — chips aren’t real money</span></span>
+<div style="flex:1;"></div>
+<div style="display:flex;gap:20px;">
+<a href="https://github.com/reflux-studio/river" style="color:#55555a;">GitHub</a>
+<a href="https://github.com/reflux-studio/river/releases" style="color:#55555a;">Releases</a>
+<a href="https://github.com/reflux-studio/river/issues" style="color:#55555a;">Issues</a>
+</div>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const LS = 'river.site.lang';
+const REPO = 'https://github.com/reflux-studio/river';
+const FELTS = [
+  { k: 'green', zh: '经典绿', en: 'Classic green', felt: 'oklch(0.47 0.1 158)', rail: '#3a2a1f' },
+  { k: 'blue', zh: '深海蓝', en: 'Deep blue', felt: 'oklch(0.43 0.09 248)', rail: '#1b1e26' },
+  { k: 'wine', zh: '酒红', en: 'Wine', felt: 'oklch(0.42 0.12 18)', rail: '#2b1b18' },
+  { k: 'graphite', zh: '石墨', en: 'Graphite', felt: 'oklch(0.35 0.012 260)', rail: '#131315' },
+  { k: 'paper', zh: '素白', en: 'Paper', felt: '#eeeeea', rail: '#dcdcd7' },
+];
+const BACKS = ['oklch(0.5 0.17 25)', 'oklch(0.45 0.13 255)', '#2a2a2e', 'oklch(0.48 0.1 160)'];
+const backPattern = c => `repeating-linear-gradient(45deg, rgba(255,255,255,0.17) 0 1.5px, transparent 1.5px 5px), repeating-linear-gradient(-45deg, rgba(255,255,255,0.17) 0 1.5px, transparent 1.5px 5px), ${c}`;
+const RAINBOW = 'conic-gradient(oklch(0.6 0.15 25), oklch(0.75 0.15 90), oklch(0.6 0.12 160), oklch(0.55 0.12 250), oklch(0.55 0.15 320), oklch(0.6 0.15 25))';
+const ON = '0 0 0 2px #121214, 0 0 0 4px #f5f5f3', OFF = '0 0 0 1px rgba(255,255,255,0.25)';
+const DENOM = [['oklch(0.52 0.14 250)', '#fff'], ['oklch(0.78 0.14 80)', '#fff'], ['oklch(0.46 0.16 300)', '#fff'], ['#26262a', '#fff'], ['oklch(0.55 0.14 150)', '#fff'], ['oklch(0.55 0.2 27)', '#fff']];
+const chipBg = (c, s) => `radial-gradient(ellipse at center, ${c} 0 38%, ${s} 38% 45%, ${c} 45% 58%, transparent 59%), repeating-conic-gradient(${c} 0deg 30deg, ${s} 30deg 45deg)`;
+const chipEdge = c => `color-mix(in oklch, ${c}, black 38%)`;
+const CUR = [['cny', '¥', 7.1], ['usd', '$', 1], ['hkd', 'HK$', 7.8], ['eur', '€', 0.92], ['jpy', 'JP¥', 150]];
+const money = (usd, c) => { const v = usd * c[2]; return c[1] + (v >= 1 ? v.toFixed(2) : v >= 0.01 ? v.toFixed(3) : v.toFixed(4)); };
+const USAGE = [['decide', 0.061, 212, 'oklch(0.6 0.17 255)'], ['speak', 0.034, 48, 'oklch(0.62 0.13 155)'], ['ask', 0.012, 9, 'oklch(0.72 0.14 80)'], ['recap', 0.019, 38, 'oklch(0.58 0.16 300)']];
+const BARS = [2.1, 3.4, 2.8, 5.2, 3.1, 2.4, 4.6, 3.3, 2.2, 6.1, 3.8, 2.9, 3.5, 2.6, 4.1, 3.0, 2.5, 5.6, 3.2, 2.7, 3.9, 4.4, 2.3, 3.6];
+const cv = arr => arr.map(c => window.RiverSite ? window.RiverSite.cardV(c) : { has: true, r: c[0], sp: '', color: '#1d1d1f' });
+const seg = (opts, cur, set) => opts.map(([k, l]) => ({ l, onClick: () => set(k), bg: cur === k ? '#fff' : 'transparent', sh: cur === k ? '0 1px 2px rgba(0,0,0,0.08)' : 'none', w: cur === k ? 600 : 400 }));
+const PROMPT_EN = {
+  li: 'You are Foxy, an aggressive player. You love c-betting and raising to apply pressure, and you bluff often. Playful and provocative, but never mean.',
+  k: 'You are Old K, a tight-aggressive veteran. You only play strong hands and act decisively. You speak little, and sometimes comment on youngsters like an elder.',
+  bai: 'You are Newbie, just learning Hold’em. You like to call and see cards and rarely fold. Talkative, emotional, full of questions.',
+  prof: 'You are the Prof, a rational math player who decides by pot odds and equity. Calm, and often quotes numbers.',
+  rock: 'You are Rock, an extremely tight player. You fold most hands and only enter with strong ones. Every word costs you.',
+  may: 'You are May, an emotional player. Thrilled when winning, quick to tilt and turn reckless when losing. Speaks bluntly, with feeling.',
+  cow: 'You are Cowboy, a risk-taker who trusts luck and loves big pots and all-ins. Hearty, and occasionally tells tales from the road.',
+  zen: 'You are Zen, who loves slow-playing and setting traps — checking or just calling with strong hands. Calm, with a touch of Zen.',
+};
+const PROMPT_ZH = {
+  li: '你是阿狸，激进型牌手。喜欢持续下注、加注施压，经常诈唬。说话俏皮、爱挑衅，但不刻薄。',
+  k: '你是老K，紧凶型老牌手。只玩强牌，出手果断。话少，偶尔用长辈口吻点评年轻人。',
+  bai: '你是小白，刚学德扑的新手，喜欢跟注看牌，很少弃牌。话多、情绪外露、爱问问题。',
+  prof: '你是教授，理性的数学派牌手，决策以底池赔率和胜率为依据。说话冷静，常引用数字。',
+  rock: '你是石头，极紧的牌手。大多数牌都弃掉，只在拿到强牌时进入。惜字如金。',
+  may: '你是阿May，情绪化牌手。赢了很兴奋，输了容易上头、变得冲动。说话直接带情绪。',
+  cow: '你是牛仔，冒险型牌手，相信运气，喜欢大底池和全下。说话豪爽，偶尔讲江湖故事。',
+  zen: '你是禅师，喜欢慢打和设陷阱。强牌时常过牌或只跟注诱敌。说话平静，带点禅意。',
+};
+const T = {
+  zh: {
+    nav: ['大厅', '牌桌', 'AI 对手', '手牌回放', '数据统计', '设置'],
+    notes: [['li', '阿狸记下', '你翻牌后被加注就弃，下次多打你。'], ['may', '阿May记下', '上一把被你河牌偷了，这次不信你。'], ['prof', '教授记下', '该玩家翻前入池偏松，约 40%。']],
+    chat: [{ sys: '翻牌', cards: ['Ks', '7h', '2d'] }, { a: 'li', act: '下注 600', t: '这把我不装了，K 在我手里。' }, { a: 'prof', act: '跟注 600', t: '按她的下注尺度，范围里有 K 的不到三成。' }, { a: 'k', act: '弃牌' }, { a: 'bai', act: '跟注 600', t: '我也不知道为啥跟，就是感觉！' }, { sys: '转牌', cards: ['Ks', '7h', '2d', 'Qc'] }, { a: 'li', act: '加注至 2,400', t: '教授，数学救不了你。' }],
+    coaches: ['温和老师', '直白教练', '数据派'],
+    coachSays: ['别慌，你手里 A♦ Q♦ 已经有四张方块，再来一张就是同花。对手这注不算大，跟下去看一张很划算～', '跟。9 张出路，胜率 38% 高于所需的 25%，别弃。', '胜率 38%，所需 25.0%。跟注 EV ≈ (0.38 × 底池) − (0.62 × 跟注)，为正。结论：跟。'],
+    levels: [['novice', '新手讲解'], ['pro', '进阶分析']],
+    quick: { novice: ['现在该怎么打？', '对手可能有什么牌？', '什么是底池赔率？'], pro: ['对手的范围？', '加注还是平跟？', '河牌怎么计划？'] },
+    prob: [['当前牌型', '同花听牌'], ['出路', '9'], ['规则建议', '跟注']],
+    recap: [['做得好', '翻牌慢打，让阿狸替你把底池做大。'], ['可改进', '转牌 Q♥ 出来时下注偏小，给了听牌便宜的赔率。'], ['下次记住', '牌面湿润时，强牌要收费。']],
+    fx: [['full', '完整'], ['lite', '精简'], ['off', '关闭']],
+    roles: [['对手模型', '所有对手共用这个模型，各自按性格提示词行动。开桌必需。', 'Anthropic', 'claude-haiku-4-5', '连接成功 · 支持强制工具调用'], ['教练模型', '教练局需要它：每步讲解、提问与每手复盘。自由局不用。', 'Anthropic', 'claude-sonnet-4-5', '连接成功 · 支持强制工具调用']],
+    purposes: { decide: 'AI 决策', speak: '教练讲解', ask: '教练问答', recap: '每手复盘' },
+    kpis: ['估算花费', '调用次数', '平均每手'], kpiH: ['按 models.dev 价格估算', '对手与教练合计', '基于 38 手'],
+    extras: [['手牌回放', '每一手按街道逐条回看行动；还没复盘的，点一下让教练补上。'], ['数据统计', '净盈亏、每手盈亏、VPIP 入池率、PFR 翻前加注、摊牌胜率。'], ['教学牌局', '第一次玩？一分钟规则入门，再跟着教练在 3 人小桌上打一手。'], ['快捷键', 'F 弃牌、C 跟注、R 加注、N 下一手，手不离键盘。'], ['数据在你电脑上', '手牌、复盘、AI 记忆都存在本地数据库里，API key 加密保存。'], ['自动更新', '后台检查 GitHub 上的新版本并下载，离开牌桌时提示重启。']],
+    platforms: [['mac', 'macOS', 'Apple 芯片 · .dmg', '下载 .dmg', '首次打开提示“无法验证开发者”：到 系统设置 → 隐私与安全性 底部点“仍要打开”。'], ['win', 'Windows', 'x64 · -setup.exe', '下载安装程序', 'SmartScreen 提示时，点“更多信息 → 仍要运行”。'], ['linux', 'Linux', 'x64 · .AppImage', '下载 .AppImage', '下载后加上可执行权限（chmod +x）再运行。']],
+    dl: { mac: '下载 macOS 版', win: '下载 Windows 版', linux: '下载 Linux 版' },
+    faq: [
+      ['要花钱吗？', 'River 免费、开源。唯一的开销是你自己的模型用量：每桌花了多少实时显示在顶栏，数据统计里还能按用途和每手细看。用 OpenAI 兼容接口接本地模型，就只统计 token、不产生账单。'],
+      ['能用哪些模型？', 'Mastra 模型路由里支持的厂商都可以，另外任何 OpenAI 兼容接口也能接。对手和教练各选一个模型；添加后可以“测试连接”，看看它是否支持强制工具调用。'],
+      ['我的 API Key 安全吗？', 'Key 加密保存在你自己的电脑上，请求直接发往你选的提供方，不经过任何我们的服务器——我们也压根没有服务器。代码都在 GitHub 上，欢迎审计。'],
+      ['没有配置模型能玩吗？', '不能。对手和教练都由大模型驱动：自由局需要对手模型，教练局还需要教练模型。首次启动的规则入门最后一页会带你去配置。'],
+      ['能打真钱吗？', '不能，以后也不会。筹码纯属虚构，输光了点一下就能重新买入。'],
+      ['为什么打开时系统说“无法验证开发者”？', '安装包用自签证书签名，没有经过 Apple 公证。macOS 到“系统设置 → 隐私与安全性”点“仍要打开”；Windows 在 SmartScreen 里点“更多信息 → 仍要运行”。只需要一次。'],
+    ],
+    pause: '暂停', resume: '继续', you: '你',
+    ver: v => v ? `最新版本 ${v}` : '最新版本',
+    status: (t, done) => done ? '一手结束 · 马上发下一手' : t ? `等待 ${t} 行动…` : '发牌中…',
+  },
+  en: {
+    nav: ['Lobby', 'Table', 'Opponents', 'Replays', 'Stats', 'Settings'],
+    notes: [['li', 'Foxy noted', 'Folds to flop raises. Pressure them more.'], ['may', 'May noted', 'Got bluffed on the river last time. Not buying it again.'], ['prof', 'Prof noted', 'Loose preflop — enters about 40% of pots.']],
+    chat: [{ sys: 'Flop', cards: ['Ks', '7h', '2d'] }, { a: 'li', act: 'Bet 600', t: 'Not hiding it — I’ve got the king.' }, { a: 'prof', act: 'Call 600', t: 'Given her sizing, under a third of her range has a king.' }, { a: 'k', act: 'Fold' }, { a: 'bai', act: 'Call 600', t: 'No idea why I’m calling. Just a feeling!' }, { sys: 'Turn', cards: ['Ks', '7h', '2d', 'Qc'] }, { a: 'li', act: 'Raise to 2,400', t: 'Math won’t save you, Prof.' }],
+    coaches: ['Gentle teacher', 'Blunt coach', 'Numbers'],
+    coachSays: ['No rush — with A♦ Q♦ you already have four diamonds, one more makes a flush. The bet isn’t big, so seeing another card is a good deal.', 'Call. Nine outs, 38% equity beats the 25% you need. Don’t fold.', 'Equity 38%, required 25.0%. Call EV ≈ (0.38 × pot) − (0.62 × call) > 0. Verdict: call.'],
+    levels: [['novice', 'Beginner'], ['pro', 'Advanced']],
+    quick: { novice: ['What should I do?', 'What might they have?', 'What are pot odds?'], pro: ['Their range?', 'Raise or flat?', 'River plan?'] },
+    prob: [['Hand', 'Flush draw'], ['Outs', '9'], ['Rule of thumb', 'Call']],
+    recap: [['Good', 'Slow-played the flop and let Foxy build the pot for you.'], ['Fix', 'Bet too small when Q♥ hit the turn — cheap price for draws.'], ['Remember', 'On wet boards, make strong hands pay.']],
+    fx: [['full', 'Full'], ['lite', 'Reduced'], ['off', 'Off']],
+    roles: [['Opponent model', 'Shared by all opponents, each acting on their own prompt. Required to open a table.', 'Anthropic', 'claude-haiku-4-5', 'Connected · forced tool calls supported'], ['Coach model', 'Needed for coach tables: turn advice, questions and hand reviews. Not used at free tables.', 'Anthropic', 'claude-sonnet-4-5', 'Connected · forced tool calls supported']],
+    purposes: { decide: 'AI decisions', speak: 'Coach advice', ask: 'Coach Q&A', recap: 'Hand reviews' },
+    kpis: ['Est. cost', 'Calls', 'Per hand'], kpiH: ['At models.dev prices', 'Opponents + coach', 'Over 38 hands'],
+    extras: [['Hand replays', 'Step through every hand street by street. Not reviewed yet? One click asks the coach.'], ['Stats', 'Net result, per-hand swings, VPIP, PFR and showdown win rate.'], ['Guided hand', 'New to poker? A one-minute rules intro, then one hand at a 3-seat table with the coach talking you through it.'], ['Hotkeys', 'F fold, C call, R raise, N next hand. Hands stay on the keyboard.'], ['Your data stays local', 'Hands, reviews and AI memory live in a local database; API keys are stored encrypted.'], ['Auto-update', 'Checks GitHub for new releases in the background and asks you to restart once you leave the table.']],
+    platforms: [['mac', 'macOS', 'Apple silicon · .dmg', 'Download .dmg', 'If macOS says it can’t verify the developer: System Settings → Privacy & Security → “Open Anyway”.'], ['win', 'Windows', 'x64 · -setup.exe', 'Download installer', 'If SmartScreen appears: “More info → Run anyway”.'], ['linux', 'Linux', 'x64 · .AppImage', 'Download .AppImage', 'Make it executable (chmod +x), then run.']],
+    dl: { mac: 'Download for macOS', win: 'Download for Windows', linux: 'Download for Linux' },
+    faq: [
+      ['Does it cost anything?', 'River is free and open source. The only cost is your own model usage: the current table’s cost sits in the top bar, and Stats breaks it down by purpose and by hand. Point it at a local OpenAI-compatible model and it only counts tokens — no bill.'],
+      ['Which models can I use?', 'Any vendor supported by Mastra’s model router, plus any OpenAI-compatible endpoint. Pick one model for opponents and one for the coach, then “Test” to check forced tool-call support.'],
+      ['Is my API key safe?', 'Keys are stored encrypted on your computer and requests go straight to the provider you chose — never through a server of ours (we don’t have one). All the code is on GitHub. Audit away.'],
+      ['Can I play without a model?', 'No. Opponents and the coach are model-driven: free tables need an opponent model, coach tables also need a coach model. The last page of the first-run intro takes you to setup.'],
+      ['Can I play for real money?', 'No, and it never will. Chips are imaginary — go broke and one click buys you back in.'],
+      ['Why does my OS warn me when opening it?', 'Builds use a self-signed certificate and aren’t notarized by Apple. On macOS go to System Settings → Privacy & Security → “Open Anyway”; on Windows click “More info → Run anyway”. Only once.'],
+    ],
+    pause: 'Pause', resume: 'Resume', you: 'You',
+    ver: v => v ? `Latest ${v}` : 'Latest release',
+    status: (t, done) => done ? 'Hand over · next one coming' : t ? `Waiting for ${t}…` : 'Dealing…',
+  },
+};
+
+class Component extends DCLogic {
+  state = { lang: this.initLang(), tick: 0, paused: false, faq: 0, coach: 1, level: 'novice', hard: false, fx: 'full', felt: 0, feltCustom: '#2f6b55', back: 0, cur: null, w: 1000, vw: 1200, rel: null, os: 'mac', dl: null };
+  wrapRef = React.createRef(); stageRef = React.createRef(); fxRef = React.createRef();
+  allinRef = React.createRef(); allinSeatRef = React.createRef(); allinFx = React.createRef();
+
+  initLang() {
+    try { const s = localStorage.getItem(LS); if (s === 'zh' || s === 'en') return s; } catch (e) {}
+    return (navigator.language || 'zh').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+  }
+  setLang(l) { try { localStorage.setItem(LS, l); } catch (e) {} document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en'; this.setState({ lang: l }); }
+  componentDidMount() {
+    document.documentElement.lang = this.state.lang === 'zh' ? 'zh-CN' : 'en';
+    const ua = navigator.userAgent || '';
+    this.setState({ os: /Windows/i.test(ua) ? 'win' : /Linux/i.test(ua) && !/Android/i.test(ua) ? 'linux' : 'mac' });
+    const boot = () => {
+      if (!window.RiverSite || !window.RiverPoker) { this.bootT = setTimeout(boot, 80); return; }
+      this.sim = window.RiverSite.createSim(['bai', 'li', 'k', 'prof', 'may'], () => this.setState(s => ({ tick: s.tick + 1 })));
+      this.sim.start(); this.forceUpdate();
+    };
+    boot();
+    const measure = () => this.setState({ w: this.wrapRef.current ? this.wrapRef.current.clientWidth : 1000, vw: window.innerWidth });
+    this.ro = new ResizeObserver(measure);
+    if (this.wrapRef.current) this.ro.observe(this.wrapRef.current);
+    window.addEventListener('resize', measure); this.measure = measure; measure();
+    fetch('https://api.github.com/repos/reflux-studio/river/releases/latest').then(r => r.ok ? r.json() : null).then(j => {
+      if (!j) return;
+      const find = re => { const a = (j.assets || []).find(x => re.test(x.name)); return a ? a.browser_download_url : null; };
+      this.setState({ rel: { v: j.tag_name, mac: find(/\.dmg$/i), win: find(/-setup\.exe$/i), linux: find(/\.AppImage$/i) } });
+    }).catch(() => {});
+    this.allinT = setInterval(() => { if (this.state.fx === 'full' && this.inView(this.allinRef.current)) this.allinBurst(); }, 2800);
+  }
+  componentDidUpdate() {
+    const RS = window.RiverSite;
+    if (RS) RS.animateNew(this.stageRef.current);
+    if (this.sim && this.sim.events.length) {
+      const evs = this.sim.events.splice(0);
+      if (this.state.fx === 'full') evs.forEach(e => this.seatFx(e));
+    }
+  }
+  componentWillUnmount() { clearTimeout(this.bootT); clearInterval(this.allinT); if (this.sim) this.sim.stop(); if (this.ro) this.ro.disconnect(); window.removeEventListener('resize', this.measure); }
+  inView(el) { if (!el) return false; const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < window.innerHeight; }
+
+  fxEl(L, css, html) { const d = document.createElement('div'); d.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;will-change:transform,opacity;' + css; if (html) d.innerHTML = html; L.appendChild(d); return d; }
+  play(d, kf, o) { const a = d.animate(kf, Object.assign({ fill: 'both' }, o)); a.onfinish = a.oncancel = () => d.remove(); }
+  ring(L, pt, color, size, dur, delay, width) { const d = this.fxEl(L, `width:${size}px;height:${size}px;border-radius:50%;border:${width || 3}px solid ${color};box-sizing:border-box;`); const at = `translate(${pt.x - size / 2}px,${pt.y - size / 2}px)`; this.play(d, [{ transform: `${at} scale(.55)`, opacity: 0.95 }, { transform: `${at} scale(1.9)`, opacity: 0 }], { duration: dur, delay: delay || 0, easing: 'cubic-bezier(.2,.7,.3,1)' }); }
+  tag(L, pt, text, css, dur, rise) {
+    const d = this.fxEl(L, 'white-space:nowrap;' + css, text);
+    const x = pt.x - d.offsetWidth / 2, y = pt.y - d.offsetHeight / 2 - 40;
+    this.play(d, [{ transform: `translate(${x}px,${y + 10}px) scale(.4)`, opacity: 0 }, { transform: `translate(${x}px,${y}px) scale(1.12)`, opacity: 1, offset: 0.18 }, { transform: `translate(${x}px,${y}px) scale(1)`, opacity: 1, offset: 0.3 }, { transform: `translate(${x}px,${y - rise}px) scale(1)`, opacity: 1, offset: 0.8 }, { transform: `translate(${x}px,${y - rise - 8}px) scale(.96)`, opacity: 0 }], { duration: dur, easing: 'ease-out' });
+  }
+  allIn(L, shakeEl, pt) {
+    const red = 'oklch(0.62 0.22 27)', gold = 'oklch(0.82 0.15 85)';
+    this.ring(L, pt, gold, 120, 800, 0, 4); this.ring(L, pt, red, 120, 900, 140, 3); this.ring(L, pt, gold, 120, 1000, 300, 2);
+    this.tag(L, pt, 'ALL IN', `padding:6px 16px;border-radius:10px;background:linear-gradient(180deg, oklch(0.66 0.22 30), oklch(0.52 0.21 25));color:#fff;font:800 24px/1 -apple-system,'SF Pro Display',sans-serif;letter-spacing:0.06em;box-shadow:0 0 0 2px ${gold},0 10px 30px oklch(0.55 0.22 25 / 0.55);`, 1800, 24);
+    for (let k = 0; k < 12; k++) {
+      const ang = Math.random() * Math.PI * 2, r = 60 + Math.random() * 70, [c, s] = DENOM[(Math.random() * 6) | 0];
+      const d = this.fxEl(L, `width:18px;height:10px;border-radius:50%;background:${chipBg(c, s)};box-shadow:0 2px 0 ${chipEdge(c)};`);
+      this.play(d, [{ transform: `translate(${pt.x - 9}px,${pt.y - 5}px) rotate(0)`, opacity: 1 }, { transform: `translate(${pt.x - 9 + Math.cos(ang) * r}px,${pt.y - 5 + Math.sin(ang) * r}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }], { duration: 700 + Math.random() * 300, easing: 'cubic-bezier(.1,.8,.3,1)' });
+    }
+    if (shakeEl) shakeEl.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-5px,2px)' }, { transform: 'translate(5px,-2px)' }, { transform: 'translate(-3px,1px)' }, { transform: 'translate(2px,0)' }, { transform: 'translate(0,0)' }], { duration: 380, easing: 'ease-out' });
+  }
+  seatFx(e) {
+    const R = this.stageRef.current, L = this.fxRef.current; if (!R || !L) return;
+    const el = R.querySelector(`[data-seat="${e.seat}"]`); if (!el) return;
+    const sc = this.sc || 1, a = R.getBoundingClientRect(), b = el.getBoundingClientRect();
+    const pt = { x: (b.left - a.left + b.width / 2) / sc, y: (b.top - a.top + b.height / 2) / sc };
+    if (e.type === 'allin') this.allIn(L, R, pt);
+    else {
+      const amber = 'oklch(0.78 0.15 75)', en = this.state.lang === 'en';
+      const lbl = en ? e.label.replace('加注至', 'Raise to').replace('下注', 'Bet') : e.label;
+      this.ring(L, pt, amber, 90, 650);
+      this.tag(L, pt, lbl, `padding:4px 12px;border-radius:999px;background:${amber};color:#1d1d1f;font:700 13px -apple-system,'PingFang SC',sans-serif;box-shadow:0 6px 16px rgba(0,0,0,0.25);`, 1300, 18);
+    }
+  }
+  allinBurst() {
+    const R = this.allinRef.current, L = this.allinFx.current, S = this.allinSeatRef.current; if (!R || !L || !S) return;
+    const a = R.getBoundingClientRect(), b = S.getBoundingClientRect();
+    this.allIn(L, R, { x: b.left - a.left + b.width / 2, y: b.top - a.top + b.height / 2 });
+  }
+
+  renderVals() {
+    const s = this.state, en = s.lang === 'en', L = T[s.lang], RS = window.RiverSite;
+    const narrow = s.w < 720, DW = narrow ? 640 : 1000, DH = narrow ? 640 : 560, sc = Math.min(1.1, s.w / DW);
+    this.sc = sc;
+    const t = this.sim && RS ? RS.viewReal(this.sim, en) : { seats: [], board: [], potF: '0', handNo: 1, street: '' };
+    const P = RS ? RS.byId : {};
+    const nm = id => P[id] ? (en ? P[id].en : P[id].zh) : '';
+    const ini = id => P[id] ? (en ? P[id].iniEn : P[id].ini) : '';
+    const avr = id => P[id] && RS ? RS.avReal(P[id].hue) : '#eee';
+    const F = s.felt < 0 ? { felt: s.feltCustom, rail: `color-mix(in oklch, ${s.feltCustom}, black 62%)` } : FELTS[s.felt];
+    const cur = CUR.find(c => c[0] === (s.cur || (en ? 'usd' : 'cny')));
+    const total = USAGE.reduce((a, u) => a + u[1], 0);
+    const g = this.sim && this.sim.g;
+    const actor = g && !g.done && g.toAct >= 0 ? nm(g.players[g.toAct].id) : '';
+    const rel = s.rel || {};
+    const urlOf = k => rel[k] || REPO + '/releases/latest';
+    const platforms = L.platforms.map(([k, name, arch, cta, note]) => ({ name, arch, cta, note, url: urlOf(k), border: k === s.os ? '1.5px solid #1d1d1f' : '1px solid #ebebe9', btnBg: k === s.os ? '#1d1d1f' : '#fff', btnInk: k === s.os ? '#fff' : '#1d1d1f' }));
+    return {
+      en, zh: !en, wide: s.vw >= 820, t,
+      langSeg: seg([['zh', '中'], ['en', 'EN']], s.lang, l => this.setLang(l)),
+      appNav: L.nav.map((l, i) => ({ l, bg: i === 1 ? '#e9e9e6' : 'transparent', c: i === 1 ? '#1d1d1f' : '#55555a', w: i === 1 ? 600 : 400 })),
+      primary: { url: urlOf(s.os), label: L.dl[s.os] },
+      verLine: L.ver(rel.v),
+      tableCost: money(0.0033 * Math.max(0, t.handNo - 1) + 0.0011, cur),
+      wrapRef: this.wrapRef, stageRef: this.stageRef, fxRef: this.fxRef, allinRef: this.allinRef, allinSeatRef: this.allinSeatRef, allinFx: this.allinFx,
+      stageW: DW + 'px', stageHpx: DH + 'px', stageH: Math.round(DH * sc) + 'px', stageTf: `scale(${sc})`,
+      feltBg: `radial-gradient(ellipse 70% 65% at 50% 42%, color-mix(in oklch, ${F.felt}, white 14%) 0%, ${F.felt} 58%, color-mix(in oklch, ${F.felt}, black 28%) 100%)`,
+      feltShadow: `0 0 0 12px ${F.rail}, 0 0 0 13px rgba(0,0,0,0.3), 0 22px 50px rgba(0,0,0,0.22), inset 0 0 50px rgba(0,0,0,0.35)`,
+      backBg: backPattern(BACKS[s.back]),
+      statusLine: s.paused ? '' : L.status(actor, g && g.done),
+      pauseLabel: s.paused ? L.resume : L.pause,
+      togglePause: () => { const v = !s.paused; this.setState({ paused: v }); if (this.sim) this.sim.setPaused(v); },
+      personas: RS ? RS.PERSONAS.map(p => ({ name: en ? p.en : p.zh, tag: en ? p.tagEn : p.tagZh, ini: en ? p.iniEn : p.ini, desc: en ? p.dEn : p.dZh, av: RS.avReal(p.hue), prompt: (en ? PROMPT_EN : PROMPT_ZH)[p.id] })) : [],
+      notes: L.notes.map(([id, who, tx]) => ({ ini: ini(id), av: avr(id), who, t: tx })),
+      chat: L.chat.map(m => m.sys ? { isSys: true, isAct: false, isMsg: false, t: m.sys, cards: cv(m.cards) } : m.t ? { isMsg: true, isSys: false, isAct: false, n: nm(m.a), ini: ini(m.a), av: avr(m.a), act: m.act, t: m.t, cards: [] } : { isAct: true, isSys: false, isMsg: false, n: nm(m.a), act: m.act, cards: [] }),
+      coachTitle: (en ? 'Coach · ' : '教练 · ') + L.coaches[s.coach] + ' ▾', coachName: L.coaches[1], coachSays: L.coachSays[s.coach],
+      cycleCoach: () => this.setState({ coach: (s.coach + 1) % 3 }),
+      levelSeg: seg(L.levels, s.level, k => this.setState({ level: k })),
+      quick: L.quick[s.level], showProb: !s.hard, hard: s.hard,
+      probStats: L.prob.map(([l, v]) => ({ l, v })),
+      toggleHard: () => this.setState({ hard: !s.hard }), hardTrack: s.hard ? '#1d1d1f' : '#e3e3e0', hardKnob: s.hard ? '16px' : '2px',
+      recapHero: cv(['Js', 'Jh']), recapBoard: cv(['Jd', '8c', '3s', 'Qh', '2d']),
+      recapRows: L.recap.map(([l, tx], i) => ({ l, t: tx, dot: ['oklch(0.55 0.14 155)', 'oklch(0.72 0.14 70)', 'oklch(0.6 0.17 255)'][i] })),
+      fxSeg: L.fx.map(([k, l]) => ({ l, onClick: () => this.setState({ fx: k }), bg: s.fx === k ? '#f5f5f3' : 'transparent', c: s.fx === k ? '#1d1d1f' : '#f5f5f3', w: s.fx === k ? 600 : 400 })),
+      feltSw: FELTS.map((f, i) => ({ n: en ? f.en : f.zh, bg: f.felt, ring: s.felt === i ? ON : OFF, onClick: () => this.setState({ felt: i }) })),
+      customBg: s.felt < 0 ? s.feltCustom : RAINBOW, customRing: s.felt < 0 ? ON : OFF, feltCustom: s.feltCustom,
+      onPickFelt: e => this.setState({ felt: -1, feltCustom: e.target.value }),
+      backSw: BACKS.map((c, i) => ({ bg: backPattern(c), ring: s.back === i ? ON : OFF, onClick: () => this.setState({ back: i }) })),
+      allinBoard: cv(['Ks', 'Kh', '7d']).concat([{ has: false, empty: true }, { has: false, empty: true }]),
+      roles: L.roles.map(([l, d, p, m, ok]) => ({ l, d, p, m, ok })),
+      curSeg: CUR.map(c => ({ l: c[1], onClick: () => this.setState({ cur: c[0] }), bg: cur[0] === c[0] ? '#fff' : 'transparent', sh: cur[0] === c[0] ? '0 1px 2px rgba(0,0,0,0.08)' : 'none', w: cur[0] === c[0] ? 600 : 400 })),
+      kpis: [[L.kpis[0], money(total, cur), L.kpiH[0]], [L.kpis[1], String(USAGE.reduce((a, u) => a + u[2], 0)), L.kpiH[1]], [L.kpis[2], money(total / 38, cur), L.kpiH[2]]].map(([l, v, h]) => ({ l, v, h })),
+      purposes: USAGE.map(([k, usd, n, c]) => ({ l: L.purposes[k], v: money(usd, cur), n: String(n), c, w: (usd / total * 100).toFixed(1) + '%' })),
+      bars: BARS.map(b => ({ h: Math.round(b / 6.1 * 52) + 'px' })),
+      extras: L.extras.map(([tt, d]) => ({ t: tt, d })),
+      platforms,
+      platSeg: L.platforms.map(([k, name]) => { const on = (s.dl || s.os) === k; return { l: name, onClick: () => this.setState({ dl: k }), bg: on ? '#fff' : 'transparent', sh: on ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', w: on ? 600 : 400, c: on ? '#1d1d1f' : '#55555a' }; }),
+      plat: platforms[Math.max(0, L.platforms.findIndex(p => p[0] === (s.dl || s.os)))],
+      endCards: cv(['Th', 'Jh', 'Qh', 'Kh', 'Ah']).map((c, i) => ({ ...c, tf: `rotate(${(i - 2) * 5}deg) translateY(${Math.abs(i - 2) * 5}px)` })),
+      faq: L.faq.map(([q, a], i) => ({ q, a, open: s.faq === i, rot: s.faq === i ? 'rotate(45deg)' : 'none', onClick: () => this.setState({ faq: s.faq === i ? -1 : i }) })),
+    };
+  }
+}
+</script>
+</body>
+</html>

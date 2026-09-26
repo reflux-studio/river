@@ -1,0 +1,398 @@
+---
+import { fmt } from '@river/engine'
+import { dict, presets, type Locale } from '@river/i18n'
+import { Avatar, MiniCards, PlayingCard } from '@river/ui'
+import '../styles/site.css'
+import { site } from '../i18n/site'
+import { REPO } from '../lib/store'
+import CoachDemo from './CoachDemo'
+import DemoTable from './DemoTable'
+import Download from './Download'
+import Effects from './Effects'
+import Faq from './Faq'
+import FeatureText from './FeatureText.astro'
+import { PrimaryButton, VerLine } from './ReleaseLink'
+import UsageCard from './UsageCard'
+
+interface Props { lang: Locale }
+const { lang } = Astro.props
+const s = site[lang]
+const P = dict(lang).poker
+const people = presets[lang]
+const who = (id: string) => people.find((p) => p.id === id)!
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+const home = { zh: `${base}/`, en: `${base}/en/` }
+const icon = `${base}/river-icon.png`
+const url = new URL(home[lang], Astro.site)
+const btn2 = 'inline-flex items-center rounded-full border border-[#d9d9d5] bg-white px-6 py-[13px] text-[16px] font-semibold whitespace-nowrap hover:bg-accent'
+const card = 'overflow-hidden rounded-2xl border bg-white shadow-[0_24px_60px_-24px_rgba(0,0,0,0.16)]'
+const split = 'grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-center gap-x-[72px] gap-y-12'
+const h2 = 'm-0 text-[clamp(32px,4.4vw,52px)] leading-[1.1] font-bold tracking-[-0.03em] text-balance'
+const eyebrow = 'text-[14px] font-semibold text-brand'
+const lead = 'm-0 max-w-[460px] text-[17px] leading-[1.6] text-pretty text-label'
+const actLabel = ([k, n]: [keyof typeof P.act, number?]) => (n === undefined ? P.act[k] : `${P.act[k]} ${fmt(n)}`)
+---
+
+<!doctype html>
+<html lang={s.meta.htmlLang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{s.meta.title}</title>
+    <meta name="description" content={s.meta.description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={url} />
+    <meta property="og:title" content={s.meta.ogTitle} />
+    <meta property="og:description" content={s.meta.ogDescription} />
+    <link rel="canonical" href={url} />
+    <link rel="alternate" hreflang="zh" href={new URL(home.zh, Astro.site)} />
+    <link rel="alternate" hreflang="en" href={new URL(home.en, Astro.site)} />
+    <link rel="icon" href={icon} />
+  </head>
+  <body>
+    {
+      lang === 'zh' && (
+        <div id="en-hint" hidden class="flex items-center justify-center gap-3 bg-foreground px-4 py-2 text-[13px] text-white">
+          <span>{s.enHint.text}</span>
+          <a href={home.en} class="font-semibold text-white underline underline-offset-3 hover:text-white">{s.enHint.link}</a>
+          <button type="button" aria-label={s.enHint.close} class="cursor-pointer border-0 bg-transparent px-1 text-[16px] leading-none text-white/70 hover:text-white">×</button>
+        </div>
+      )
+    }
+    {
+      lang === 'zh' && (
+        <script is:inline>
+          ;(() => {
+            const K = 'river.site.enHintClosed'
+            const el = document.getElementById('en-hint')
+            let closed = false
+            try {
+              closed = localStorage.getItem(K) === '1'
+            } catch {}
+            if (closed || /^zh/i.test(navigator.language || 'zh')) return
+            el.hidden = false
+            el.querySelector('button').onclick = () => {
+              el.hidden = true
+              try {
+                localStorage.setItem(K, '1')
+              } catch {}
+            }
+          })()
+        </script>
+      )
+    }
+
+    <header class="sticky top-0 z-50 border-b bg-[rgba(251,251,250,0.86)] backdrop-blur-[16px] backdrop-saturate-[180%]">
+      <div class="mx-auto flex h-14 max-w-[1120px] items-center gap-7 px-6 max-[480px]:gap-3 max-[480px]:px-4">
+        <a href="#top" class="flex items-center gap-2 text-[17px] font-bold tracking-[-0.01em]"><img src={icon} alt="" width="28" height="28" class="block" />River</a>
+        <nav class="hidden gap-[22px] text-[14px] min-[820px]:flex">
+          <a href="#regulars">{s.nav.regulars}</a>
+          <a href="#features">{s.nav.features}</a>
+          <a href="#models">{s.nav.models}</a>
+          <a href="#download">{s.nav.download}</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <div class="flex-1"></div>
+        <div class="flex rounded-[9px] bg-muted p-[3px]">
+          {
+            (['zh', 'en'] as const).map((l) => (
+              <a href={home[l]} hreflang={l} class:list={['rounded-[7px] px-2.5 py-1 text-[13px] hover:text-foreground', l === lang && 'bg-white font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.08)]']}>
+                {l === 'zh' ? '中' : 'EN'}
+              </a>
+            ))
+          }
+        </div>
+        <a href={REPO} class="rounded-full border border-input bg-white px-3.5 py-[7px] text-[14px] font-medium whitespace-nowrap hover:bg-accent">GitHub</a>
+      </div>
+    </header>
+
+    <section id="top" class="px-6 pt-20 max-[480px]:px-4">
+      <div class="mx-auto flex max-w-[1120px] flex-col items-center gap-[22px] text-center">
+        <div class="flex items-center gap-2 rounded-full border bg-white px-3.5 py-1.5 text-[13px] text-label">
+          <span class="size-[7px] shrink-0 rounded-full bg-[oklch(0.55_0.14_155)]"></span>{s.hero.badge}
+        </div>
+        <h1 class="m-0 max-w-[920px] text-[clamp(40px,6.6vw,80px)] leading-[1.06] font-bold tracking-[-0.035em] text-balance">{s.hero.title[0]}<br />{s.hero.title[1]}</h1>
+        <p class="m-0 max-w-[600px] text-[clamp(17px,1.6vw,20px)] leading-[1.6] text-pretty text-label">{s.hero.lead}</p>
+        <div class="mt-1.5 flex flex-wrap justify-center gap-3">
+          <PrimaryButton lang={lang} client:load />
+          <a href={REPO} class={btn2}>{s.hero.source}</a>
+        </div>
+        <div class="flex flex-wrap justify-center gap-1.5 text-[13px] text-subtle">
+          <span><VerLine lang={lang} client:load /></span><span>·</span><a href="#download" class="text-label underline underline-offset-3">{s.hero.other}</a>
+        </div>
+      </div>
+      <DemoTable lang={lang} client:load />
+    </section>
+
+    <section id="regulars" class="px-6 pt-[120px] pb-[110px] max-[480px]:px-4">
+      <div class="mx-auto flex max-w-[1120px] flex-col gap-10">
+        <div class="flex flex-wrap items-end justify-between gap-x-[60px] gap-y-6">
+          <div class="flex max-w-[560px] flex-col gap-3.5">
+            <div class={eyebrow}>{s.regulars.eyebrow}</div>
+            <h2 class={h2}>{s.regulars.title}</h2>
+          </div>
+          <p class={lead}>{s.regulars.lead}</p>
+        </div>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-3.5">
+          {
+            people.map((o) => (
+              <div class="flex flex-col gap-3 rounded-2xl border bg-white p-[18px]">
+                <div class="flex items-center gap-3">
+                  <Avatar ini={o.ini} hue={o.hue} size={44} />
+                  <div class="flex min-w-0 flex-col">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[16px] font-semibold">{o.name}</span>
+                      <span class="rounded-[5px] bg-muted px-1.5 py-px text-[11px] whitespace-nowrap text-subtle">{o.tag}</span>
+                    </div>
+                    <span class="text-[13px] text-pretty text-muted-foreground">{o.desc}</span>
+                  </div>
+                </div>
+                <div class="rounded-[10px] border border-input px-3 py-2.5 text-[13px] leading-[1.55] text-pretty text-[#3a3a3c]">{o.prompt}</div>
+              </div>
+            ))
+          }
+          <div class="flex flex-col justify-center gap-3 rounded-2xl border-[1.5px] border-dashed border-[#d4d4cf] p-[18px]">
+            <div class="flex items-center gap-3">
+              <Avatar ini={s.regulars.custom.ini} size={44} />
+              <div class="flex items-center gap-1.5">
+                <span class="text-[16px] font-semibold">{s.regulars.custom.name}</span>
+                <span class="rounded-[5px] bg-[oklch(0.96_0.02_255)] px-1.5 py-px text-[11px] text-[oklch(0.5_0.15_255)]">{s.regulars.custom.tag}</span>
+              </div>
+            </div>
+            <div class="rounded-[10px] border border-input px-3 py-2.5 text-[13px] leading-[1.55] text-muted-foreground">{s.regulars.custom.prompt}</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-center gap-x-16 gap-y-7 rounded-[20px] bg-[#f3f3f1] p-7 max-[480px]:p-5">
+          <div class="flex flex-col gap-2.5">
+            <span class="text-[20px] font-bold tracking-[-0.01em]">{s.regulars.grudgeTitle}</span>
+            <span class="text-[15px] leading-[1.65] text-pretty text-label">{s.regulars.grudge}</span>
+          </div>
+          <div class="flex flex-col gap-2">
+            {
+              s.regulars.notes.map(([id, t]) => (
+                <div class="flex items-start gap-2.5 rounded-xl border bg-white px-3 py-2.5">
+                  <Avatar ini={who(id).ini} hue={who(id).hue} size={26} />
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-[12px] text-muted-foreground">{s.regulars.noted(who(id).name)}</span>
+                    <span class="text-[14px] leading-[1.5]">{t}</span>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="border-t bg-white px-6 pt-[110px] pb-[120px] max-[480px]:px-4">
+      <div class="mx-auto flex max-w-[1120px] flex-col gap-[120px]">
+        <div class={split}>
+          <FeatureText eyebrow={s.chat.eyebrow} title={s.chat.title} lead={s.chat.lead} />
+          <div class:list={[card, 'w-full max-w-[420px] justify-self-center']}>
+            <div class="flex items-center gap-2 border-b border-[#f0f0ee] px-4 py-3">
+              <span class="text-[15px] font-semibold">{s.chat.panel}</span><span class="text-[12px] text-muted-foreground">{s.chat.hide}</span>
+            </div>
+            <div class="flex flex-col gap-3 px-4 pt-3.5 pb-[18px]">
+              {
+                s.chat.lines.map((m) =>
+                  'sys' in m ? (
+                    <div class="flex items-center justify-center gap-1.5 text-[12px] text-[#a1a1a6]">
+                      <span>— {P.street[m.sys]}</span>
+                      <MiniCards cards={m.cards} />
+                      <span>—</span>
+                    </div>
+                  ) : m.t ? (
+                    <div class="flex gap-2.5">
+                      <Avatar ini={who(m.a).ini} hue={who(m.a).hue} size={28} />
+                      <div class="flex min-w-0 flex-col gap-[3px]">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-[13px] font-semibold">{who(m.a).name}</span>
+                          <span class="rounded-[5px] bg-muted px-1.5 py-px text-[11px] whitespace-nowrap text-subtle">{actLabel(m.act)}</span>
+                        </div>
+                        <div class="text-[14px] leading-[1.5] text-pretty">{m.t}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div class="flex items-center gap-1.5 pl-[38px] text-[12px] text-muted-foreground">
+                      <span class="font-semibold text-label">{who(m.a).name}</span>
+                      <span>{actLabel(m.act)}</span>
+                    </div>
+                  )
+                )
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class={split}>
+          <CoachDemo lang={lang} client:visible />
+          <FeatureText eyebrow={s.coach.eyebrow} title={s.coach.title} lead={s.coach.lead}>
+            <div class="flex flex-col gap-2 pt-1 text-[14px] leading-[1.6] text-[#3a3a3c]">
+              {
+                s.coach.modes.map(([k, d]) => (
+                  <div class="flex gap-2.5">
+                    <span class="font-semibold whitespace-nowrap">{k}</span>
+                    <span class="text-label">{d}</span>
+                  </div>
+                ))
+              }
+            </div>
+          </FeatureText>
+        </div>
+
+        <div class={split}>
+          <FeatureText eyebrow={s.recap.eyebrow} title={s.recap.title} lead={s.recap.lead} />
+          <div class:list={[card, 'w-full max-w-[400px] justify-self-center rounded-[14px]']}>
+            <div class="flex flex-col gap-2 bg-topbar px-3 py-2.5">
+              <div class="flex items-baseline gap-2">
+                <span class="text-[13px] font-semibold">{s.recap.head}</span>
+                <div class="flex-1"></div>
+                <span class="text-[13px] font-semibold text-win">+2,400</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <MiniCards cards={['Js', 'Jh']} w={20} h={28} />
+                <span class="h-[18px] w-px bg-input"></span>
+                <MiniCards cards={['Jd', '8c', '3s', 'Qh', '2d']} w={20} h={28} />
+              </div>
+            </div>
+            <div class="flex flex-col gap-2.5 p-3">
+              <div class="text-[14px] leading-[1.5] font-semibold text-pretty">{s.recap.summary}</div>
+              {
+                s.recap.rows.map(([l, t], i) => (
+                  <div class="flex gap-2 text-[13px] leading-[1.6]">
+                    <span class="flex h-[21px] w-[68px] shrink-0 items-center gap-[5px] font-medium text-subtle">
+                      <span class="size-1.5 rounded-full" style={{ background: ['oklch(0.55 0.14 155)', 'oklch(0.72 0.14 70)', 'oklch(0.6 0.17 255)'][i] }}></span>
+                      {l}
+                    </span>
+                    <span class="min-w-0 flex-1 text-pretty">{t}</span>
+                  </div>
+                ))
+              }
+              <span class="text-[11px] text-[#a1a1a6]">{s.coach.coaches[1]}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white px-6 max-[480px]:px-4">
+      <Effects lang={lang} client:visible />
+    </section>
+
+    <section id="models" class="bg-white px-6 pt-[130px] pb-[120px] max-[480px]:px-4">
+      <div class="mx-auto flex max-w-[1120px] flex-col gap-14">
+        <div class="flex flex-wrap items-end justify-between gap-x-[60px] gap-y-6">
+          <div class="flex max-w-[560px] flex-col gap-3.5">
+            <div class={eyebrow}>{s.models.eyebrow}</div>
+            <h2 class={h2}>{s.models.title[0]}<br />{s.models.title[1]}</h2>
+          </div>
+          <p class={lead}>{s.models.lead}</p>
+        </div>
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,440px),1fr))] items-start gap-5">
+          <div class="flex flex-col gap-2">
+            <span class="pl-1 text-[13px] text-muted-foreground">{s.models.providersLabel}</span>
+            <div class="rounded-[14px] border bg-white px-[18px]">
+              {
+                s.models.providers.map(([n, d]) => (
+                  <div class="flex items-center gap-4 border-b border-divider py-3.5">
+                    <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span class="text-[14px] font-medium">{n}</span>
+                      <span class="text-[12px] leading-[1.5] break-words text-muted-foreground">{d}</span>
+                    </div>
+                    <span class="rounded-full border border-input px-3.5 py-1.5 text-[13px] whitespace-nowrap">{s.models.edit}</span>
+                  </div>
+                ))
+              }
+              {
+                s.models.roles.map(([l, d, p, m, ok]) => (
+                  <div class="flex flex-col gap-2.5 border-b border-divider py-3.5">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="text-[14px] font-medium">{l}</span>
+                      <span class="text-[12px] leading-[1.5] text-muted-foreground">{d}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="flex w-[120px] items-center justify-between gap-2 rounded-lg border border-input px-2.5 py-[7px] text-[13px]">{p}<span class="text-[#a1a1a6]">▾</span></span>
+                      <span class="min-w-[140px] flex-1 rounded-lg border border-input px-2.5 py-[7px] font-mono text-[13px]">{m}</span>
+                      <span class="rounded-full border border-input px-3.5 py-1.5 text-[13px] whitespace-nowrap">{s.models.test}</span>
+                    </div>
+                    <span class="text-[12px] text-win">{ok}</span>
+                  </div>
+                ))
+              }
+              <div class="py-3.5"><span class="rounded-full border border-input px-3.5 py-1.5 text-[13px]">{s.models.add}</span></div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-2">
+            <span class="pl-1 text-[13px] text-muted-foreground">{s.models.usageLabel}</span>
+            <UsageCard lang={lang} client:visible />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="border-t px-6 py-[110px] max-[480px]:px-4">
+      <div class="mx-auto flex max-w-[1120px] flex-col gap-9">
+        <h2 class="m-0 text-[clamp(28px,3.6vw,40px)] leading-[1.15] font-bold tracking-[-0.025em]">{s.extras.title}</h2>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-px overflow-hidden rounded-2xl border bg-border">
+          {
+            s.extras.items.map(([t, d]) => (
+              <div class="flex flex-col gap-1.5 bg-white p-[22px]">
+                <span class="text-[16px] font-semibold">{t}</span>
+                <span class="text-[14px] leading-[1.6] text-pretty text-label">{d}</span>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <section id="download" class="border-t bg-white px-6 py-[120px] max-[480px]:px-4">
+      <div class="mx-auto flex max-w-[680px] flex-col items-center gap-7 text-center">
+        <div class="flex flex-col items-center gap-3.5">
+          <img src={icon} alt="" width="80" height="80" class="block" />
+          <h2 class="m-0 text-[clamp(32px,4.4vw,48px)] leading-[1.1] font-bold tracking-[-0.03em]">{s.download.title}</h2>
+          <a href={`${REPO}/releases`} class="text-[14px] text-muted-foreground"><VerLine lang={lang} client:load /> · {s.download.all}</a>
+        </div>
+        <Download lang={lang} client:load />
+        <span class="max-w-[560px] text-[13px] leading-[1.6] text-pretty text-muted-foreground">{s.download.foot}</span>
+      </div>
+    </section>
+
+    <section id="faq" class="px-6 py-[110px] max-[480px]:px-4">
+      <div class="mx-auto flex max-w-[760px] flex-col gap-9">
+        <h2 class="m-0 text-[clamp(32px,4.4vw,52px)] leading-[1.1] font-bold tracking-[-0.03em]">{s.faq.title}</h2>
+        <Faq lang={lang} client:visible />
+      </div>
+    </section>
+
+    <section class="border-t bg-white px-6 py-[120px] max-[480px]:px-4">
+      <div class="mx-auto flex max-w-[1120px] flex-col items-center gap-6 text-center">
+        <div class="flex gap-1.5">
+          {
+            ['Th', 'Jh', 'Qh', 'Kh', 'Ah'].map((c, i) => (
+              <PlayingCard card={c} w={48} h={68} style={{ border: '1px solid #e3e3e0', boxShadow: '0 6px 16px rgba(0,0,0,0.08)', transform: `rotate(${(i - 2) * 5}deg) translateY(${Math.abs(i - 2) * 5}px)` }} />
+            ))
+          }
+        </div>
+        <h2 class="m-0 text-[clamp(36px,5.4vw,64px)] leading-[1.08] font-bold tracking-[-0.035em] text-balance">{s.end.title}</h2>
+        <div class="flex flex-wrap justify-center gap-3">
+          <PrimaryButton lang={lang} client:load />
+          <a href={REPO} class={btn2}>{s.end.star}</a>
+        </div>
+      </div>
+    </section>
+
+    <footer class="border-t bg-white px-6 pt-7 pb-10 max-[480px]:px-4">
+      <div class="mx-auto flex max-w-[1120px] flex-wrap items-center gap-x-7 gap-y-3 text-[13px] text-subtle">
+        <span class="font-semibold text-foreground">River</span>
+        <span>{s.footer}</span>
+        <div class="flex-1"></div>
+        <div class="flex gap-5">
+          <a href={REPO} class="text-label">GitHub</a>
+          <a href={`${REPO}/releases`} class="text-label">Releases</a>
+          <a href={`${REPO}/issues`} class="text-label">Issues</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
