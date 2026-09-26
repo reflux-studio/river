@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as db from '../src/main/db'
+import { commandHandlers } from '../src/main/ipc'
 import type { TableStart } from '../src/shared/types'
 import { scriptModel, type Step } from './mock-model'
 import { drive, harness, seeded, setup, teardown, type Harness } from './table-helpers'
@@ -106,5 +107,21 @@ describe('英文 newChat', () => {
     await drive(h, () => hands(h) >= 6 && h.chat.some((m) => m.sysKind === 'rebuy'), () => 'call')
     await drive(h, () => seen.some((s) => /System: .* rebought /.test(s)), () => 'call')
     expect(seen.some((s) => /System: Hand \d+ · Preflop/.test(s))).toBe(true)
+  })
+})
+
+describe('牌局中途在设置页切换语言', () => {
+  beforeEach(enTable)
+
+  it('下一次模型调用的 system 换成新语言', async () => {
+    model = scriptModel(() => ({ tools: [{ name: 'act', input: { think: 'hmm', action: 'call' } }] }))
+    const h = await harness({ agents })
+    await h.runner.start(free4)
+    await drive(h, () => model.calls.length >= 1)
+    const before = model.calls.length
+    await commandHandlers(h.runner)['settings.update']({ locale: 'zh' })
+    await drive(h, () => model.calls.length > before)
+    expect(model.calls[before - 1].system).toMatch(/Reply in English\.$/)
+    expect(model.calls[before].system).toMatch(/请用中文回复。$/)
   })
 })

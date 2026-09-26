@@ -87,7 +87,6 @@ export async function invoke<K extends keyof Commands>(cmd: K, ...args: Paramete
   }
 }
 
-// 语言在运行期间不变（只在引导页选一次），所以直接跟随 settings.locale
 export const useT = () => dict(useRiver((s) => s.settings.locale))
 
 export const go = (page: Page) => setState({ page })

@@ -129,7 +129,8 @@ export function Onboarding() {
   // 语言页的选择只在本地，结束引导时才写入；没选过就是预选值（bootstrap 之后才拿到）
   const [picked, setPicked] = useState<Locale | null>(null)
   const locale = picked ?? current
-  const finish = () => finishOnboarding(locale)
+  // 组件常驻：不清掉的话，之后在设置页切换语言，规则介绍仍停在当时选的语言
+  const finish = () => finishOnboarding(locale).then(() => setPicked(null))
   return (
     <Dialog open={open} onOpenChange={(o) => !o && finish()}>
       <DialogContent

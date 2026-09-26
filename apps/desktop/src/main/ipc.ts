@@ -1,6 +1,6 @@
 import type { App, IpcMain } from 'electron'
 import { PROVIDER_REGISTRY } from '@mastra/core/llm'
-import { dict } from '@river/i18n'
+import { dict, presets } from '@river/i18n'
 import type { Commands, FxRates, Recap, UpdateCheck } from '../shared/types'
 import {
   clearHistory, clearMemory, completeOnboarding, deletePersona, deleteProvider, getBankroll, getHand, getLobby, handKeyOf, listUsage, getOnboarded, getReview, getSettings, listHands,
@@ -52,7 +52,8 @@ export function commandHandlers(runner: TableRunner, app: AppInfo = { version: (
       packaged: app.packaged
     }),
     'settings.update': async (patch) => {
-      if ('locale' in patch) throw new Error('locale is fixed after onboarding')
+      // 存进库的非法值会让之后每次加载都失败
+      if ('locale' in patch && !Object.hasOwn(presets, patch.locale!)) throw new Error(`unknown locale: ${patch.locale}`)
       const s = await updateSettings(patch)
       runner.broadcast()
       return s

@@ -184,7 +184,7 @@ function ModelPicker({ role }: { role: Role }) {
   )
 }
 
-function Seg<K extends 'speed' | 'coachPersona' | 'level'>({
+function Seg<K extends 'speed' | 'coachPersona' | 'level' | 'locale'>({
   k, labels, values
 }: {
   k: K
@@ -331,6 +331,9 @@ export function Settings() {
           </Row>
         </Group>
         <Group title={s.look}>
+          <Row label={s.lang} desc={s.langDesc}>
+            <Seg k="locale" labels={[t.common.localeNames.zh, t.common.localeNames.en]} values={['zh', 'en']} />
+          </Row>
           <Row label={a.felt} desc={s.feltDesc}>
             <FeltSwatches size={24} />
           </Row>

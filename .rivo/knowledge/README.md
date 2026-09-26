@@ -36,9 +36,10 @@ packages/i18n    @river/i18n    Locale、字典、扑克术语、对手预设、
 
 ## i18n
 
-- **语言只选一次**：新用户在引导页第一页选择（预选值按系统语言，`zh*` 为中文，否则英文），`onboarding.done(locale)` 写入；之后 `settings.update` 带 `locale` 会被拒绝（`apps/desktop/src/main/ipc.ts`）。从设置页重看规则介绍时没有语言页。已完成引导但库里没有 `locale` 的老用户固定为 `zh`（`db/index.ts`）。选英文且币种仍是人民币时改为美元。
+- **引导页选语言，设置页可改**：新用户在引导页第一页选择（预选值按系统语言，`zh*` 为中文，否则英文），`onboarding.done(locale)` 写入；选英文且币种仍是人民币时改为美元。之后可在设置页随时切换（`settings.update({ locale })`，只接受 `zh`/`en`，`apps/desktop/src/main/ipc.ts`），切换不改币种、不改对手，提示词从下一次模型调用起换语言，牌局不锁定。从设置页重看规则介绍时没有语言页。已完成引导但库里没有 `locale` 的老用户预选为 `zh`（`db/index.ts`）。
+- **对手预设按 `presetLocale` 快照**：kv `presetLocale` 只由 `completeOnboarding` 写入一次，内置对手的种子取 `presets[presetLocale]`（`db/index.ts` 的 `seeds()`，保存差异与“恢复默认”都以它为准）。缺失时：已完成引导的老库为 `zh`，未完成引导时跟随当前 `locale`。
 - **固定内容双语**，都在 `@river/i18n`：界面文案、主进程模板文字、系统提示词与局面描述（提示词写明回复语言）、对手预设种子。取字典用 `dict(locale)`；`en` 的类型是 `typeof zh`，缺词在 typecheck 时报错。
-- **动态内容保持生成时的快照**，不随语言翻译：选定后的对手预设、用户写的内容、模型输出、历史记录。
+- **动态内容保持生成时的快照**，不随语言翻译：引导时快照的对手预设、用户写的内容、模型输出、历史记录。
 - **官网**：中文 `/`、英文 `/en/`，文案在 `apps/site/src/i18n/site.ts`，术语与预设同样取自 `@river/i18n`。
 
 ## 系统结构

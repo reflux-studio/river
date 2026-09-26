@@ -190,15 +190,53 @@ describe('语言', () => {
     expect((await db.completeOnboarding('zh')).settings).toMatchObject({ locale: 'zh', currency: 'cny' })
   })
 
-  it('ipc：settings.update 拒绝改语言；onboarding.done 转发', async () => {
+  it('ipc：settings.update 可以改语言，只接受已知语言；onboarding.done 转发', async () => {
     const cmd = commandHandlers({ broadcast: () => {} } as unknown as TableRunner)
-    await expect(cmd['settings.update']({ locale: 'en' })).rejects.toThrow('locale is fixed after onboarding')
     await expect(cmd['onboarding.done']('fr' as never)).rejects.toThrow('unknown locale')
     await expect(cmd['onboarding.done']('constructor' as never)).rejects.toThrow('unknown locale')
     expect(db.getSettings().locale).toBe('zh')
     expect((await cmd['onboarding.done']('en')).settings.locale).toBe('en')
-    await expect(cmd['settings.update']({ locale: 'zh' })).rejects.toThrow('locale is fixed after onboarding')
+    await expect(cmd['settings.update']({ locale: 'fr' as never })).rejects.toThrow('unknown locale')
+    await expect(cmd['settings.update']({ locale: 'constructor' as never })).rejects.toThrow('unknown locale')
+    expect(db.getSettings().locale).toBe('en')
     expect((await cmd['settings.update']({ speed: 0 })).locale).toBe('en')
+  })
+
+  it('英文引导后在设置页切到中文：界面语言变，对手预设和币种不变', async () => {
+    const cmd = commandHandlers({ broadcast: () => {} } as unknown as TableRunner)
+    await cmd['onboarding.done']('en')
+    expect((await cmd['settings.update']({ locale: 'zh' })).locale).toBe('zh')
+    expect(db.getSettings()).toMatchObject({ locale: 'zh', currency: 'usd' })
+    expect(db.personaOf('li')).toMatchObject({ name: 'Foxy', edited: false })
+    await db.savePersona({ ...db.personaOf('li')!, name: 'Foxy2' })
+    await db.resetPersona('li')
+    expect(db.personaOf('li')).toMatchObject({ name: 'Foxy', edited: false })
+    await reopen('zh-CN')
+    expect(db.getSettings().locale).toBe('zh')
+    expect(db.personaOf('li')!.name).toBe('Foxy')
+  })
+
+  it('老库（已完成引导、没有 presetLocale）切到英文：对手仍是中文预设', async () => {
+    await db.setOnboarded(true)
+    await reopen('en-US')
+    const cmd = commandHandlers({ broadcast: () => {} } as unknown as TableRunner)
+    await cmd['settings.update']({ locale: 'en' })
+    expect(db.personaOf('li')!.name).toBe('阿狸')
+    await reopen('en-US')
+    expect(db.getSettings().locale).toBe('en')
+    expect(db.personaOf('li')!.name).toBe('阿狸')
+  })
+
+  it('切换语言后 savePersona / deletePersona 按引导时的预设计算', async () => {
+    await db.completeOnboarding('en')
+    await db.updateSettings({ locale: 'zh' })
+    const seed = presets.en.find((p) => p.id === 'k')!
+    await db.savePersona({ ...db.personaOf('k')!, name: 'King' })
+    const row = async () => { const c = createClient({ url }); const r = (await c.execute("SELECT name, tag, prompt, description, builtin FROM river_personas WHERE persona_id = 'k'")).rows[0]; c.close(); return r }
+    expect({ ...(await row()) }).toEqual({ name: 'King', tag: null, prompt: '', description: null, builtin: 1 })
+    await db.deletePersona('k')
+    expect({ ...(await row()) }).toMatchObject({ builtin: 1 })
+    expect(db.personaOf('k')).toMatchObject({ name: 'King', tag: seed.tag, deleted: true })
   })
 
   it('英文下保存与种子相同的字段存为空，恢复默认回到英文预设', async () => {

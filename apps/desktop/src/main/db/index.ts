@@ -57,6 +57,8 @@ export let settingsCache: Settings = DEFAULT_SETTINGS
 export const providersCache = new Map<string, ProviderRow>()
 export let personasCache: Persona[] = []
 let lobbyCache: Lobby = DEFAULT_LOBBY
+// 引导时的快照；老库（已完成引导、没存过）为 zh，未完成引导时为 undefined，种子跟随预选的界面语言
+let presetLocaleCache: Locale | undefined
 
 function db(): Client {
   if (!client) throw new Error('db not initialized')
@@ -149,8 +151,10 @@ async function loadCaches() {
   // getKv 会合并默认值，要看库里有没有存过 locale 只能读原始值
   const saved = await getKv<Partial<Settings>>('settings', {})
   settingsCache = pick(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, ...saved })
-  // 预选值只放内存：老用户（已完成引导）固定中文，新用户按系统语言
-  if (!saved.locale) settingsCache.locale = (await getOnboarded()) ? 'zh' : resolveLocale(systemLocale)
+  const onboarded = await getOnboarded()
+  // 预选值只放内存：老用户（已完成引导）为中文，新用户按系统语言
+  if (!saved.locale) settingsCache.locale = onboarded ? 'zh' : resolveLocale(systemLocale)
+  presetLocaleCache = (await getKv<Locale | undefined>('presetLocale', undefined)) ?? (onboarded ? 'zh' : undefined)
   // 不认识的币种（含早期存的大写代码）回到可识别的值
   const cur = String(settingsCache.currency).toLowerCase()
   settingsCache.currency = CURRENCIES.some((c) => c.code === cur) ? (cur as Currency) : DEFAULT_SETTINGS.currency
@@ -227,7 +231,7 @@ export const setBankroll = (n: number) => setKv('bankroll', n)
 export const getOnboarded = () => getKv('onboarded', false)
 export const setOnboarded = (v: boolean) => setKv('onboarded', v)
 
-// 语言只在这里写入；settings.update 的守卫在 ipc.ts，这里直接调用 updateSettings 不受影响
+// 对手预设的语言只在这里写入一次；之后设置页切换的只是界面语言
 export async function completeOnboarding(locale: Locale): Promise<{ settings: Settings; personas: Persona[] }> {
   if (await getOnboarded()) return { settings: settingsCache, personas: personasCache }
   // 来自渲染进程；存进库的非法值会让之后每次加载预设都失败
@@ -235,6 +239,8 @@ export async function completeOnboarding(locale: Locale): Promise<{ settings: Se
   const patch: Partial<Settings> = { locale }
   if (locale === 'en' && settingsCache.currency === 'cny') Object.assign(patch, { currency: 'usd', fxRate: null })
   await updateSettings(patch)
+  presetLocaleCache = locale
+  await setKv('presetLocale', locale)
   await setOnboarded(true)
   personasCache = await loadPersonas()
   return { settings: settingsCache, personas: personasCache }
@@ -255,7 +261,7 @@ interface PersonaRow {
   created_at: number
 }
 
-const seeds = () => presets[settingsCache.locale]
+const seeds = () => presets[presetLocaleCache ?? settingsCache.locale]
 
 async function loadPersonas(): Promise<Persona[]> {
   const rows = (await db().execute('SELECT * FROM river_personas ORDER BY created_at DESC')).rows as unknown as PersonaRow[]
