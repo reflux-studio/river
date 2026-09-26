@@ -22,7 +22,7 @@
 - **i18n 原则**：
   - 固定内容做双语：界面文案、主进程的模板文字、系统提示词和局面描述，提示词里写明回复语言。
   - 动态内容保持生成时的快照：对手预设选定之后的内容、用户写的内容、模型输出、历史记录。
-  - 语言只在引导页选择一次，之后不能再改；老用户固定为 `zh`。
+  - 语言首次在引导页选择，之后可以在设置页切换（T10）；对手预设只在引导时按所选语言写入一次，之后不随语言变化。老用户默认 `zh`。
 - **测试默认中文**：已有断言不能因为本次改动而大面积改写。
 - **工具链**：`typescript`、`vitest`、`@types/node` 在根 `package.json` 的 devDependencies 中统一声明，各包不再重复声明；`packages/*` 的 `typecheck` 脚本为 `tsc --noEmit -p tsconfig.json`；desktop 保留现有脚本（分别检查 `tsconfig.node.json` 和 `tsconfig.web.json`），因为它的根 `tsconfig.json` 是 `files: []` 加 references，直接检查会什么都不查，还会让 ADR-007 的守卫失效。官网为 `astro check`，`@astrojs/check` 由 site 自己声明；`@types/react` 由 ui 声明。如果 pnpm 在各包目录下执行脚本时找不到根目录的 `tsc` 或 `vitest`，就改由各包自己声明这些依赖。所有包都必须有 `typecheck` 和 `test` 脚本（没有测试的包用 `vitest run --passWithNoTests`），这样 `pnpm -r` 才能覆盖到。
 - **中文检查命令**：统一用 `rg -n '\p{Han}' <路径> -g '*.ts' -g '*.tsx'`；macOS 自带的 grep 不支持 `-P`。
@@ -273,7 +273,7 @@
 | `initDb({ url, encrypt, decrypt, systemLocale })` | 在现有的选项对象中新增可选字段 `systemLocale?: string`，缺省为 `'zh'`，保证现有测试默认中文 |
 | 预选值 | `getKv` 会合并默认值，判断不出库里有没有 `locale`，所以 `loadCaches` 要读取原始 kv 值来判断。原始值里没有 `locale` 时：`onboarded` 为 true 取 `'zh'`，否则取 `resolveLocale(systemLocale)`，程序不会主动把预选值写库；它被 `updateSettings` 顺带存进库也不影响结果。`systemLocale` 由 `index.ts` 在 app ready 之后读取 `app.getLocale()`，再作为 `initDb` 的新参数传入 |
 | `onboarding.done(locale)` | 签名为 `(locale: Locale) => { settings: Settings; personas: Persona[] }`，逻辑见下方伪代码 |
-| `settings.update(patch)` | patch 中含 `locale` 时抛错（`'locale is fixed after onboarding'`，界面不展示这条错误） |
+| `settings.update(patch)` | patch 中含 `locale` 时抛错（`'locale is fixed after onboarding'`，界面不展示这条错误） |（已由 T10 取代：守卫删除，改为只校验取值）
 
 `onboarding.done` 的主进程逻辑写在 db 模块中，导出为 `completeOnboarding`，`ipc.ts` 只负责转发：
 
@@ -600,10 +600,14 @@ export async function completeOnboarding(locale: Locale) {
 - `apps/desktop/src/main/db/index.ts`：
   - 新增 kv 项 `presetLocale`；`completeOnboarding` 在写入 locale 之后写 `setKv('presetLocale', locale)`。
   - 新增内部函数 `presetLocale()`：kv 里有值就用它；没有时，已完成引导取 `'zh'`，否则取 `settingsCache.locale`。
-  - `loadPersonas`、`savePersona`、`deletePersona` 中所有用到 `presets[settingsCache.locale]` 的地方，改为 `presets[presetLocale()]`。
-  - 要能同步取到值：`loadCaches` 时把 `presetLocale` 读进内存缓存，`completeOnboarding` 写入时同时更新缓存。
+  - 三个函数都通过 `seeds()`（`db/index.ts` 约 258 行）取种子，只改 `seeds()` 这一处，让它按 `presetLocale()` 取值。
+  - `loadCaches` 要在 `loadPersonas` 之前把 kv 中的 `presetLocale` 读进内存缓存；库里没有这一项时，把缓存设为 `undefined`，避免测试之间残留上一次的值。`completeOnboarding` 写入时同时更新缓存。
+  - 语言值校验沿用 `Object.hasOwn(presets, locale)`。
+  - 已知边界（接受）：引导的 IPC 调用失败后，主进程仍是未完成引导的状态，这时在设置页切换语言，对手缓存要到重启后才刷新。
 - `apps/desktop/src/renderer/src/pages/Settings.tsx`：新增“语言”一行，用现有的 `Segmented` 组件，选项为 `中文`、`English`（选项名取 `t.common.localeNames`），调用 `updateSettings({ locale })`。放在最前面的通用区块，或者和外观类设置放在一起，按页面现有的分组决定。行标题和说明加进 `dict.ts` 的 desktop 命名空间，中英两份。
 - `.rivo/knowledge/README.md`：把“`settings.update` 带 locale 会被拒绝”改成现在的规则：设置页可以切换语言；对手预设按 `presetLocale` 快照。
+- 引导页语言页的说明（`packages/i18n/src/dict.ts` 中 `desktop.onboarding.lang.b` 的中英两份，原文写着“选定后不能再更改”）改为：界面语言以后可以在设置页修改；对手的名字和提示词按这次选择的语言生成，以后不会随语言变化（plan-3 B1）。
+- 更新过时的代码注释：`lib/river.ts:90` 附近、`db/index.ts:152`、`db/index.ts:230` 附近关于“语言固定”的说法。
 - 测试：`apps/desktop/test/db.test.ts` 等原来断言 `locale is fixed after onboarding` 的用例，改为断言新的行为。
 
 **输入输出**：
@@ -618,9 +622,11 @@ export async function completeOnboarding(locale: Locale) {
 - 新用户选 English 完成引导，再 `settings.update({ locale: 'zh' })`：`settings.locale` 变为 zh；`personas` 仍然是英文预设（Foxy…）；“恢复默认”后仍是英文预设；币种仍是 usd。
 - 老库（已完成引导、没有 `presetLocale`）切到 en：对手仍是中文预设。
 - 切换语言后，runner 的下一次模型调用，system 提示词是新语言：用 mock 模型在牌局中途切换，断言切换前后两次调用的 system 分别以“请用中文回复。”和“Reply in English.”结尾，或用等价的方式判断。
-- `settings.update({ locale: 'fr' })` 抛错。
+- 通过 `commandHandlers['settings.update']` 切换语言（同时证明守卫已经删掉），传入 `'fr'` 和 `'constructor'` 都抛错 `unknown locale`。
+- 切换语言后调用 `savePersona`（保存和种子相同的值会存为空）和 `deletePersona`（内置对手恢复默认），结果都按 `presetLocale` 的种子计算。
 - 根目录 `pnpm typecheck`、`pnpm test` 通过；`apps/desktop` 下 `pnpm build` 通过。
-- dev 实机：先把 River-dev 目录重命名备份，结束后必须恢复原名。新用户选中文完成引导，然后在设置页切到 English：检查界面变成英文、对手页仍是中文预设、从设置页打开规则介绍没有语言页，截图存到 `evidence/T10/`。不开牌局。
+- dev 实机：先把 River-dev 目录重命名备份，结束后必须恢复原名。新用户选中文完成引导，然后在设置页切到 English：检查界面变成英文、对手页仍是中文预设、从设置页打开规则介绍没有语言页，截图存到 `evidence/T10/`，另外截一张引导页的语言页（核对 B1 的新文案）。不开牌局。
+- 说明：用 T4 到 T7 期间的构建在本地完成过英文引导的开发库没有 `presetLocale`，对手会退回中文。这些版本没有发布过，只影响开发者本地库，不处理。
 
 **结果**：
 

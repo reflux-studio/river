@@ -139,6 +139,8 @@ river/
 - 留在 desktop 的：shadcn `ui/*`、`Segmented`（依赖 radix toggle-group）、`ActionBar`、`ChatPanel`、`CoachPanel`、`Appearance`、`TopBar` 和各页面。这些都带状态或 IPC；官网上对应的只是静态示意，内容也不同，由官网用 ui 的叶子组件自己拼。
 - `cn`：ui 直接依赖 `cn` 包（与 desktop 现在的写法相同）。
 
+> **2026-09-26 修订**：本节中关于“设置页不能切换语言”“`settings.update` 拒绝 locale”“对手种子跟随 `settings.locale`”的内容已经被用户纠正，以 `plan.md` 的“语言入口：引导页与设置页”“对手预设”两节为准：设置页可以切换语言，对手预设按 `presetLocale` 在引导时快照。
+
 ### @river/i18n 与 desktop 双语
 
 **原则：只有固定内容做双语，动态内容不做。**
