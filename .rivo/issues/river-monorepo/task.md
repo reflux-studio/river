@@ -36,6 +36,7 @@
 阶段一（迁移，行为不变）   T1 ─► T2 ─► T3
 阶段二（双语与更新）       T4 ─► T5 ─► T6 ─► T7（T7 和 T5、T6 改动同几个文件，所以串行）
 阶段三（官网与 CI）        T8（依赖 T3、T5）  T9（依赖 T1、T8）
+追加（用户纠正）           T10 设置页切换语言、对手预设在引导时快照（依赖 T4–T7）
 最后                       整体验证
 ```
 
@@ -582,6 +583,46 @@ export async function completeOnboarding(locale: Locale) {
   - F3：`ci.yml` 增加 `pnpm build:site`。
 - 独立审阅：`reviews/T9-1.md`。本地检查全部通过，没有发现缺陷。F4（desktop 重复声明 packageManager）、F5（README 措辞）是可选改进，不做。
 - **未完成**：F1，推送分支后 `ci.yml` 的结果，以及手动触发 `build.yml` 时三个平台是否都能打包。这两项要用户同意推送后才能做，Windows 和 Linux 在 workspace 布局下打包还没有实测过。
+
+## 任务 10：设置页切换语言，对手预设在引导时快照
+
+**背景**：用户在 2026-09-26 纠正了一个误解。原意是设置页不重新走引导，而不是设置页不能切换语言。用户同时明确：对手的名称和提示词只在引导页按所选语言写入一次，之后怎么切换语言都不变。plan 的“语言入口：引导页与设置页”“对手预设”两节已经按这个意思重写。
+
+**目标**：
+- 用户可以在设置页随时切换中文和 English，界面立即切换。
+- 系统提示词和局面描述从下一次模型调用起用新语言。
+- 对手预设、币种、历史记录都不受切换影响。
+
+**前置依赖**：T4 到 T7（已完成）。
+
+**修改位置**：
+- `apps/desktop/src/main/ipc.ts`：删掉 `settings.update` 中“拒绝修改 locale”的守卫；改为补丁里有 `locale` 时，只接受 `zh` 或 `en`，其他值抛错 `unknown locale`。
+- `apps/desktop/src/main/db/index.ts`：
+  - 新增 kv 项 `presetLocale`；`completeOnboarding` 在写入 locale 之后写 `setKv('presetLocale', locale)`。
+  - 新增内部函数 `presetLocale()`：kv 里有值就用它；没有时，已完成引导取 `'zh'`，否则取 `settingsCache.locale`。
+  - `loadPersonas`、`savePersona`、`deletePersona` 中所有用到 `presets[settingsCache.locale]` 的地方，改为 `presets[presetLocale()]`。
+  - 要能同步取到值：`loadCaches` 时把 `presetLocale` 读进内存缓存，`completeOnboarding` 写入时同时更新缓存。
+- `apps/desktop/src/renderer/src/pages/Settings.tsx`：新增“语言”一行，用现有的 `Segmented` 组件，选项为 `中文`、`English`（选项名取 `t.common.localeNames`），调用 `updateSettings({ locale })`。放在最前面的通用区块，或者和外观类设置放在一起，按页面现有的分组决定。行标题和说明加进 `dict.ts` 的 desktop 命名空间，中英两份。
+- `.rivo/knowledge/README.md`：把“`settings.update` 带 locale 会被拒绝”改成现在的规则：设置页可以切换语言；对手预设按 `presetLocale` 快照。
+- 测试：`apps/desktop/test/db.test.ts` 等原来断言 `locale is fixed after onboarding` 的用例，改为断言新的行为。
+
+**输入输出**：
+
+| 名称 | 契约 |
+| --- | --- |
+| `settings.update({ locale })` | 接受 `'zh'`、`'en'`；其他值抛错 `unknown locale`；不改币种、不改对手 |
+| kv `presetLocale` | `'zh' \| 'en'`，只在 `completeOnboarding` 中写入 |
+| 种子语言 | kv 有值就用它；没有时，已完成引导取 `'zh'`，否则取 `settingsCache.locale` |
+
+**验证与完成标准**（先写失败的测试）：
+- 新用户选 English 完成引导，再 `settings.update({ locale: 'zh' })`：`settings.locale` 变为 zh；`personas` 仍然是英文预设（Foxy…）；“恢复默认”后仍是英文预设；币种仍是 usd。
+- 老库（已完成引导、没有 `presetLocale`）切到 en：对手仍是中文预设。
+- 切换语言后，runner 的下一次模型调用，system 提示词是新语言：用 mock 模型在牌局中途切换，断言切换前后两次调用的 system 分别以“请用中文回复。”和“Reply in English.”结尾，或用等价的方式判断。
+- `settings.update({ locale: 'fr' })` 抛错。
+- 根目录 `pnpm typecheck`、`pnpm test` 通过；`apps/desktop` 下 `pnpm build` 通过。
+- dev 实机：先把 River-dev 目录重命名备份，结束后必须恢复原名。新用户选中文完成引导，然后在设置页切到 English：检查界面变成英文、对手页仍是中文预设、从设置页打开规则介绍没有语言页，截图存到 `evidence/T10/`。不开牌局。
+
+**结果**：
 
 ## 整体验证与交接
 

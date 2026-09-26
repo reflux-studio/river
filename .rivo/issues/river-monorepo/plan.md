@@ -27,10 +27,10 @@
 **关键规则**：
 
 - **固定内容与动态内容**：固定内容是写在代码里的文字，包括界面文案、主进程按模板拼出的展示文字、系统提示词和局面描述，这些都做双语。动态内容是用户写的、模型生成的，或者已经落库的历史记录，都按生成时的语言保存，不翻译。这条原则由用户提出。
-- **语言只在引导页选一次**：选定后不能再改；已完成引导的老用户是中文。
-- **对手预设**：引导页选好语言后，内置对手就用这个语言的预设；从此它们就是用户数据。
+- **语言**：首次进入时在引导页选择，之后可以随时在设置页切换，设置页不会重新走引导。已完成引导的老用户默认中文，也可以切换。
+- **对手预设**：只在引导页按所选语言写入一次（快照）。之后无论怎么切换语言，对手的名称、提示词和“恢复默认”的结果都不再改变。
 
-**明确不做**：拆 Agent 包；引入 Turborepo；支持中英以外的语言；设置页切换语言；翻译历史记录和模型输出；使用文档（Starlight）；官网深色模式；自定义域名。
+**明确不做**：拆 Agent 包；引入 Turborepo；支持中英以外的语言；设置页重新走引导；翻译历史记录和模型输出；使用文档（Starlight）；官网深色模式；自定义域名。
 
 **验收**：“验证与发布”一节中的场景全部通过。
 
@@ -251,7 +251,7 @@ river/
 | 发给模型的其他固定文字：`thread.ts` 和 `runner.ts` 里的摘要与工具结果文字 | 固定 | 按语言取字典 |
 | 发给模型的其他固定文字：工具的 description 和 zod 的 `.describe()` | 固定 | 按语言取字典 |
 | 渲染进程的格式化：日期（现在写死为 `'zh-CN'`）、`<html lang>`、币种名称 | 固定 | 按语言选取 |
-| 对手预设：内置 8 个对手的名称、标签、介绍、提示词 | 选定语言前固定，之后动态 | 按引导页选的语言决定，之后视为用户数据 |
+| 对手预设：内置 8 个对手的名称、标签、介绍、提示词 | 引导前固定，引导时快照 | 按引导页选的语言写入一次，之后切换语言也不变 |
 | 用户写的内容：自建或改过的对手、提问 | 动态 | 原样保存和显示 |
 | 模型输出：对手发言、教练讲解、复盘、长期印象 | 动态 | 原样保存和显示 |
 | 历史记录：公屏、手牌记录中的 `label`、`pos`、`handName`，往手摘要 | 动态 | 按生成时的语言保存，不重新渲染 |
@@ -292,63 +292,77 @@ export const en: typeof zh = {
 
 主进程通过 `dict(settings.locale)` 取字典。渲染进程用 `useT()` hook 取 `t`：它的实现是 `dict(useRiver(s => s.settings.locale))`，不需要 Provider，随 `settings.locale` 变化。
 
-### 语言入口：引导页
+### 语言入口：引导页与设置页
 
-**`Settings` 新增字段**：
+**两个语言字段**：
 
-| 字段 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `locale` | `'zh' \| 'en'` | 见下文“预选值” | 必须写进 `DEFAULT_SETTINGS`，否则 `pick()` 会丢掉存下的值 |
+| 字段 | 位置 | 类型 | 写入时机 | 作用 |
+| --- | --- | --- | --- | --- |
+| `locale` | `Settings`，写进 `DEFAULT_SETTINGS`（值为 `'zh'`） | `'zh' \| 'en'` | 引导完成时写入；之后设置页可以随时修改 | 固定内容的语言：界面、主进程展示文字、系统提示词和局面描述 |
+| `presetLocale` | db 的 kv 项 `presetLocale`，不放进 `Settings` | `'zh' \| 'en'` | 只在引导完成时写入一次 | 内置对手种子值的语言 |
 
-**预选值**：界面拿到的 `settings.locale` 总是有值，确定方式如下：
+分成两个字段，是因为对手预设在引导时是一份快照，而界面语言之后还可以改。`presetLocale` 不放进 `Settings`，这样 `settings.update` 从根上就改不到它。
 
-- `DEFAULT_SETTINGS.locale` 为 `'zh'`。
-- `getKv` 读出的设置已经合并了默认值，无法据此判断库里有没有存 `locale`。所以 `loadCaches` 要读取原始的 kv 值来判断。
-- 原始值里没有 `locale` 时：已完成引导的老用户取 `zh`；还没完成引导的新用户取 `resolveLocale(systemLocale)`。程序不会主动把预选值写库；现有的 `updateSettings` 每次写入整份设置，预选值可能被顺带存进去，这不影响结果。
-- `systemLocale` 由 `index.ts` 在 app ready 之后读取 `app.getLocale()`，再作为 `initDb` 的新参数传入。
+**预选值**：界面拿到的 `settings.locale` 总是有值。
+- `getKv` 读出的设置已经合并了默认值，判断不出库里有没有存 `locale`，所以 `loadCaches` 要读取原始的 kv 值来判断。
+- 原始值里没有 `locale` 时：已完成引导的老用户取 `zh`；还没完成引导的新用户取 `resolveLocale(systemLocale)`。
+- 程序不会主动把预选值写库。现有的 `updateSettings` 每次写入整份设置，预选值可能被顺带存进去，这不影响结果。
+- `systemLocale` 由 `index.ts` 在 app ready 之后读取 `app.getLocale()`，再作为 `initDb` 的选项传入。
+
+**预设语言的取值**：
+- kv 里有 `presetLocale`，就用它。
+- 没有时：已完成引导的老用户取 `zh`，和现在的种子一致；还没完成引导的新用户取当前的 `settings.locale`，这样引导前大厅里显示的对手和预选语言一致。
 
 **命令与返回值的变化**：
 
 | 名称 | 旧 | 新 |
 | --- | --- | --- |
 | `onboarding.done` | `() => void` | `(locale: Locale) => { settings: Settings; personas: Persona[] }` |
-| `settings.update` | 接受 `Partial<Settings>` 中的任意字段 | 补丁中含 `locale` 时抛错拒绝；只有 `onboarding.done` 能写入语言 |
+| `settings.update` | 接受 `Partial<Settings>` 中的任意字段 | 不变。可以修改 `locale`，这一项不影响对手预设 |
 | `Bootstrap` | — | 新增 `packaged: boolean`，供“检查更新”按钮使用 |
 
 **引导流程**：
-
 - 引导 Dialog 的第一页是语言页，只在还没完成引导时出现；从设置页或大厅重新打开“规则介绍”时，不再显示语言页。
 - 在语言页切换选项后，后面的引导卡片立即换成所选语言，但这时还不写库。
-- 点“完成”、点“跳过”、按 Esc，所有结束引导的方式都调用 `onboarding.done(当前选中的语言)`，没改动过就是预选值。所以英文系统的新用户直接跳过，得到的也是英文。
-- 最后一页的“去配置”和“带我打一手”要先 `await onboarding.done`，再跳转。否则可能在对手缓存按新语言重建之前就开桌。
+- 点“跳过”、点“稍后再说”、点“去配置”、点“带我打一手”、按 Esc、点遮罩，所有结束引导的方式都调用 `onboarding.done(当前选中的语言)`，没改动过就是预选值。
+- 最后一页的“去配置”和“带我打一手”要先 `await onboarding.done`，再跳转。
 
-**主进程处理 `onboarding.done`**：逻辑写在 db 模块里，导出为 `completeOnboarding(locale)`，因为它要直接写 `settingsCache`、`personasCache`，并调用模块内部的 `loadPersonas`。`ipc.ts` 只负责转发。
+**主进程处理 `onboarding.done`**：逻辑写在 db 模块里，导出为 `completeOnboarding(locale)`，`ipc.ts` 只负责转发。
 
 ```ts
 // main/db/index.ts
 export async function completeOnboarding(locale: Locale) {
+  if (!Object.hasOwn(presets, locale)) throw new Error(`unknown locale: ${locale}`)
   if (await getOnboarded()) return { settings: settingsCache, personas: personasCache } // 只在未完成引导时生效
   const patch: Partial<Settings> = { locale }
   if (locale === 'en' && settingsCache.currency === 'cny') Object.assign(patch, { currency: 'usd', fxRate: null })
-  await updateSettings(patch)          // 直接调用 db 现有的函数；拒绝修改 locale 的守卫在 ipc.ts 的 settings.update 处理函数里，这里不受影响
+  await updateSettings(patch)
+  await setKv('presetLocale', locale)  // 对手预设的快照语言，只在这里写入
   await setOnboarded(true)
-  personasCache = await loadPersonas() // 按新语言的预设重建
+  personasCache = await loadPersonas()
   return { settings: settingsCache, personas: personasCache }
 }
 ```
 
+**设置页切换语言**：
+- 设置页新增一行“语言”，提供 `中文 | English` 两个选项，调用 `settings.update({ locale })`。
+- 界面立即切换；主进程的展示文字从下一次推送起切换；系统提示词和局面描述从下一次模型调用起切换。牌局进行中切换也一样，不锁桌。
+- 不会影响：对手预设（按 `presetLocale`）、币种、已有历史记录和模型输出。
+- 按用户的原则，这里不做锁定：同一桌里前后两次模型调用的提示词语言可能不同，这是可以接受的。
+- `settings.update` 收到的 `locale` 不是 `zh` 或 `en` 时抛错（`unknown locale`），保证库里不会存进非法值。
+
 **启动失败弹窗**：这时可能读不到数据库，按 `app.getLocale()` 选择语言。
 
-**默认币种**：选英文的新用户，如果币种还是默认的人民币，就改成美元。选中文的用户币种不变，仍然可以在设置页修改。
+**默认币种**：只在引导时生效。选英文的新用户，如果币种还是默认的人民币，就改成美元；之后在设置页切换语言不会改币种。
 
 ### 对手预设
 
 - 数据库仍然只保存用户改过的字段，没改过的字段为空，读取时用种子值补齐。
-- 种子值从 `shared/personas.ts` 中的中文改为 `presets[settings.locale]`。
-- 保存时和同一语言的种子值比较，“恢复默认”就是把字段清空，恢复成这个语言的预设。
-- 语言选定后不会再变，所以效果等同于“引导页选好语言后把预设写进去”，但不需要复制数据，也不需要迁移。
-- 老用户的 `locale` 是 `zh`，种子值和现在完全一样。
-- 少见情况：没完成过引导、但已经改过对手的老用户选择英文时，改过的字段保留原文，没改过的字段变成英文，同一个对手会中英混杂。这只发生在引导完成之前，接受这个结果。
+- 种子值是 `presets[presetLocale]`；保存时和这个种子比较，“恢复默认”就是把字段清空，恢复成引导时那个语言的预设。
+- 切换界面语言不会改变对手的任何字段，因为种子值只由 `presetLocale` 决定，而它只在引导时写入一次。这样就实现了“对手预设只在引导页写入一次”，不需要复制数据，也不需要迁移。
+- 老用户没有 `presetLocale`，按 `zh` 处理，种子值和现在完全一样。
+- 少见情况：没完成过引导、但已经改过对手的老用户选择英文时，改过的字段保留原文，没改过的字段变成英文。这只发生在首次引导时，接受这个结果。
+- 新建对手时的初始模板（名字、标签、提示词占位文字）属于界面固定内容，按当前 `locale` 显示；保存之后就是用户数据。
 - `shared/personas.ts` 中的 `COACHES`、`STREET` 分别移到 i18n 的 `prompts.ts` 和 `poker.ts`，`BLINDS` 留在 desktop。
 
 ### 公屏系统消息的类型字段
@@ -491,7 +505,12 @@ async function checkNow(): Promise<UpdateCheck> {
    - **新用户全流程**：新用户分别选择中文和英文，完整走一遍。检查引导页、界面、状态文字、对手预设、对手发言、教练讲解和复盘，都应是所选语言。
    - **结束引导的方式**：英文系统的新用户分别用“完成”、“跳过”、Esc 结束引导，三种方式都应得到英文。
    - **引导的重复打开与即时生效**：从设置页重新打开规则介绍时，不出现语言页。选完语言后，大厅和对手页不用重启就是新语言。
-   - **语言写入守卫**：引导完成后调用 `settings.update({ locale })` 会被拒绝。
+   - **设置页切换语言**：
+     - 在设置页从中文切到 English：界面立即变成英文，大厅和对手页的对手名称、提示词保持引导时的语言，币种不变；
+     - 切换后的下一次模型调用，提示词是英文（mock 测试断言）；
+     - 老用户也能切换，切换后对手预设仍是中文；
+     - 从设置页打开规则介绍，不会出现语言页；
+     - 调用 `settings.update({ locale: 'fr' })` 会被拒绝。
    - **老数据库**：用 v0.2.1 的老数据库启动，不出现引导页，语言是中文，改过的对手保持原样。
    - **默认币种**：选英文的新用户币种为美元；选中文的是人民币。
    - **字典完整性**：`en: typeof zh` 能通过 typecheck。这只能发现字典缺词。
