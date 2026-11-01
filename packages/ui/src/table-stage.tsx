@@ -4,10 +4,10 @@ import { EmptyCard, PlayingCard } from './cards'
 import type { feltOf } from './felt'
 import { useTableFx } from './fx'
 import { BetChip, ChipStacks, Seat } from './seat'
-import type { Back, Fx, SeatView } from './types'
+import type { Back, DealCard, Fx, SeatView } from './types'
 
 // 桌面椭圆、底池、公共牌、下注筹码、座位与特效层。要缩放请包一层外部元素：全下震屏会改写本组件根节点的 transform
-export function TableStage({ seats, board, pot, done, handNo, heroSeat, heroTurn, felt: F, back, fx, labels, children }: {
+export function TableStage({ seats, board, pot, done, handNo, heroSeat, heroTurn, felt: F, back, fx, labels, dealId, dealOrder, onDealStart, children }: {
   seats: SeatView[]
   board: Card[]
   pot: number
@@ -19,11 +19,17 @@ export function TableStage({ seats, board, pot, done, handNo, heroSeat, heroTurn
   back: Back
   fx: Fx
   labels: { pot: string; sb: string; bb: string }
+  // undefined：按换手自动发牌；null：恢复/已消费状态；字符串：实时发牌一次。
+  dealId?: string | null
+  // 引擎给的逐张发牌顺序；缺省时按 DOM 圈次推断
+  dealOrder?: DealCard[]
+  // 参数为实际飞出的牌数，供声音逐张对齐
+  onDealStart?: (count: number) => void
   children?: ReactNode
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const fxRef = useRef<HTMLDivElement>(null)
-  useTableFx(rootRef, fxRef, { handNo, board, seats, done }, fx, back)
+  useTableFx(rootRef, fxRef, { handNo, board, seats, done }, fx, back, dealId, dealOrder, onDealStart)
   const n = seats.length
   const potInk = F.dark ? '#fff' : '#1d1d1f'
   return (

@@ -15,7 +15,7 @@ export interface ProviderRow {
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}, locale: 'zh'
+  speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', soundEnabled: true, soundVolume: 50, notificationsEnabled: true, currency: 'cny', fxRate: null, models: {}, locale: 'zh'
 }
 const DEFAULT_LOBBY: Lobby = { size: 6, blinds: 1, picks: ['li', 'prof', 'bai', 'k', 'rock'], mode: 'coach' }
 const MEMORY_KEEP = 10
@@ -151,6 +151,11 @@ async function loadCaches() {
   // getKv 会合并默认值，要看库里有没有存过 locale 只能读原始值
   const saved = await getKv<Partial<Settings>>('settings', {})
   settingsCache = pick(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, ...saved })
+  if (typeof settingsCache.soundEnabled !== 'boolean') settingsCache.soundEnabled = DEFAULT_SETTINGS.soundEnabled
+  if (typeof settingsCache.soundVolume !== 'number' || !Number.isFinite(settingsCache.soundVolume) || settingsCache.soundVolume < 0 || settingsCache.soundVolume > 100) {
+    settingsCache.soundVolume = DEFAULT_SETTINGS.soundVolume
+  }
+  if (typeof settingsCache.notificationsEnabled !== 'boolean') settingsCache.notificationsEnabled = DEFAULT_SETTINGS.notificationsEnabled
   const onboarded = await getOnboarded()
   // 预选值只放内存：老用户（已完成引导）为中文，新用户按系统语言
   if (!saved.locale) settingsCache.locale = onboarded ? 'zh' : resolveLocale(systemLocale)
@@ -209,6 +214,11 @@ export function getSettings(): Settings {
 }
 
 export async function updateSettings(patch: Partial<Settings>): Promise<Settings> {
+  if ('soundEnabled' in patch && typeof patch.soundEnabled !== 'boolean') throw new Error('soundEnabled must be boolean')
+  if ('soundVolume' in patch && (typeof patch.soundVolume !== 'number' || !Number.isFinite(patch.soundVolume) || patch.soundVolume < 0 || patch.soundVolume > 100)) {
+    throw new Error('soundVolume must be between 0 and 100')
+  }
+  if ('notificationsEnabled' in patch && typeof patch.notificationsEnabled !== 'boolean') throw new Error('notificationsEnabled must be boolean')
   const next = { ...settingsCache, ...patch, models: { ...settingsCache.models, ...patch.models } }
   settingsCache = next
   await setKv('settings', next)

@@ -5,7 +5,8 @@
 // 3. 无人跟注的下注在本轮结束时退回，不计入赢得
 
 import type { Card, HandCat, Street } from './types'
-import { best, FULL, handCat, shuffle, type Rng } from './eval'
+import { best, handCat, type Rng } from './eval'
+import { Deck, type DealEvent } from './deck'
 
 export type ActionType = 'fold' | 'check' | 'call' | 'bet' | 'raise'
 
@@ -53,7 +54,8 @@ export class Table {
   private btn: number
   private sbSeat = -1
   private bbSeat = -1
-  private deck: Card[] = []
+  private deck!: Deck
+  private deals: DealEvent[] = []
   private board: Card[] = []
   private street: Street = 'preflop'
   private phase: Phase = 'idle'
@@ -94,7 +96,8 @@ export class Table {
     const live = this.seatsArr.filter((s) => s && s.stack > 0).length
     if (live < 2) throw new Error('need at least 2 players with chips')
     this.hand++
-    this.deck = shuffle(FULL.slice(), this.rng)
+    this.deck = new Deck(this.rng)
+    this.deals = []
     this.board = []
     this.log = []
     this.wins = []
@@ -115,7 +118,14 @@ export class Table {
     }
     this.post(this.sbSeat, this.blinds.smallBlind)
     this.post(this.bbSeat, this.blinds.bigBlind)
-    for (let r = 0; r < 2; r++) for (const s of this.seatsArr) if (s && !s.out) s.hole.push(this.deck.pop()!)
+    for (let r = 0; r < 2; r++) {
+      for (let i = 0; i < this.seatsArr.length; i++) {
+        const s = this.seatsArr[i]
+        if (!s || s.out) continue
+        s.hole.push(this.deck.draw())
+        this.recordDeal('preflop', r, i, null)
+      }
+    }
     this.curBet = this.blinds.bigBlind
     this.minRaise = this.blinds.bigBlind
     this.phase = 'betting'
@@ -198,13 +208,19 @@ export class Table {
       this.toAct = -1
       return
     }
-    this.deck.pop()
+    this.deck.draw()
+    this.recordDeal(this.street, 0, null, null, true)
     if (this.street === 'preflop') {
-      this.board.push(this.deck.pop()!, this.deck.pop()!, this.deck.pop()!)
+      for (let i = 0; i < 3; i++) {
+        this.board.push(this.deck.draw())
+        this.recordDeal('flop', 0, null, i)
+      }
       this.street = 'flop'
     } else {
-      this.board.push(this.deck.pop()!)
-      this.street = this.street === 'flop' ? 'turn' : 'river'
+      const street: Street = this.street === 'flop' ? 'turn' : 'river'
+      this.board.push(this.deck.draw())
+      this.recordDeal(street, 0, null, this.board.length - 1)
+      this.street = street
     }
     this.log.push({ street: this.street, board: this.board.slice() })
     this.toAct = this.firstNeeding(this.btn)
@@ -273,6 +289,15 @@ export class Table {
   // 全部底牌；按视角裁剪由调用方负责
   holeCards(): (Card[] | null)[] {
     return this.seatsArr.map((s) => (s && s.hole.length ? s.hole.slice() : null))
+  }
+
+  // 本手的取牌事件（含烧牌与公共牌），按实际发生顺序；不带牌面
+  dealEvents(): DealEvent[] {
+    return this.deals.map((e) => ({ ...e }))
+  }
+
+  private recordDeal(street: Street, round: number, seat: number | null, board: number | null, burn = false) {
+    this.deals.push({ seq: this.deals.length, street, round, seat, board, burn })
   }
 
   communityCards() {

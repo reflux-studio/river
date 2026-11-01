@@ -54,7 +54,7 @@ export function ActionBar({ view: v }: { view: TableView }) {
     setDraft(fmt(to))
   }
 
-  const canAct = isTurn && !coach?.locked
+  const canAct = v.hero.canAct
   const canRaise = canAct && L.canRaise
   const act = (type: 'fold' | 'call' | 'raise') => cmd(invoke('table.heroAct', type === 'raise' ? { type, to: clamp(raiseTo) } : { type }))
   const canNext = v.done && (coach ? coach.canNext : true)
@@ -71,7 +71,7 @@ export function ActionBar({ view: v }: { view: TableView }) {
   const status = v.stalled
     ? a.stopped
     : coach?.busy === 'ask' ? a.coachAnswering
-      : isTurn ? (coach?.locked ? t.desktop.coachPanel.looking : a.yourTurn(fmt(toCall)))
+      : isTurn ? (coach?.locked ? t.desktop.coachPanel.looking : !canAct ? a.dealing : a.yourTurn(fmt(toCall)))
         : hero.folded ? a.youFolded + (thinking ? a.thinking(thinking.name) : '')
           : thinking ? a.waiting(thinking.name) : v.runout ? a.dealing : ''
   const isAllIn = canRaise && raiseTo >= L.maxTo

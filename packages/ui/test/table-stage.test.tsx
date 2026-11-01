@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
-import { act } from 'react'
+import { act, StrictMode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { feltOf, TableStage, type SeatView } from '../src'
+import { feltOf, TableStage, type DealCard, type Fx, type SeatView } from '../src'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -15,23 +15,147 @@ let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
   // happy-dom 没有 Web Animations；特效节点在 onfinish 前留在特效层里，便于断言
-  Element.prototype.animate = vi.fn(() => ({}) as Animation)
+  Element.prototype.animate = vi.fn(() => ({ cancel: vi.fn() }) as unknown as Animation)
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
 })
-afterEach(() => (act(() => root.unmount()), host.remove()))
+afterEach(async () => {
+  await act(async () => root.unmount())
+  host.remove()
+})
 
-const render = (seats: SeatView[], o: { heroSeat?: number | null; handNo?: number } = {}) =>
+const render = (seats: SeatView[], o: { heroSeat?: number | null; handNo?: number; dealId?: string | null; dealOrder?: DealCard[]; onDealStart?: (count: number) => void; fx?: Fx } = {}) =>
   act(() =>
     root.render(
       <TableStage seats={seats} board={[]} pot={30} done={false} handNo={o.handNo ?? 1} heroSeat={o.heroSeat === undefined ? 0 : o.heroSeat} heroTurn={false}
-        felt={feltOf({ felt: 'green', feltCustom: '#000000' })} back="red" fx="full" labels={{ pot: 'Pot', sb: 'SB', bb: 'BB' }} />
+        felt={feltOf({ felt: 'green', feltCustom: '#000000' })} back="red" fx={o.fx ?? 'full'} dealId={o.dealId} dealOrder={o.dealOrder} onDealStart={o.onDealStart} labels={{ pot: 'Pot', sb: 'SB', bb: 'BB' }} />
     )
   )
 const layerText = () => host.querySelector('.z-\\[8\\]')!.textContent
 
 describe('TableStage', () => {
+  it('StrictMode模拟清理不取消首手发牌或重复启动声音，真实卸载仍清理', async () => {
+    const start = vi.fn()
+    await act(async () => root.render(
+      <StrictMode>
+        <TableStage seats={[seat(), seat()]} board={[]} pot={30} done={false} handNo={1} heroSeat={0} heroTurn={false}
+          felt={feltOf({ felt: 'green', feltCustom: '#000000' })} back="red" fx="full" dealId="strict-deal" onDealStart={start} labels={{ pot: 'Pot', sb: 'SB', bb: 'BB' }} />
+      </StrictMode>
+    ))
+    const animations = vi.mocked(Element.prototype.animate).mock.results.map((r) => r.value as Animation)
+    expect(animations).toHaveLength(4)
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(start).toHaveBeenCalledWith(4)
+    expect(animations.every((a) => vi.mocked(a.cancel).mock.calls.length === 0)).toBe(true)
+    await act(async () => root.unmount())
+    expect(animations.every((a) => vi.mocked(a.cancel).mock.calls.length === 1)).toBe(true)
+    root = createRoot(host)
+  })
+
+  it('首挂载收到显式发牌事件时按170ms逐圈发牌，500ms飞行，并在DOM就绪后通知一次', () => {
+    const start = vi.fn(() => expect(host.querySelectorAll('[data-seat-cards]')).toHaveLength(2))
+    render([seat(), seat()], { dealId: 'table-1:hand-1', onDealStart: start })
+    const calls = vi.mocked(Element.prototype.animate).mock.calls
+    expect(calls).toHaveLength(4)
+    expect(calls.map((c) => (c[1] as KeyframeAnimationOptions).delay)).toEqual([0, 170, 340, 510])
+    expect(calls.every((c) => (c[1] as KeyframeAnimationOptions).duration === 500)).toBe(true)
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(start).toHaveBeenCalledWith(4)
+  })
+
+  it('按引擎给的逐张顺序发牌，不看 DOM 座位顺序', () => {
+    const start = vi.fn()
+    const animate = vi.mocked(Element.prototype.animate)
+    const seen: Element[] = []
+    animate.mockImplementation(function (this: Element) {
+      seen.push(this)
+      return { cancel: vi.fn() } as unknown as Animation
+    })
+    const card = (s: number, r: number) => host.querySelector(`[data-seat-cards="${s}"]`)!.children[r]
+    render([seat(), seat()], {
+      dealId: 'deal-order',
+      dealOrder: [{ seat: 1, round: 0 }, { seat: 0, round: 1 }, { seat: 0, round: 0 }],
+      onDealStart: start
+    })
+    expect(seen).toEqual([card(1, 0), card(0, 1), card(0, 0)])
+    expect(start).toHaveBeenCalledWith(3)
+  })
+
+  it('显式null恢复快照不自动发牌，随后换手仍不播', () => {
+    const start = vi.fn()
+    render([seat(), seat()], { dealId: null, handNo: 1, onDealStart: start })
+    render([seat(), seat()], { dealId: null, handNo: 2, onDealStart: start })
+    expect(Element.prototype.animate).not.toHaveBeenCalled()
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('同一deal重渲染、替换回调和消费为null均不重播或取消在途动画', () => {
+    const start = vi.fn()
+    render([seat(), seat()], { dealId: 'deal-a', onDealStart: start })
+    const animations = vi.mocked(Element.prototype.animate).mock.results.map((r) => r.value as Animation)
+    const replacement = vi.fn()
+    render([seat(), seat()], { dealId: 'deal-a', onDealStart: replacement })
+    render([seat(), seat()], { dealId: null, onDealStart: replacement })
+    expect(Element.prototype.animate).toHaveBeenCalledTimes(4)
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(replacement).not.toHaveBeenCalled()
+    expect(animations.every((a) => vi.mocked(a.cancel).mock.calls.length === 0)).toBe(true)
+  })
+
+  it('关闭视觉效果仍消费显式deal并通知声音启动，不创建动画', () => {
+    const start = vi.fn()
+    render([seat(), seat()], { dealId: 'deal-a', fx: 'off', onDealStart: start })
+    expect(Element.prototype.animate).not.toHaveBeenCalled()
+    // 关闭特效时也从 DOM 数出实际牌数，声音仍有正确张数
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(start).toHaveBeenCalledWith(4)
+    render([seat(), seat()], { dealId: 'deal-a', fx: 'full', onDealStart: start })
+    expect(Element.prototype.animate).not.toHaveBeenCalled()
+    expect(start).toHaveBeenCalledTimes(1)
+  })
+
+  it('换手或新deal到来时取消旧发牌序列，卸载也清理动画', async () => {
+    render([seat(), seat()], { dealId: 'deal-a' })
+    const first = vi.mocked(Element.prototype.animate).mock.results.map((r) => r.value as Animation)
+    expect(first).toHaveLength(4)
+    render([seat(), seat()], { handNo: 2, dealId: 'deal-b' })
+    expect(first.every((a) => vi.mocked(a.cancel).mock.calls.length === 1)).toBe(true)
+    const second = vi.mocked(Element.prototype.animate).mock.results.slice(4).map((r) => r.value as Animation)
+    expect(second).toHaveLength(4)
+    await act(async () => root.unmount())
+    expect(second.every((a) => vi.mocked(a.cancel).mock.calls.length === 1)).toBe(true)
+    root = createRoot(host)
+  })
+
+  it('同手号换桌以新deal身份重新发牌，并取消旧桌序列', () => {
+    render([seat(), seat()], { handNo: 1, dealId: 'table-a:1' })
+    const first = vi.mocked(Element.prototype.animate).mock.results.map((r) => r.value as Animation)
+    const start = vi.fn()
+    render([seat(), seat()], { handNo: 1, dealId: 'table-b:1', onDealStart: start })
+    expect(first).toHaveLength(4)
+    expect(first.every((a) => vi.mocked(a.cancel).mock.calls.length === 1)).toBe(true)
+    expect(Element.prototype.animate).toHaveBeenCalledTimes(8)
+    expect(start).toHaveBeenCalledTimes(1)
+  })
+
+  it('已消费id再次出现不重播；关闭视觉效果会取消当前序列', () => {
+    render([seat(), seat()], { dealId: 'deal-a' })
+    const first = vi.mocked(Element.prototype.animate).mock.results.map((r) => r.value as Animation)
+    render([seat(), seat()], { dealId: null, fx: 'off' })
+    expect(first).toHaveLength(4)
+    expect(first.every((a) => vi.mocked(a.cancel).mock.calls.length === 1)).toBe(true)
+    render([seat(), seat()], { dealId: 'deal-a', fx: 'full' })
+    expect(Element.prototype.animate).toHaveBeenCalledTimes(4)
+  })
+
+  it('未提供dealId时保留官网按hand变化的自动发牌', () => {
+    render([seat(), seat()], { handNo: 1 })
+    expect(Element.prototype.animate).not.toHaveBeenCalled()
+    render([seat(), seat()], { handNo: 2 })
+    expect(Element.prototype.animate).toHaveBeenCalledTimes(4)
+  })
+
   it('文字全部来自 labels；heroSeat 为 null 时没有座位按玩家本人显示', () => {
     render([seat({ isSB: true, cards: ['As', 'Kd'] }), seat({ isBB: true, cards: ['2c', '3c'] })], { heroSeat: null })
     expect(host.textContent).toContain('Pot')

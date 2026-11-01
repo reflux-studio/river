@@ -1,0 +1,86 @@
+[
+  {
+    "file": "kenney-casino/Audio/card-place-1.ogg",
+    "bytes": 9624,
+    "duration": 0.6891156462585034,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-casino/Audio/card-place-2.ogg",
+    "bytes": 8046,
+    "duration": 0.45648526077097507,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-casino/Audio/card-slide-1.ogg",
+    "bytes": 8833,
+    "duration": 0.6007709750566893,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-casino/Audio/card-shove-1.ogg",
+    "bytes": 10690,
+    "duration": 0.7658730158730159,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-casino/Audio/chip-lay-1.ogg",
+    "bytes": 5720,
+    "duration": 0.16959183673469388,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-casino/Audio/chip-lay-2.ogg",
+    "bytes": 6123,
+    "duration": 0.22707482993197278,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-casino/Audio/chips-handle-1.ogg",
+    "bytes": 9374,
+    "duration": 0.6162585034013606,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-casino/Audio/chips-handle-5.ogg",
+    "bytes": 11273,
+    "duration": 0.833718820861678,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-casino/Audio/chips-collide-1.ogg",
+    "bytes": 6356,
+    "duration": 0.2558503401360544,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-casino/Audio/chips-stack-1.ogg",
+    "bytes": 6469,
+    "duration": 0.28458049886621317,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-impact/Audio/impactWood_light_000.ogg",
+    "bytes": 6343,
+    "duration": 0.2626984126984127,
+    "channels": 2,
+    "sampleRate": 44100
+  },
+  {
+    "file": "kenney-impact/Audio/impactWood_light_002.ogg",
+    "bytes": 6366,
+    "duration": 0.2626984126984127,
+    "channels": 2,
+    "sampleRate": 44100
+  }
+]

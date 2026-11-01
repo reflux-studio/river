@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { fmt } from '../../shared/format'
 import { dict } from '@river/i18n'
+import { DEAL_CARD_DURATION_MS, DEAL_CARD_INTERVAL_MS } from '@river/ui/deal-timing'
 import { BLINDS } from '../../shared/personas'
-import type { ChatMessage, CoachEntry, CoachState, Events, HandRecord, HeroAction, Mode, Persona, Recap, TableStart, TableView } from '../../shared/types'
+import type { ChatMessage, CoachEntry, CoachState, Events, FeedbackKind, HandRecord, HeroAction, Mode, Persona, ReadyDecision, Recap, TableFeedback, TableStart, TableView } from '../../shared/types'
 import { coachAsk, coachRecap, coachSpeak } from '../agents/coach'
 import { setUsageListener, type Msg, type Usage, type UsageTag } from '../agents/llm'
 import { opponentAct, opponentTalk, type RawAct } from '../agents/opponent'
@@ -55,6 +56,13 @@ export class TableRunner {
   bankroll = 0
 
   readonly emit: Emit
+  private readonly onDecision?: (decision: ReadyDecision | null) => void
+  private viewRevision = 0
+  private feedbackSeq = 0
+  private feedbackLogCursor = 0
+  private feedbackBoardCount = 0
+  private pendingFeedback: TableFeedback[] = []
+  private turnFeedbackKey: string | null = null
   private agents: AgentDeps
   private rng: Rng
   private started = false
@@ -80,12 +88,14 @@ export class TableRunner {
   private talkCtrl = new Map<string, AbortController>()
   private endKey: number | null = null
   private stepTimer?: ReturnType<typeof setTimeout>
+  private dealUntil = 0
   private usage: UsageRow[] = []
   // 入座时的角色快照：牌局中途删除自建角色也能继续
   private snapshots = new Map<string, Persona>()
 
-  constructor(o: { emit: Emit; agents?: Partial<AgentDeps>; rng?: Rng }) {
+  constructor(o: { emit: Emit; agents?: Partial<AgentDeps>; rng?: Rng; onDecision?: (decision: ReadyDecision | null) => void }) {
     this.emit = o.emit
+    this.onDecision = o.onDecision
     this.agents = { ...realAgents, ...o.agents }
     this.rng = o.rng ?? Math.random
     setUsageListener((u) => this.recordUsage(u))
@@ -145,12 +155,13 @@ export class TableRunner {
     this.resetTable()
     this.bankroll += back
     this.emit('bankroll', this.bankroll)
-    this.emit('table:view', null)
+    this.broadcast()
     await setBankroll(this.bankroll)
   }
 
   private resetHand() {
     clearTimeout(this.stepTimer)
+    this.dealUntil = 0
     this.thinking = null
     this.deciding = null
     this.stalled = null
@@ -162,10 +173,15 @@ export class TableRunner {
     this.recapEntry = null
     this.endKey = null
     this.notes.clear()
+    this.feedbackLogCursor = 0
+    this.feedbackBoardCount = 0
+    this.pendingFeedback = []
+    this.turnFeedbackKey = null
   }
 
   private resetTable() {
     this.resetHand()
+    this.feedbackSeq = 0
     this.started = false
     this.chat = []
     this.coachThread = []
@@ -203,6 +219,12 @@ export class TableRunner {
     this.resetHand()
     t.startHand()
     this.started = true
+    // 底牌顺序来自引擎的逐张发牌事件；公共牌与烧牌不进这个事件
+    const cards = t.dealEvents().flatMap((e) => (e.seat === null ? [] : [{ seat: e.seat, round: e.round }]))
+    const count = cards.length
+    this.dealUntil = Date.now() + Math.max(0, count - 1) * DEAL_CARD_INTERVAL_MS + DEAL_CARD_DURATION_MS
+    this.queueFeedback('deal', { count, cards })
+    this.queueLogFeedback()
     this.sys('hand', tr().desktop.table.hand(t.handNumber(), tr().poker.street.preflop))
     void this.loop()
   }
@@ -223,6 +245,15 @@ export class TableRunner {
     if (!t) return
     const rid = this.runId
     this.broadcast()
+    const dealing = this.dealUntil - Date.now()
+    if (dealing > 0) {
+      const hand = t.handNumber()
+      clearTimeout(this.stepTimer)
+      this.stepTimer = setTimeout(() => {
+        if (rid === this.runId && this.table === t && t.handNumber() === hand) this.loop()
+      }, dealing)
+      return
+    }
     // 提问期间牌局暂停：在途的对手调用落子后不再推进（discussion §14 F2）
     if (this.stalled || this.coachBusy === 'ask') return
     if (!t.isHandInProgress()) return void this.onHandEnd()
@@ -242,7 +273,12 @@ export class TableRunner {
   private endRound(t: Table) {
     if (!t.isHandInProgress() || t.isBettingRoundInProgress()) return
     const before = t.communityCards().length
+    const bets = t.seats().reduce((sum, seat) => sum + (seat?.bet ?? 0), 0)
+    const logStart = t.handLog().length
     t.endBettingRound()
+    const returned = t.handLog().slice(logStart).reduce((sum, entry) => sum + ('type' in entry && entry.type === 'return' ? entry.amount : 0), 0)
+    if (bets > returned) this.queueFeedback('collect')
+    this.queueLogFeedback()
     const board = t.communityCards()
     if (board.length > before) this.sys('street', tr().poker.street[t.roundOfBetting()], board)
     if (t.areBettingRoundsCompleted()) t.showdown()
@@ -287,6 +323,7 @@ export class TableRunner {
     if (rid !== this.runId || this.table !== t || t.handLog().length !== at) return
     const [type, to] = normalize(t, r.args)
     t.actionTaken(type, to)
+    this.queueLogFeedback()
     const e = t.handLog().at(-1)!
     const act = 'seat' in e ? label(e, t.blindSeats()) : ''
     const d = tr()
@@ -322,6 +359,7 @@ export class TableRunner {
       to = Math.max(L.chipRange.min, Math.min(L.chipRange.max, Math.round(a.to)))
     } else type = L.toCall === 0 ? 'check' : a.type
     t.actionTaken(type, to)
+    this.queueLogFeedback()
     const e = t.handLog().at(-1)!
     if ('seat' in e) this.push({ kind: 'act', from: 'hero', act: label(e, t.blindSeats()) })
     this.loop()
@@ -329,7 +367,19 @@ export class TableRunner {
 
   private heroCanAct() {
     const t = this.table
-    return !!t && !this.stalled && t.isHandInProgress() && t.isBettingRoundInProgress() && t.playerToAct() === 0 && !this.locked()
+    if (!t || Date.now() < this.dealUntil || this.stalled || !this.isHeroPoint()) return false
+    return this.mode !== 'coach' || (this.spokenKey === this.heroKey && this.coachBusy === null)
+  }
+
+  readyDecision(): ReadyDecision | null {
+    const t = this.table
+    if (!t || !t.isHandInProgress() || !t.isBettingRoundInProgress() || t.playerToAct() !== 0) return null
+    return {
+      tableId: this.tableId,
+      handNo: t.handNumber(),
+      decisionId: `${this.tableId}:${t.handNumber()}-${t.handLog().length}`,
+      canAct: this.heroCanAct()
+    }
   }
 
   // 教练局：教练对当前决策点说完之前、以及提问回答期间，操作锁定
@@ -552,6 +602,9 @@ export class TableRunner {
     if (this.endKey === t.handNumber()) return
     this.endKey = t.handNumber()
     this.thinking = null
+    if (t.roundOfBetting() === 'showdown') this.queueFeedback('showdown')
+    const hero = t.seats()[0]!
+    this.queueFeedback('payout', { heroNet: hero.stack - hero.startStack })
     const d = tr()
     const won = new Map<number, { amount: number; cat: string }>()
     for (const w of t.winners()) {
@@ -692,7 +745,50 @@ export class TableRunner {
 
   broadcast() {
     const v = this.view()
-    if (v) this.emit('table:view', v)
+    const decision = this.readyDecision()
+    if (decision?.canAct && decision.decisionId !== this.turnFeedbackKey) {
+      this.turnFeedbackKey = decision.decisionId
+      this.queueFeedback('turn', { decisionId: decision.decisionId })
+    }
+    this.emit('table:view', { revision: ++this.viewRevision, view: v })
+    const pending = this.pendingFeedback
+    this.pendingFeedback = []
+    for (const feedback of pending) this.emit('table:feedback', feedback)
+    try {
+      this.onDecision?.(decision)
+    } catch (error) {
+      // 系统通知不可用不能阻塞牌局推进。
+      console.error('decision observer failed', error)
+    }
+  }
+
+  snapshot() {
+    return {
+      view: this.view(),
+      viewRevision: this.viewRevision,
+      feedback: { tableId: this.table ? this.tableId : null, seq: this.feedbackSeq }
+    }
+  }
+
+  private queueFeedback(kind: FeedbackKind, fields: Pick<TableFeedback, 'seat' | 'count' | 'cards' | 'heroNet' | 'decisionId'> = {}) {
+    if (!this.table) return
+    this.pendingFeedback.push({
+      tableId: this.tableId, handNo: this.table.handNumber(), seq: ++this.feedbackSeq,
+      at: Date.now(), kind, ...fields
+    })
+  }
+
+  private queueLogFeedback() {
+    const log = this.table!.handLog()
+    for (const entry of log.slice(this.feedbackLogCursor)) {
+      if ('board' in entry) {
+        this.queueFeedback('board', { count: entry.board.length - this.feedbackBoardCount })
+        this.feedbackBoardCount = entry.board.length
+      } else if (entry.type !== 'return') {
+        this.queueFeedback(entry.allIn ? 'allin' : entry.type, { seat: entry.seat })
+      }
+    }
+    this.feedbackLogCursor = log.length
   }
 
   view(): TableView | null {
@@ -701,6 +797,8 @@ export class TableRunner {
     const coach: CoachState | null =
       this.mode === 'coach' ? { busy: this.coachBusy, locked: this.locked(), canNext: this.canNext(), retry: this.retryId() } : null
     return buildTableView({
+      tableId: this.tableId,
+      canAct: this.heroCanAct(),
       table: t,
       seats: this.seats,
       mode: this.mode,

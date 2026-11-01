@@ -1,0 +1,78 @@
+{
+  "platform": "darwin",
+  "electron": "44.4.5",
+  "testBridge": true,
+  "realNotificationsShown": false,
+  "errors": [],
+  "fileRequests": [
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/card-slide-1-hB7Ao2KH.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/card-place-1-xxd3dFBv.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chip-lay-1-BI5HtEmY.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chips-handle-5-C3RHD1A6.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/card-place-2-QpWpiY94.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chip-lay-2-DPVJE_7X.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/card-shove-1-CYQdjDQ-.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/impactWood_light_000-CbUoxcPY.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chips-collide-1-CaC-6XMQ.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/impactWood_light_002-DgaIJ__L.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chips-stack-1-CFxBKJfX.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chips-handle-1-DmTNegdL.ogg",
+      "status": 200
+    }
+  ],
+  "preview": {
+    "starts": 1,
+    "states": [
+      "running"
+    ],
+    "ogg": []
+  },
+  "tableVisible": true,
+  "background": {
+    "minimized": true,
+    "before": 1,
+    "after": 3
+  },
+  "mute": {
+    "enabled": false,
+    "before": 5,
+    "after": 5,
+    "stops": 1
+  },
+  "notificationSupported": true,
+  "pass": true
+}

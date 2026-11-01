@@ -162,6 +162,19 @@ export const zh = {
       perHand: (priced: boolean) => `每手${priced ? '花费' : ' token'} · 最近 40 手`,
       note: 'Token 来自提供方返回的用量；价格来自 models.dev，仅供参考，实际以账单为准。没有公开价格的模型（例如 OpenAI 兼容接口）只统计 token。'
     },
+    audio: {
+      title: '声音', enabled: '牌局音效', description: '筹码、牌张与操作提示，后台继续播放。',
+      volume: '音量', preview: '试听', mute: '静音', unmute: '恢复音效',
+      silent: '音效已关闭或音量为 0', yourTurn: '轮到你了',
+      notifications: '窗口不在前台时，轮到你会上系统通知。',
+      notificationTitle: '后台提醒', notificationTest: '发送测试', notificationTesting: '发送中…',
+      notificationSettings: '打开系统设置', notificationTestBody: '这是 River 后台提醒测试。',
+      notificationUnknown: '尚未请求系统通知权限。',
+      notificationPrepared: '已请求系统权限，若出现提示请点“允许”。',
+      notificationScheduled: '已开启。',
+      notificationFailed: '系统未允许通知。',
+      notificationUnsupported: '当前环境不支持系统通知。'
+    },
     settings: {
       roles: { opponent: '对手', coach: '教练' },
       roleSep: '和',
@@ -588,6 +601,19 @@ export const en: typeof zh = {
       purposes: { decide: 'AI decisions', talk: 'After-hand talk', speak: 'Coach advice', ask: 'Coach Q&A', recap: 'Hand recaps' },
       perHand: (priced) => `${priced ? 'Cost' : 'Tokens'} per hand · Last 40 hands`,
       note: 'Tokens are as reported by providers; prices come from models.dev and are for reference only. Your bill is what counts. Models without public prices (such as OpenAI-compatible APIs) are counted in tokens only.'
+    },
+    audio: {
+      title: 'Sound', enabled: 'Table sounds', description: 'Chips, cards and turn cues keep playing in the background.',
+      volume: 'Volume', preview: 'Preview', mute: 'Mute sounds', unmute: 'Unmute sounds',
+      silent: 'Sounds are off or volume is zero', yourTurn: 'Your turn',
+      notifications: 'Get a system notification when it is your turn and the window is in the background.',
+      notificationTitle: 'Background alerts', notificationTest: 'Send test', notificationTesting: 'Sending…',
+      notificationSettings: 'Open system settings', notificationTestBody: 'This is a River background alert test.',
+      notificationUnknown: 'Notification permission has not been requested yet.',
+      notificationPrepared: 'Permission requested. Allow River if the system asks.',
+      notificationScheduled: 'On.',
+      notificationFailed: 'The system is not allowing notifications.',
+      notificationUnsupported: 'System notifications are unavailable in this environment.'
     },
     settings: {
       roles: { opponent: 'opponent', coach: 'coach' },

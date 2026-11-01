@@ -1,7 +1,7 @@
 import type { App, IpcMain } from 'electron'
 import { PROVIDER_REGISTRY } from '@mastra/core/llm'
 import { dict, presets } from '@river/i18n'
-import type { Commands, FxRates, Recap, UpdateCheck } from '../shared/types'
+import type { Commands, FxRates, NotificationStatus, Recap, UpdateCheck } from '../shared/types'
 import {
   clearHistory, clearMemory, completeOnboarding, deletePersona, deleteProvider, getBankroll, getHand, getLobby, handKeyOf, listUsage, getOnboarded, getReview, getSettings, listHands,
   listProviders, personasCache, resetPersona, resetUsage, restorePersona, saveProvider, savePersona, settingsCache, updateLobby, updateSettings
@@ -19,6 +19,12 @@ export interface AppInfo {
   check: () => Promise<UpdateCheck>
   fx: () => FxRates | null
   packaged: boolean
+  setTableVisible?: (visible: boolean) => void
+  notificationStatus?: () => NotificationStatus
+  prepareNotifications?: () => NotificationStatus
+  testNotifications?: () => Promise<NotificationStatus>
+  openNotificationSettings?: () => Promise<void>
+  notificationsChanged?: () => void
 }
 
 // 旧版本存的是纯文本复盘，新版本存 JSON
@@ -35,26 +41,41 @@ function parseReview(text: string): Recap | string {
 export function commandHandlers(runner: TableRunner, app: AppInfo = { version: () => '0.0.0', update: () => null, install: () => {}, check: async () => ({ state: 'latest' }), fx: () => null, packaged: false }): Handlers {
   const personasChanged = () => runner.emit('personas', personasCache)
   const err = () => dict(settingsCache.locale).desktop.error
+  const notificationFallback = (): NotificationStatus => ({ revision: 0, state: 'unsupported', supported: false, permission: 'unknown', platform: process.platform })
   return {
-    'app.bootstrap': async () => ({
-      settings: getSettings(),
-      lobby: getLobby(),
-      bankroll: runner.bankroll,
-      onboarded: await getOnboarded(),
-      personas: personasCache,
-      providers: listProviders(needsKey),
-      view: runner.view(),
-      coachThread: runner.coachThread,
-      chat: runner.chat,
-      version: app.version(),
-      update: app.update(),
-      fx: app.fx(),
-      packaged: app.packaged
-    }),
+    'app.bootstrap': async () => {
+      // 异步读取完成后，同一同步区段捕获视图及两种水位。
+      const onboarded = await getOnboarded()
+      const snapshot = runner.snapshot()
+      return {
+        settings: getSettings(),
+        lobby: getLobby(),
+        bankroll: runner.bankroll,
+        onboarded,
+        personas: personasCache,
+        providers: listProviders(needsKey),
+        ...snapshot,
+        coachThread: runner.coachThread,
+        chat: runner.chat,
+        version: app.version(),
+        update: app.update(),
+        fx: app.fx(),
+        packaged: app.packaged
+      }
+    },
+    'app.setTableVisible': (visible) => {
+      if (typeof visible !== 'boolean') throw new Error('visible must be boolean')
+      app.setTableVisible?.(visible)
+    },
+    'notification.status': () => app.notificationStatus?.() ?? notificationFallback(),
+    'notification.prepare': () => app.prepareNotifications?.() ?? notificationFallback(),
+    'notification.test': () => app.testNotifications?.() ?? Promise.resolve(notificationFallback()),
+    'notification.openSettings': () => app.openNotificationSettings?.() ?? Promise.resolve(),
     'settings.update': async (patch) => {
       // 存进库的非法值会让之后每次加载都失败
       if ('locale' in patch && !Object.hasOwn(presets, patch.locale!)) throw new Error(`unknown locale: ${patch.locale}`)
       const s = await updateSettings(patch)
+      if ('notificationsEnabled' in patch) app.notificationsChanged?.()
       runner.broadcast()
       return s
     },

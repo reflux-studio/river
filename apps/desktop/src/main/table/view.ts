@@ -17,6 +17,8 @@ export interface Nums {
 export type SeatDisplay = SeatInfo & { ini: string; hue: number }
 
 export interface ViewState {
+  tableId: string
+  canAct: boolean
   table: Table
   seats: SeatDisplay[]
   mode: Mode
@@ -139,6 +141,7 @@ export function buildTableView(s: ViewState): TableView {
     }
   }
   return {
+    tableId: s.tableId,
     mode: s.mode,
     title: T.title(smallBlind, bb, s.seats.length),
     bb,
@@ -147,7 +150,7 @@ export function buildTableView(s: ViewState): TableView {
     board: t.communityCards(),
     pot: total - bets,
     seats,
-    hero: { legal: L, toCall: L.toCall, isTurn: heroTurn, defaultRaiseTo, presets },
+    hero: { legal: L, toCall: L.toCall, isTurn: heroTurn, canAct: s.canAct, defaultRaiseTo, presets },
     done,
     runout: inHand && !t.isBettingRoundInProgress() && !s.stalled,
     result,

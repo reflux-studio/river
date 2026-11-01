@@ -1,9 +1,11 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 import { dict, type Locale } from '@river/i18n'
+import { audio } from './audio'
+import { FeedbackSync } from './feedback-sync'
 import type {
   Bootstrap, ChatMessage, CoachEntry, Commands, Events, FxRates, Lobby, Persona, PersonaInput, ProviderInput,
-  ProviderPublic, RiverApi, Settings, TableStart, TableView
+  ProviderPublic, RiverApi, Settings, TableFeedback, TableStart, TableView
 } from '../../../shared/types'
 
 declare global {
@@ -26,6 +28,8 @@ export interface RiverState {
   personas: Persona[]
   providers: ProviderPublic[]
   view: TableView | null
+  openingTable: boolean
+  deal: TableFeedback | null
   chat: ChatMessage[]
   coach: CoachEntry[]
   rulesOpen: boolean
@@ -40,13 +44,15 @@ export interface RiverState {
 let state: RiverState = {
   ready: false,
   page: 'lobby',
-  settings: { speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', currency: 'cny', fxRate: null, models: {}, locale: 'zh' },
+  settings: { speed: 1, coachPersona: 0, level: 'novice', hard: false, felt: 'green', feltCustom: '#2f6b55', back: 'red', fx: 'full', soundEnabled: true, soundVolume: 50, notificationsEnabled: true, currency: 'cny', fxRate: null, models: {}, locale: 'zh' },
   lobby: { size: 6, blinds: 1, picks: [], mode: 'coach' },
   bankroll: 0,
   onboarded: true,
   personas: [],
   providers: [],
   view: null,
+  openingTable: false,
+  deal: null,
   chat: [],
   coach: [],
   rulesOpen: false,
@@ -58,8 +64,23 @@ let state: RiverState = {
 }
 
 const subs = new Set<() => void>()
+let tableVisible: boolean | undefined
 export function setState(patch: Partial<RiverState> | ((s: RiverState) => Partial<RiverState>)) {
   state = { ...state, ...(typeof patch === 'function' ? patch(state) : patch) }
+  audio.configure(state.settings)
+  // A page switch before React commits must not swallow a live background deal.
+  if (state.deal && state.page !== 'table') {
+    const deal = state.deal
+    state = { ...state, deal: null }
+    audio.play(deal)
+  }
+  if (state.ready) {
+    const visible = state.page === 'table' && (state.view !== null || state.openingTable)
+    if (visible !== tableVisible) {
+      tableVisible = visible
+      void river.invoke('app.setTableVisible', visible).catch(() => {})
+    }
+  }
   subs.forEach((f) => f())
 }
 
@@ -95,8 +116,45 @@ export const openRules = () => setState({ rulesOpen: true })
 // 与主进程公屏上限一致
 const MAX_CHAT = 300
 
+const feedback = new FeedbackSync({
+  view: (view) => {
+    audio.setTable(view?.tableId ?? null, view?.handNo ?? 0)
+    setState((s) => ({
+      view,
+      ...((!view || s.deal?.tableId !== view.tableId || s.deal?.handNo !== view.handNo) && { deal: null }),
+      ...(!view && s.page === 'table' && !s.openingTable && { page: 'lobby' as Page })
+    }))
+  },
+  feedback: (event) => {
+    if (event.kind === 'deal' && state.page === 'table') setState({ deal: event })
+    else audio.play(event)
+  }
+})
+
+/**
+ * TableStage calls this from its layout effect, at the visual deal's start.
+ * count 是实际飞出的牌数，声音只按它播放。
+ */
+export function startDealSound(id: string, count: number) {
+  const deal = state.deal
+  if (!deal || `${deal.tableId}:${deal.seq}` !== id) return
+  audio.playDeal(deal, count)
+  setState({ deal: null })
+}
+
 function listen() {
-  river.on('table:view', (v) => setState((s) => ({ view: v, ...(!v && s.page === 'table' && { page: 'lobby' as Page }) })))
+  let notificationFailed = false
+  river.on('notification:status', (status) => {
+    if (status.state === 'failed') {
+      if (!notificationFailed) toast.error(dict(state.settings.locale).desktop.audio.notificationFailed)
+      notificationFailed = true
+    } else if (status.state === 'scheduled') notificationFailed = false
+  })
+  river.on('table:view', (v) => feedback.view(v))
+  river.on('table:feedback', (event) => feedback.feedback(event))
+  river.on('app:showTable', ({ tableId }) => {
+    if (state.view?.tableId === tableId) go('table')
+  })
   river.on('chat:append', (m) => setState((s) => (s.chat.some((x) => x.id === m.id) ? {} : { chat: [...s.chat, m].slice(-MAX_CHAT) })))
   river.on('coach:upsert', (e) =>
     setState((s) => ({ coach: s.coach.some((x) => x.id === e.id) ? s.coach.map((x) => (x.id === e.id ? e : x)) : [...s.coach, e] }))
@@ -110,6 +168,8 @@ function listen() {
 
 export async function init() {
   listen()
+  window.addEventListener('pointerdown', () => { void audio.prepare() })
+  window.addEventListener('keydown', () => { void audio.prepare() })
   const b: Bootstrap = await invoke('app.bootstrap')
   setState({
     ready: true,
@@ -128,15 +188,21 @@ export async function init() {
     update: b.update,
     fx: b.fx
   })
+  feedback.seed(b)
+  void audio.preload()
 }
 
 const fail = (e: unknown) => toast.error(e instanceof Error ? e.message : String(e))
 
 // 主进程先改缓存后写库，写库失败时修改仍可能生效，所以乐观更新后不回滚
+let settingsRevision = 0
 export async function updateSettings(patch: Partial<Settings>) {
+  const revision = ++settingsRevision
   setState((s) => ({ settings: { ...s.settings, ...patch, models: { ...s.settings.models, ...patch.models } } }))
   try {
-    setState({ settings: await invoke('settings.update', patch) })
+    const settings = await invoke('settings.update', patch)
+    // A slow volume acknowledgement must not undo a later mute or slider move.
+    if (revision === settingsRevision) setState({ settings })
   } catch (e) {
     fail(e)
   }
@@ -162,15 +228,22 @@ export const configured = (s: RiverState, role: Role) => modelOf(s, role)?.provi
 
 // 所有入座入口都先检查模型：缺哪个就提示并引导去设置（discussion §9）
 export async function startTable(opts: TableStart) {
+  if (state.openingTable) return
   const coach = opts.guided || opts.mode === 'coach'
   if (!configured(state, 'opponent')) return setState({ needModel: 'opponent', rulesOpen: false })
   if (coach && !configured(state, 'coach')) return setState({ needModel: 'coach', rulesOpen: false })
   // table.start 之后事件只追加，旧桌的公屏与教练对话要在入座前清掉
-  setState({ chat: [], coach: [] })
+  const previousPage = state.page
+  // Initialize macOS native authorization while still in the foreground.
+  void river.invoke('notification.prepare').catch(() => {})
+  const prepared = audio.prepare()
+  setState({ chat: [], coach: [], openingTable: true, page: 'table', rulesOpen: false })
   try {
+    await prepared
     await invoke('table.start', opts)
-    setState({ page: 'table', rulesOpen: false })
+    setState({ page: 'table', openingTable: false })
   } catch (e) {
+    setState({ page: previousPage, openingTable: false })
     fail(e)
   }
 }

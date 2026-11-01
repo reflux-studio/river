@@ -1,0 +1,287 @@
+{
+  "platform": "darwin",
+  "electron": "44.4.5",
+  "testBridge": true,
+  "realNotificationsShown": false,
+  "realNotificationPermissionVerified": false,
+  "limitations": [
+    "Production renderer only; development StrictMode replay is covered separately by UI tests, not this runtime.",
+    "Test IPC bridge supplies views/events; no real runner/model/database.",
+    "Audio source scheduling is observed, not subjective listening or OS notification permission validation."
+  ],
+  "errors": [],
+  "fileRequests": [
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chip-lay-2-DPVJE_7X.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chip-lay-1-BI5HtEmY.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/card-place-1-xxd3dFBv.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/card-place-2-QpWpiY94.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chips-handle-5-C3RHD1A6.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chips-collide-1-CaC-6XMQ.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chips-handle-1-DmTNegdL.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/card-slide-1-hB7Ao2KH.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/impactWood_light_002-DgaIJ__L.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/card-shove-1-CYQdjDQ-.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/impactWood_light_000-CbUoxcPY.ogg",
+      "status": 200
+    },
+    {
+      "url": "file:///Users/suziming/Documents/personal/river/apps/desktop/out/renderer/assets/chips-stack-1-CFxBKJfX.ogg",
+      "status": 200
+    }
+  ],
+  "mockNotificationCalls": [
+    "status",
+    "prepare",
+    "status",
+    "openSettings"
+  ],
+  "preview": {
+    "sounds": [
+      {
+        "at": 635.6000000238419,
+        "state": "running",
+        "duration": 0.16959183673469388
+      }
+    ],
+    "animations": []
+  },
+  "firstDeal": {
+    "sounds": [
+      {
+        "at": 1267.6000000238419,
+        "state": "running",
+        "duration": 0.6007709750566893
+      },
+      {
+        "at": 1439.6000000238419,
+        "state": "running",
+        "duration": 0.6007709750566893
+      },
+      {
+        "at": 1608.8999999761581,
+        "state": "running",
+        "duration": 0.6007709750566893
+      },
+      {
+        "at": 1778.6000000238419,
+        "state": "running",
+        "duration": 0.6007709750566893
+      }
+    ],
+    "animations": [
+      {
+        "at": 1265.7999999523163,
+        "delay": 0,
+        "duration": 500
+      },
+      {
+        "at": 1267.1999999284744,
+        "delay": 170,
+        "duration": 500
+      },
+      {
+        "at": 1267.3999999761581,
+        "delay": 340,
+        "duration": 500
+      },
+      {
+        "at": 1267.5,
+        "delay": 510,
+        "duration": 500
+      }
+    ],
+    "firstStartDifferenceMs": 1.8000000715255737
+  },
+  "notificationFailureUI": {
+    "failure": "系统未能发送后台提醒。请完成或检查系统通知授权，再发送测试。",
+    "development": true,
+    "help": true,
+    "openSettingsButton": true
+  },
+  "roundTrip": {
+    "sounds": [
+      {
+        "at": 1267.6000000238419,
+        "state": "running",
+        "duration": 0.6007709750566893
+      },
+      {
+        "at": 1439.6000000238419,
+        "state": "running",
+        "duration": 0.6007709750566893
+      },
+      {
+        "at": 1608.8999999761581,
+        "state": "running",
+        "duration": 0.6007709750566893
+      },
+      {
+        "at": 1778.6000000238419,
+        "state": "running",
+        "duration": 0.6007709750566893
+      }
+    ],
+    "animations": [
+      {
+        "at": 1265.7999999523163,
+        "delay": 0,
+        "duration": 500
+      },
+      {
+        "at": 1267.1999999284744,
+        "delay": 170,
+        "duration": 500
+      },
+      {
+        "at": 1267.3999999761581,
+        "delay": 340,
+        "duration": 500
+      },
+      {
+        "at": 1267.5,
+        "delay": 510,
+        "duration": 500
+      }
+    ],
+    "noReplay": true
+  },
+  "nextDeal": {
+    "sounds": [
+      {
+        "at": 3111.1999999284744,
+        "state": "running",
+        "duration": 0.6007709750566893
+      },
+      {
+        "at": 3282.7999999523163,
+        "state": "running",
+        "duration": 0.6007709750566893
+      },
+      {
+        "at": 3452.6999999284744,
+        "state": "running",
+        "duration": 0.6007709750566893
+      },
+      {
+        "at": 3622,
+        "state": "running",
+        "duration": 0.6007709750566893
+      }
+    ],
+    "animations": [
+      {
+        "at": 3110.5,
+        "delay": 0,
+        "duration": 500
+      },
+      {
+        "at": 3111.100000023842,
+        "delay": 170,
+        "duration": 500
+      },
+      {
+        "at": 3111.100000023842,
+        "delay": 340,
+        "duration": 500
+      },
+      {
+        "at": 3111.1999999284744,
+        "delay": 510,
+        "duration": 500
+      }
+    ],
+    "firstStartDifferenceMs": 0.6999999284744263
+  },
+  "mutedDeal": {
+    "sounds": [],
+    "animations": [
+      {
+        "at": 3895.7999999523163,
+        "delay": 0,
+        "duration": 500
+      },
+      {
+        "at": 3895.899999976158,
+        "delay": 170,
+        "duration": 500
+      },
+      {
+        "at": 3895.899999976158,
+        "delay": 340,
+        "duration": 500
+      },
+      {
+        "at": 3896,
+        "delay": 510,
+        "duration": 500
+      }
+    ]
+  },
+  "background": {
+    "minimized": true,
+    "sounds": [
+      {
+        "at": 5216,
+        "state": "running",
+        "duration": 0.2626984126984127
+      },
+      {
+        "at": 5317.5,
+        "state": "running",
+        "duration": 0.2626984126984127
+      }
+    ],
+    "animations": []
+  },
+  "immediateMute": {
+    "enabled": false,
+    "before": 2,
+    "after": 2,
+    "stops": 4
+  },
+  "tableVisible": true,
+  "assertions": {
+    "files": true,
+    "firstDeal": true,
+    "nextDeal": true,
+    "roundTrip": true,
+    "mutedDeal": true,
+    "background": true,
+    "immediateMute": true,
+    "failureUI": true,
+    "mockSettings": true,
+    "noConsoleErrors": true
+  },
+  "pass": true
+}

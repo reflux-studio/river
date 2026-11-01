@@ -22,6 +22,10 @@ export interface Settings {
   feltCustom: string
   back: Back
   fx: Fx
+  soundEnabled: boolean
+  soundVolume: number
+  // 后台轮到你时发系统通知；系统授权另行由 macOS 决定
+  notificationsEnabled: boolean
   // 花费显示的货币；价格源（models.dev）是美元，按汇率换算
   currency: Currency
   // 手动汇率（1 美元 = fxRate 当前货币）；null 为自动
@@ -167,6 +171,7 @@ export interface CoachState {
 }
 
 export interface TableView {
+  tableId: string
   mode: Mode
   title: string
   bb: number
@@ -175,7 +180,7 @@ export interface TableView {
   board: Card[]
   pot: number
   seats: SeatView[]
-  hero: { legal: Legal; toCall: number; isTurn: boolean; defaultRaiseTo: number; presets: { label: string; to: number }[] }
+  hero: { legal: Legal; toCall: number; isTurn: boolean; canAct: boolean; defaultRaiseTo: number; presets: { label: string; to: number }[] }
   done: boolean
   runout: boolean
   result: { text: string; sub: string; heroWon: boolean; net: number } | null
@@ -226,6 +231,8 @@ export interface Bootstrap {
   personas: Persona[]
   providers: ProviderPublic[]
   view: TableView | null
+  viewRevision: number
+  feedback: FeedbackSnapshot
   coachThread: CoachEntry[]
   chat: ChatMessage[]
   version: string
@@ -254,8 +261,23 @@ export type UpdateCheck =
   | { state: 'ready'; version: string }
   | { state: 'error'; message: string }
 
+// Electron 的公开 API 不提供 macOS 原生授权状态；prepared/scheduled 不等于已允许横幅。
+export interface NotificationStatus {
+  revision: number
+  state: 'unknown' | 'prepared' | 'scheduled' | 'failed' | 'unsupported'
+  supported: boolean | null
+  permission: 'unknown'
+  platform: string
+  error?: string
+}
+
 export interface Commands {
   'app.bootstrap': () => Bootstrap
+  'app.setTableVisible': (visible: boolean) => void
+  'notification.status': () => NotificationStatus
+  'notification.prepare': () => NotificationStatus
+  'notification.test': () => Promise<NotificationStatus>
+  'notification.openSettings': () => Promise<void>
   'settings.update': (patch: Partial<Settings>) => Settings
   'lobby.update': (patch: Partial<Lobby>) => Lobby
   'persona.save': (input: PersonaInput) => Persona
@@ -287,9 +309,51 @@ export interface Commands {
   'update.check': () => UpdateCheck
 }
 
+export type FeedbackKind = 'deal' | 'board' | 'blind' | 'check' | 'fold' | 'call' | 'bet' | 'raise' | 'allin' | 'collect' | 'showdown' | 'payout' | 'turn'
+
+// 一手牌里第几张发给谁；UI 按这个顺序做发牌动画与声音
+export interface DealCard {
+  seat: number
+  round: number
+}
+
+export interface TableFeedback {
+  tableId: string
+  handNo: number
+  seq: number
+  at: number
+  kind: FeedbackKind
+  seat?: number
+  count?: number
+  // 仅 deal：底牌的实际发放顺序
+  cards?: DealCard[]
+  heroNet?: number
+  decisionId?: string
+}
+
+export interface FeedbackSnapshot {
+  tableId: string | null
+  seq: number
+}
+
+export interface TableViewUpdate {
+  revision: number
+  view: TableView | null
+}
+
+export interface ReadyDecision {
+  tableId: string
+  decisionId: string
+  handNo: number
+  canAct: boolean
+}
+
 export interface Events {
   // null：已离桌
-  'table:view': TableView | null
+  'table:view': TableViewUpdate
+  'table:feedback': TableFeedback
+  'app:showTable': { tableId: string }
+  'notification:status': NotificationStatus
   'chat:append': ChatMessage
   // 整条教练消息；流式输出时同一 id 反复推送
   'coach:upsert': CoachEntry

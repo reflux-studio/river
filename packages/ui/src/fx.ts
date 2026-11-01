@@ -1,9 +1,10 @@
 // 牌桌动效：对比前后两次视图，用 Web Animations 播放。移植自设计稿 runFx（River v2 脚本 486–588 行）。
 // 完整：发牌、翻牌、气泡、筹码飞行、加注与全下特效、弃牌、赢家收筹码；精简：只保留发牌、翻牌和气泡；关闭：都不播
 import type { Card } from '@river/engine'
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
+import { DEAL_CARD_DURATION_MS, DEAL_CARD_INTERVAL_MS } from './deal-timing'
 import { backOf, chipBg, chipEdge, DENOM } from './felt'
-import type { Back, Fx, SeatView } from './types'
+import type { Back, DealCard, Fx, SeatView } from './types'
 
 type Pt = { x: number; y: number }
 // 元素，或已换算好的舞台坐标（如上一帧记下的下注位置）
@@ -133,16 +134,100 @@ interface Snap {
   betPos: (Pt | null)[]
 }
 
+// 逐张发牌：牌面和顺序都来自引擎事件（order）；没有事件时退回按 DOM 圈次推断，供官网演示。
+function dealCards(root: HTMLElement, animate: boolean, order?: DealCard[]): { animations: Animation[]; count: number } {
+  const row = root.querySelector('[data-boardrow]')
+  if (!row) return { animations: [], count: 0 }
+  const from = animate ? stagePt(root, row) : null
+  const animations: Animation[] = []
+  let count = 0
+  const deal = (child: Element) => {
+    const index = count++
+    if (!animate || !from) return
+    const to = stagePt(root, child)
+    const end = getComputedStyle(child).transform
+    animations.push(child.animate(
+      [{ transform: `translate(${from.x - to.x}px,${from.y - to.y}px) rotate(-40deg) scale(.5)`, opacity: 0 }, { transform: end === 'none' ? 'none' : end, opacity: 1 }],
+      { duration: DEAL_CARD_DURATION_MS, delay: index * DEAL_CARD_INTERVAL_MS, easing: 'cubic-bezier(.2,.8,.25,1)', fill: 'backwards' }
+    ))
+  }
+  if (order?.length) {
+    for (const { seat, round } of order) {
+      const child = root.querySelector<HTMLElement>(`[data-seat-cards="${seat}"]`)?.children[round]
+      if (child) deal(child)
+    }
+  } else {
+    const boxes = [...root.querySelectorAll<HTMLElement>('[data-seat-cards]')]
+    const rounds = Math.max(0, ...boxes.map((box) => box.children.length))
+    // 按圈发放：各座位先收到第一张，再收到第二张。
+    for (let round = 0; round < rounds; round++) {
+      for (const box of boxes) {
+        const child = box.children[round]
+        if (child) deal(child)
+      }
+    }
+  }
+  return { animations, count }
+}
+
 // 各字段取自同一次视图推送；按字段依赖，调用方重渲染但视图没变时不会重复对比
 export function useTableFx(
   root: RefObject<HTMLDivElement | null>,
   layer: RefObject<HTMLDivElement | null>,
   { handNo, board, seats, done }: { handNo: number; board: Card[]; seats: SeatView[]; done: boolean },
   fx: Fx,
-  back: Back
+  back: Back,
+  dealId?: string | null,
+  // 引擎给的逐张发牌顺序；没有时按 DOM 圈次推断（官网演示）
+  dealOrder?: DealCard[],
+  // 参数是实际飞出的牌数；声音按它逐张播放
+  onDealStart?: (count: number) => void
 ) {
   const prev = useRef<Snap | null>(null)
   const winT = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const dealHand = useRef<number | null>(null)
+  const seenDeals = useRef(new Set<string>())
+  const dealAnimations = useRef<Animation[]>([])
+  const dealMount = useRef(0)
+  const dealStart = useRef(onDealStart)
+  dealStart.current = onDealStart
+
+  const cancelDeal = () => {
+    for (const animation of dealAnimations.current) animation.cancel()
+    dealAnimations.current = []
+  }
+
+  useLayoutEffect(() => {
+    const mount = ++dealMount.current
+    return () => {
+      // StrictMode 会同步重跑 setup；等这一轮结束后只清理真正卸载的实例。
+      queueMicrotask(() => {
+        if (dealMount.current === mount) cancelDeal()
+      })
+    }
+  }, [])
+
+  // 先于首帧绘制安排发牌，首挂载也能消费实时事件；不从恢复快照反推。
+  useLayoutEffect(() => {
+    const previousHand = dealHand.current
+    const changedHand = previousHand !== handNo
+    dealHand.current = handNo
+    if (changedHand || fx === 'off') {
+      cancelDeal()
+      clearTimeout(winT.current)
+    }
+    const explicit = dealId !== undefined
+    const shouldStart = explicit ? dealId !== null && !seenDeals.current.has(dealId) : previousHand !== null && changedHand
+    if (!shouldStart || !root.current) return
+    if (fx !== 'off' && !root.current.querySelector('[data-seat-cards]')) return
+    cancelDeal()
+    clearTimeout(winT.current)
+    if (explicit) seenDeals.current.add(dealId!)
+    const dealt = dealCards(root.current, fx !== 'off', dealOrder)
+    dealAnimations.current = dealt.animations
+    dealStart.current?.(dealt.count)
+    // onDealStart 消费后把 id 改成 null 时不清理；仅新手/新事件/卸载清理。
+  }, [handNo, seats, fx, dealId, dealOrder, root])
 
   useEffect(() => () => clearTimeout(winT.current), [])
 
@@ -170,24 +255,7 @@ export function useTableFx(
     prev.current = cur
     if (fx === 'off' || !P) return
 
-    // 发牌：新的一手，底牌从桌心飞向各座位
-    if (cur.hand !== P.hand) {
-      const row = q('[data-boardrow]')
-      if (!row) return
-      const c = stagePt(R, row)
-      const boxes = [...R.querySelectorAll<HTMLElement>('[data-seat-cards]')]
-      boxes.forEach((box, oi) =>
-        [...box.children].forEach((child, r) => {
-          const p = stagePt(R, child)
-          const end = getComputedStyle(child).transform
-          child.animate(
-            [{ transform: `translate(${c.x - p.x}px,${c.y - p.y}px) rotate(-40deg) scale(.5)`, opacity: 0 }, { transform: end === 'none' ? 'none' : end, opacity: 1 }],
-            { duration: 420, delay: (r * boxes.length + oi) * 85, easing: 'cubic-bezier(.2,.8,.25,1)', fill: 'backwards' }
-          )
-        })
-      )
-      return
-    }
+    if (cur.hand !== P.hand) return
     if (cur.board > P.board) {
       ;[...R.querySelectorAll<HTMLElement>('[data-board-card]')].slice(P.board).forEach((c, k) =>
         c.animate(

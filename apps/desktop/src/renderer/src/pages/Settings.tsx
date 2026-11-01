@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Volume2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Confirm } from '@/components/Confirm'
 import { ProviderDialog, useRegistry } from '@/components/ProviderDialog'
@@ -7,12 +8,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { BackSwatches, FeltSwatches, FxSegment } from '@/components/Appearance'
-import { deleteProvider, invoke, openRules, testProvider, toastError, updateSettings, useRiver, useT } from '@/lib/river'
+import { deleteProvider, invoke, openRules, testProvider, toastError, updateSettings, useEvent, useRiver, useT } from '@/lib/river'
 import { rateText, useMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { audio } from '@/lib/audio'
 import { CURRENCIES } from '../../../shared/currency'
 import type { Dict } from '@river/i18n'
-import type { ProviderPublic, Settings as SettingsT } from '../../../shared/types'
+import type { NotificationStatus, ProviderPublic, Settings as SettingsT } from '../../../shared/types'
 
 type Role = 'opponent' | 'coach'
 const ROLES: Role[] = ['opponent', 'coach']
@@ -312,6 +314,7 @@ export function Settings() {
       <div className="mx-auto flex max-w-[760px] flex-col gap-[22px] px-8 pt-10 pb-16">
         <div className="text-[28px] font-semibold">{t.desktop.nav.settings}</div>
         <Providers />
+        <Sound />
         <Group title={t.desktop.nav.opponents}>
           <Row label={s.opponentModel} desc={s.opponentModelDesc} below={<ModelPicker role="opponent" />} />
           <Row label={s.speed} desc={s.speedDesc}>
@@ -353,5 +356,106 @@ export function Settings() {
         <Data />
       </div>
     </div>
+  )
+}
+
+function Sound() {
+  const { soundEnabled, soundVolume } = useRiver((s) => s.settings)
+  const a = useT().desktop.audio
+  const silent = !soundEnabled || soundVolume === 0
+  return (
+    <Group title={a.title}>
+      <Row
+        label={a.enabled}
+        desc={a.description}
+        below={
+          // 音量与试听跟着开关走，合成同一块，开关关闭时整行变灰
+          <div className={cn('flex items-center gap-2.5 text-xs text-muted-foreground', !soundEnabled && 'opacity-40')}>
+            <span>{a.volume}</span>
+            <input
+              type="range" min={0} max={100} step={1} value={soundVolume}
+              aria-label={a.volume} disabled={!soundEnabled} className="w-32 accent-foreground"
+              onChange={(e) => updateSettings({ soundVolume: Number(e.target.value) })}
+            />
+            <span className="w-9 tabular-nums text-foreground">{soundVolume}%</span>
+            <button
+              type="button" onClick={() => void audio.preview()} disabled={silent}
+              aria-label={a.preview} title={a.preview}
+              className="flex size-6 items-center justify-center rounded-full border border-input text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Volume2 size={13} />
+            </button>
+          </div>
+        }
+      >
+        <Switch checked={soundEnabled} onCheckedChange={(enabled) => updateSettings({ soundEnabled: enabled })} aria-label={a.enabled} />
+      </Row>
+      <Notifications />
+    </Group>
+  )
+}
+
+const linkBtn = 'text-xs text-foreground underline decoration-1 underline-offset-2 hover:opacity-60 disabled:opacity-50'
+
+function Notifications() {
+  const enabled = useRiver((s) => s.settings.notificationsEnabled)
+  const a = useT().desktop.audio
+  const [status, setStatus] = useState<NotificationStatus | null>(null)
+  const [busy, setBusy] = useState(false)
+  const receive = (next: NotificationStatus) => setStatus((previous) => !previous || next.revision >= previous.revision ? next : previous)
+  useEvent('notification:status', receive)
+  useEffect(() => {
+    let mounted = true
+    void invoke('notification.status').then((next) => mounted && receive(next), toastError)
+    return () => { mounted = false }
+  }, [])
+  // 打开开关时顺带发出系统授权请求；关掉只改本地偏好
+  const toggle = async (next: boolean) => {
+    await updateSettings({ notificationsEnabled: next })
+    if (!next) return
+    setBusy(true)
+    try { receive(await invoke('notification.prepare')) } catch (error) { toastError(error) } finally { setBusy(false) }
+  }
+  const test = async () => {
+    setBusy(true)
+    try { receive(await invoke('notification.test')) } catch (error) { toastError(error) } finally { setBusy(false) }
+  }
+  const supported = status?.supported !== false
+  const canLink = status?.platform === 'darwin' || status?.platform === 'win32'
+  const state = status?.state ?? 'unknown'
+  const description = state === 'prepared' ? a.notificationPrepared
+    : state === 'scheduled' ? a.notificationScheduled
+      : state === 'failed' ? a.notificationFailed
+        : state === 'unsupported' ? a.notificationUnsupported : a.notificationUnknown
+  return (
+    <Row
+      label={a.notificationTitle}
+      desc={a.notifications}
+      below={
+        enabled ? (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-normal" role="status">
+            <span className={state === 'failed' ? 'text-lose' : 'text-muted-foreground'}>{description}</span>
+            {supported && canLink && (
+              <>
+                <span className="text-subtle">·</span>
+                <button type="button" className={linkBtn} disabled={busy} onClick={() => void test()}>
+                  {busy ? a.notificationTesting : a.notificationTest}
+                </button>
+              </>
+            )}
+            {state === 'failed' && canLink && (
+              <>
+                <span className="text-subtle">·</span>
+                <button type="button" className={linkBtn} onClick={() => void invoke('notification.openSettings').catch(toastError)}>
+                  {a.notificationSettings}
+                </button>
+              </>
+            )}
+          </div>
+        ) : undefined
+      }
+    >
+      <Switch checked={enabled} disabled={busy || !supported} onCheckedChange={(next) => void toggle(next)} aria-label={a.notificationTitle} />
+    </Row>
   )
 }

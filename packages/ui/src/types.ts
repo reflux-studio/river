@@ -7,6 +7,12 @@ export type Felt = 'green' | 'blue' | 'wine' | 'graphite' | 'paper' | 'custom'
 export type Back = 'red' | 'blue' | 'black' | 'green'
 export type Fx = 'full' | 'lite' | 'off'
 
+// 一手牌里第几张发给谁；与引擎 DealEvent 的座位/圈次对应
+export interface DealCard {
+  seat: number
+  round: number
+}
+
 export interface SeatView {
   name: string
   personaId?: string

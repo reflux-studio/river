@@ -9,5 +9,9 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["electron.vite.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*", "test/**/*"]
+  "include": [
+    "electron.vite.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*", "test/**/*",
+    "src/renderer/src/lib/feedback-sync.ts", "src/renderer/src/lib/audio-controller.ts",
+    "src/renderer/src/lib/river.ts", "src/renderer/src/lib/audio.ts"
+  ]
 }

@@ -16,10 +16,11 @@ const PAGES: Record<Page, React.ComponentType> = { lobby: Lobby, table: Table, o
 export function App() {
   const ready = useRiver((s) => s.ready)
   const hasTable = useRiver((s) => s.view !== null)
+  const openingTable = useRiver((s) => s.openingTable)
   const want = useRiver((s) => s.page)
   const lang = useLangTag()
   useEffect(() => void (document.documentElement.lang = lang), [lang])
-  const page = want === 'table' && !hasTable ? 'lobby' : want
+  const page = want === 'table' && !hasTable && !openingTable ? 'lobby' : want
   const Page = PAGES[page]
 
   return (

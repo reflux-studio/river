@@ -1,10 +1,11 @@
 import { feltOf, TableStage } from '@river/ui'
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { Volume2, VolumeX } from 'lucide-react'
 import { AppearancePopover } from '@/components/Appearance'
 import { ActionBar } from '@/components/table/ActionBar'
 import { ChatPanel, lastSaid, useSpeaker } from '@/components/table/ChatPanel'
 import { CoachPanel } from '@/components/table/CoachPanel'
-import { useRiver, useT } from '@/lib/river'
+import { startDealSound, updateSettings, useRiver, useT } from '@/lib/river'
 import type { TableView } from '../../../shared/types'
 
 const CHAT_KEY = 'river.chatShown'
@@ -31,6 +32,8 @@ export function Table() {
 function Screen({ v }: { v: TableView }) {
   const chat = useRiver((s) => s.chat)
   const st = useRiver((s) => s.settings)
+  const deal = useRiver((s) => s.deal)
+  const dealId = deal?.tableId === v.tableId && deal.handNo === v.handNo ? `${deal.tableId}:${deal.seq}` : null
   const who = useSpeaker()
   const t = useT()
   const width = useWidth()
@@ -64,6 +67,9 @@ function Screen({ v }: { v: TableView }) {
           pot={v.pot}
           done={v.done}
           handNo={v.handNo}
+          dealId={dealId}
+          dealOrder={dealId ? deal?.cards : undefined}
+          onDealStart={(count) => { if (dealId) startDealSound(dealId, count) }}
           heroSeat={0}
           heroTurn={v.hero.isTurn}
           felt={F}
@@ -78,6 +84,15 @@ function Screen({ v }: { v: TableView }) {
             </button>
           )}
           <div data-felt-popover className="absolute top-3.5 right-3.5 z-10 flex flex-col items-end gap-2">
+            <button
+              onClick={() => updateSettings({ soundEnabled: !st.soundEnabled })}
+              className={floating}
+              aria-label={st.soundEnabled ? t.desktop.audio.mute : t.desktop.audio.unmute}
+              title={st.soundEnabled ? t.desktop.audio.mute : t.desktop.audio.unmute}
+              aria-pressed={!st.soundEnabled}
+            >
+              {st.soundEnabled && st.soundVolume > 0 ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
             <button onClick={() => setFeltOpen((x) => !x)} className={floating}>
               <span className="size-3 rounded-full shadow-[0_0_0_1px_rgba(0,0,0,0.15)]" style={{ background: F.felt }} />
               {t.desktop.appearance.title}

@@ -1,0 +1,28 @@
+{
+  "platform": "darwin",
+  "electron": "44.4.5",
+  "testBridge": true,
+  "realNotificationsShown": false,
+  "errors": [],
+  "preview": {
+    "starts": 1,
+    "states": [
+      "running"
+    ],
+    "ogg": []
+  },
+  "tableVisible": true,
+  "background": {
+    "minimized": true,
+    "before": 1,
+    "after": 3
+  },
+  "mute": {
+    "enabled": false,
+    "before": 5,
+    "after": 5,
+    "stops": 1
+  },
+  "notificationSupported": true,
+  "pass": false
+}
