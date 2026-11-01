@@ -89,12 +89,24 @@ function createWindow() {
 // 开发与打包默认共用 ~/Library/Application Support/River；依赖此路径的模块须在 whenReady 后才调用 getPath
 if (!app.isPackaged) app.setPath('userData', join(app.getPath('appData'), 'River-dev'))
 
+// 只允许一个实例：重复启动时把已有窗口带到前台，而不是再开一个
+const instanceLock = app.requestSingleInstanceLock()
+if (!instanceLock) app.quit()
+else {
+  app.on('second-instance', () => {
+    if (!win || win.isDestroyed()) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  })
+}
+
 const runner = new TableRunner({
   emit: (event, payload) => win?.webContents.send(event, payload),
   onDecision: (decision) => turnNotifications.setDecision(decision)
 })
 
-app.whenReady().then(async () => {
+if (instanceLock) app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('app.river.desktop')
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(iconPath)
   try {
