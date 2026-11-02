@@ -22,6 +22,7 @@ const people = presets[lang]
 const who = (id: string) => people.find((p) => p.id === id)!
 const base = import.meta.env.BASE_URL.replace(/\/$/, '')
 const home = { zh: `${base}/`, en: `${base}/en/` }
+const playUrl = import.meta.env.PUBLIC_PLAY_URL
 const icon = `${base}/river-icon.png`
 const url = new URL(home[lang], Astro.site)
 const btn2 = 'inline-flex items-center rounded-full border border-[#d9d9d5] bg-white px-6 py-[13px] text-[16px] font-semibold whitespace-nowrap hover:bg-accent'
@@ -115,6 +116,7 @@ const actLabel = ([k, n]: [keyof typeof P.act, number?]) => (n === undefined ? P
         <p class="m-0 max-w-[600px] text-[clamp(17px,1.6vw,20px)] leading-[1.6] text-pretty text-label">{s.hero.lead}</p>
         <div class="mt-1.5 flex flex-wrap justify-center gap-3">
           <PrimaryButton lang={lang} client:load />
+          {playUrl && <a href={playUrl} class={btn2}>{lang === 'zh' ? '浏览器开桌' : 'Play with friends'}</a>}
           <a href={REPO} class={btn2}>{s.hero.source}</a>
         </div>
         <div class="flex flex-wrap justify-center gap-1.5 text-[13px] text-subtle">
@@ -377,6 +379,7 @@ const actLabel = ([k, n]: [keyof typeof P.act, number?]) => (n === undefined ? P
         <h2 class="m-0 text-[clamp(36px,5.4vw,64px)] leading-[1.08] font-bold tracking-[-0.035em] text-balance">{s.end.title}</h2>
         <div class="flex flex-wrap justify-center gap-3">
           <PrimaryButton lang={lang} client:load />
+          {playUrl && <a href={playUrl} class={btn2}>{lang === 'zh' ? '浏览器开桌' : 'Play with friends'}</a>}
           <a href={REPO} class={btn2}>{s.end.star}</a>
         </div>
       </div>

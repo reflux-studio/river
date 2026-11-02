@@ -1,0 +1,388 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-11-02T14:05:22.673Z",
+  "specification": {
+    "path": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.json",
+    "sha256": "1ab2de0884fbe8e0520e6f176501f2daecd72c8e7eb81e394fc8280d20319213",
+    "bytes": 1603
+  },
+  "artifact": {
+    "path": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html",
+    "sha256": "94347ed2f54caed5a7cdbacbae41a2ff8a3826e4abf662ffb126da374dd524a7",
+    "bytes": 811562
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/Users/suziming/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/suziming/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.json",
+        "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html",
+        "--quality",
+        "showcase",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "1ab2de0884fbe8e0520e6f176501f2daecd72c8e7eb81e394fc8280d20319213",
+          "bytes": 1603
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 185,
+      "command": [
+        "/Users/suziming/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/suziming/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.json",
+        "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html",
+        "--quality",
+        "showcase",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "139dae5a-6661-420c-bcbc-eeec4036f2ac",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.json",
+        "output": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html",
+        "specification": {
+          "sha256": "1ab2de0884fbe8e0520e6f176501f2daecd72c8e7eb81e394fc8280d20319213",
+          "bytes": 1603
+        },
+        "artifact": {
+          "sha256": "94347ed2f54caed5a7cdbacbae41a2ff8a3826e4abf662ffb126da374dd524a7",
+          "bytes": 811562
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 81,
+      "command": [
+        "/Users/suziming/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/suziming/.agents/skills/archify/bin/archify.mjs",
+        "check",
+        "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html",
+        "artifact": {
+          "sha256": "94347ed2f54caed5a7cdbacbae41a2ff8a3826e4abf662ffb126da374dd524a7",
+          "bytes": 811562
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "metrics": {
+            "properCrossings": 0,
+            "resolvedCrossovers": 0,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 0,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 109.2,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 7.5,
+            "maxBends": 2,
+            "routesOverSuggestedBends": 0,
+            "maxStretch": 1.513,
+            "routesOverSuggestedStretch": 1,
+            "minSegmentPx": 100,
+            "minInteriorSegmentPx": 390,
+            "shortSegmentCount": 0,
+            "shortEndpointSegmentCount": 0,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [],
+            "detours": [
+              {
+                "relationship": {
+                  "id": "views",
+                  "from": "runtime",
+                  "to": "ui",
+                  "label": "玩家可见视图",
+                  "collectionIndex": 2,
+                  "artifactIndex": 3
+                },
+                "bends": 2,
+                "stretch": 1.513
+              }
+            ]
+          },
+          "leadingSpace": {
+            "measured": true,
+            "emptyTopPx": 40,
+            "emptyTopRatio": 0.077,
+            "occupiedTop": 40,
+            "viewBoxTop": 0,
+            "canvasHeight": 518,
+            "typicalNodeHeight": 90,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "recognized-declared-wide",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 1012.5,
+            "actualBudgetPx": 1012.5,
+            "actualReaderWidth": 1042.5,
+            "desiredReaderWidth": 1042.5,
+            "viewportCap": 1376,
+            "limit": "source-size",
+            "requestedTargetPx": 7.5,
+            "requestedTargetMet": true,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "edge",
+              "id": "command",
+              "from": "ui",
+              "to": "runtime"
+            },
+            "minimumSourceTextPx": 8,
+            "minimumProjectedTextPx": 7.5,
+            "semanticTextCount": 12
+          },
+          "issues": []
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "139dae5a-6661-420c-bcbc-eeec4036f2ac"
+      }
+    },
+    "browser-check": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": 4419,
+      "command": [
+        "/Users/suziming/.nvm/versions/node/v24.19.0/bin/node",
+        "/Users/suziming/.agents/skills/archify/bin/archify.mjs",
+        "browser-check",
+        "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html",
+        "--json",
+        "--require-provenance"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "fail",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "139dae5a-6661-420c-bcbc-eeec4036f2ac",
+        "artifact": {
+          "path": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html",
+          "sha256": "94347ed2f54caed5a7cdbacbae41a2ff8a3826e4abf662ffb126da374dd524a7",
+          "bytes": 811562
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "available",
+          "executable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/browser-check-runtime",
+            "severity": "error",
+            "message": "browser-check could not complete its Chrome inspection.",
+            "subject": {
+              "artifact": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html"
+            },
+            "evidence": {
+              "reason": "Chrome DevTools read pipe failed: stream ended\nChrome process: still running.\nChrome transport: Node v24.19.0, libuv 1.52.1, darwin; pid=16274, exitCode=null, signalCode=null.\nChrome read pipe: readable=false, ended=true, destroyed=false, receivedBytes=0, messages=0, bufferedBytes=0.\nChrome write pipe: writable=true, ended=false, destroyed=false, completedWrites=1, writtenBytes=50, bufferedBytes=0."
+            },
+            "supportedFixes": [
+              "resolve the reported Chrome inspection error, then rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "fail",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "fail",
+          "viewports": []
+        },
+        "readability": {
+          "status": "fail",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "fail",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "receipt": "runtime-v2.browser-check.json",
+          "files": []
+        },
+        "error": "Chrome DevTools read pipe failed: stream ended\nChrome process: still running.\nChrome transport: Node v24.19.0, libuv 1.52.1, darwin; pid=16274, exitCode=null, signalCode=null.\nChrome read pipe: readable=false, ended=true, destroyed=false, receivedBytes=0, messages=0, bufferedBytes=0.\nChrome write pipe: writable=true, ended=false, destroyed=false, completedWrites=1, writtenBytes=50, bufferedBytes=0."
+      }
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/browser-check-runtime",
+      "severity": "error",
+      "message": "browser-check could not complete its Chrome inspection.",
+      "subject": {
+        "artifact": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html"
+      },
+      "evidence": {
+        "reason": "Chrome DevTools read pipe failed: stream ended\nChrome process: still running.\nChrome transport: Node v24.19.0, libuv 1.52.1, darwin; pid=16274, exitCode=null, signalCode=null.\nChrome read pipe: readable=false, ended=true, destroyed=false, receivedBytes=0, messages=0, bufferedBytes=0.\nChrome write pipe: writable=true, ended=false, destroyed=false, completedWrites=1, writtenBytes=50, bufferedBytes=0."
+      },
+      "supportedFixes": [
+        "resolve the reported Chrome inspection error, then rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.finalize.json",
+    "summaryReceipt": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.finalize-summary.json",
+    "browserCheckReceipt": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-11-02T14:05:27.498Z",
+  "durationMs": 4825,
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-unavailable"
+  }
+}

@@ -1,0 +1,426 @@
+@import 'tailwindcss';
+@import '@river/ui/tokens.css';
+@source '../../ui/src';
+@source './';
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background font-sans text-foreground;
+    margin: 0;
+  }
+  button {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button:disabled {
+    cursor: default;
+    opacity: 0.4;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+.river-game {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-width: 0;
+  isolation: isolate;
+}
+.river-header a {
+  text-decoration: none;
+  color: inherit;
+}
+.river-header nav {
+  display: flex;
+  margin-left: 6px;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+}
+.river-header nav button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+  color: var(--label);
+}
+.river-header nav button:hover {
+  background: #efefec;
+}
+.river-status {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.river-status.online {
+  color: var(--win);
+}
+.river-error {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff3ee;
+  color: var(--lose);
+  padding: 10px 20px;
+  font-size: 13px;
+}
+.river-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: white;
+  padding: 20px 22px;
+}
+.river-panel h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.river-game label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--label);
+}
+.river-game input:not([type='checkbox']),
+.river-game select {
+  border: 1px solid var(--input);
+  border-radius: 8px;
+  background: white;
+  min-width: 0;
+  max-width: 100%;
+  padding: 8px 10px;
+  color: var(--foreground);
+  font-size: 14px;
+}
+.river-panel input:not([type='checkbox']) {
+  width: 100%;
+}
+.river-panel button:not([data-slot]),
+.river-row button,
+.river-preactions button,
+.river-roomline button,
+.river-own button,
+.river-room-tools > button {
+  border: 1px solid var(--input);
+  border-radius: 999px;
+  background: white;
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.river-panel button:not([data-slot]):hover,
+.river-row button:hover,
+.river-preactions button:hover {
+  background: var(--accent);
+}
+.river-game button.river-primary {
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: white;
+  padding: 12px 26px;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 999px;
+}
+.river-game .selected {
+  background: var(--muted);
+  border-color: var(--foreground);
+}
+.river-formgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.river-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.river-checks label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.river-checks input {
+  accent-color: var(--foreground);
+}
+.river-game summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.river-panel details[open] > summary {
+  margin-bottom: 12px;
+}
+.river-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.river-row > input {
+  flex: 1;
+  width: 90px;
+}
+.river-row > select {
+  flex: 1;
+}
+.river-roomline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.river-roomline strong {
+  color: var(--blue);
+}
+.river-room {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.river-play {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: auto;
+}
+.river-table-stage {
+  display: flex;
+  flex: 1;
+  min-height: 560px;
+  container-type: inline-size;
+}
+.river-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 12;
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px;
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--background);
+}
+.river-actions .river-action-controls input {
+  width: 84px;
+  border: 0;
+  border-radius: 0;
+  padding: 4px;
+}
+.river-preactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.river-room-tools {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, 100%);
+  overflow: auto;
+  padding: 12px;
+  border-left: 1px solid var(--border);
+  background: var(--background);
+  box-shadow: -8px 0 24px #0001;
+}
+.river-member {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  padding: 6px 0;
+}
+.river-member > span {
+  margin-right: auto;
+}
+.river-coach-panel {
+  width: 296px;
+  flex-shrink: 0;
+  overflow: auto;
+  border-left: 1px solid var(--border);
+}
+.river-coach-panel .river-panel {
+  border: 0;
+  border-radius: 0;
+  padding: 14px 16px;
+}
+.river-coach {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.7;
+  background: oklch(0.97 0.012 250);
+  border-radius: 12px;
+  padding: 12px;
+}
+.river-cards {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.river-history {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  width: min(100%, 960px);
+  margin: auto;
+  padding: 32px 20px;
+}
+.river-history h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.river-history > svg {
+  width: 100%;
+  max-height: 220px;
+  margin: 20px 0;
+}
+.river-history > .river-panel {
+  margin: 14px 0;
+}
+.river-history details p {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.river-history ol {
+  max-height: 260px;
+  overflow: auto;
+  font-size: 12px;
+  color: var(--subtle);
+}
+@container (max-width: 600px) {
+  [data-table-seat] {
+    gap: 3px;
+    max-width: 96px;
+  }
+  [data-table-seat] [data-seat] {
+    gap: 4px;
+    padding: 5px 8px;
+  }
+  [data-table-seat] [data-seat] > :first-child {
+    display: none;
+  }
+  [data-table-seat] [data-seat] .text-sm {
+    max-width: 78px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+  }
+  [data-table-seat] [data-seat-cards] {
+    scale: 0.7;
+    transform-origin: bottom center;
+    margin-bottom: -12px;
+  }
+  [data-table-seat] [data-seat] .text-xs {
+    font-size: 11px;
+  }
+  [data-table-seat] [data-seat] .text-\[11px\] {
+    font-size: 9px;
+  }
+  [data-boardrow] {
+    scale: 0.63;
+  }
+  [data-bet] {
+    scale: 0.75;
+  }
+}
+@media (max-width: 900px) {
+  .river-chat-panel {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 25;
+    background: var(--background);
+    width: min(320px, 100%);
+    box-shadow: 8px 0 24px #0002;
+  }
+  .river-coach-panel {
+    width: 250px;
+  }
+}
+@media (max-width: 600px) {
+  .river-header {
+    gap: 6px;
+    padding: 0 10px;
+  }
+  .river-header nav {
+    margin-left: auto;
+  }
+  .river-header nav button {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .river-status {
+    display: none;
+  }
+  .river-roomline {
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .river-roomline button {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+  .river-table-stage {
+    min-height: 630px;
+  }
+  .river-actions {
+    gap: 8px;
+    padding: 10px;
+  }
+  .river-action-controls {
+    flex-wrap: wrap;
+  }
+  .river-action-controls > :nth-child(3) {
+    order: 4;
+    width: 100%;
+    justify-content: center;
+  }
+  .river-action-controls > button {
+    font-size: 14px;
+  }
+  .river-coach-panel {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 24;
+    width: min(296px, 80%);
+    background: white;
+  }
+}
+.river-game[data-desktop='true'] .river-header {
+  -webkit-app-region: drag;
+  padding-left: 88px;
+  padding-right: 120px;
+}
+.river-game[data-desktop='true'] .river-header button,
+.river-game[data-desktop='true'] .river-header a,
+.river-game[data-desktop='true'] .river-header nav {
+  -webkit-app-region: no-drag;
+}

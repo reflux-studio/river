@@ -1,0 +1,25 @@
+{
+  "name": "@river/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --external:@libsql/client --external:ws --outfile=dist/index.js && node dist/index.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node24 --external:@libsql/client --external:ws --outfile=dist/index.js",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "@river/protocol": "workspace:*",
+    "@river/runtime": "workspace:*",
+    "@river/storage": "workspace:*",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.6",
+    "@types/ws": "8.18.1",
+    "esbuild": "0.28.2",
+    "typescript": "~5.9.3"
+  }
+}

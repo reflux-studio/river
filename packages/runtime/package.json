@@ -1,0 +1,16 @@
+{
+  "name": "@river/runtime",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@river/engine": "workspace:*",
+    "@river/protocol": "workspace:*",
+    "@river/storage": "workspace:*"
+  }
+}

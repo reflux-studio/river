@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "139dae5a-6661-420c-bcbc-eeec4036f2ac",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.json",
+  "output": "/Users/suziming/Documents/personal/river/.rivo/issues/river-web-multiplayer/assets/runtime-v2.html",
+  "specification": {
+    "sha256": "1ab2de0884fbe8e0520e6f176501f2daecd72c8e7eb81e394fc8280d20319213",
+    "bytes": 1603
+  },
+  "artifact": {
+    "sha256": "94347ed2f54caed5a7cdbacbae41a2ff8a3826e4abf662ffb126da374dd524a7",
+    "bytes": 811562
+  }
+}

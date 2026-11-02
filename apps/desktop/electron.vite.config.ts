@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  main: {},
+  main: { build: { externalizeDeps: { exclude: ['@river/runtime', '@river/storage', '@river/protocol', '@river/client'] } } },
   preload: {
     // 沙箱中的 preload 只能是 CommonJS；package.json 为 "type": "module"，故显式 .cjs
     build: { rollupOptions: { output: { format: 'cjs', entryFileNames: '[name].cjs' } } }

@@ -6,7 +6,9 @@
     ".": "./src/index.ts",
     "./types": "./src/types.ts",
     "./deal-timing": "./src/deal-timing.ts",
-    "./tokens.css": "./src/tokens.css"
+    "./tokens.css": "./src/tokens.css",
+    "./toggle": "./src/toggle.tsx",
+    "./toggle-group": "./src/toggle-group.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -18,7 +20,9 @@
   },
   "dependencies": {
     "@river/engine": "workspace:*",
-    "cn": "^0.4.0"
+    "cn": "^0.4.0",
+    "class-variance-authority": "^0.7.1",
+    "radix-ui": "^1.6.7"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

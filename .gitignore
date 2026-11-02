@@ -5,3 +5,5 @@ dist/
 .DS_Store
 *.tsbuildinfo
 .astro/
+apps/server/data/
+.pnpm-store/

@@ -26,6 +26,21 @@ importers:
       '@mastra/core':
         specifier: ~1.69.0
         version: 1.69.0(express@5.2.1(supports-color@7.2.0))(supports-color@7.2.0)(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5)
+      '@river/app':
+        specifier: workspace:*
+        version: link:../../packages/app
+      '@river/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@river/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@river/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@river/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -97,6 +112,37 @@ importers:
         specifier: ^7.3.6
         version: 7.3.6(@types/node@24.13.6)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
 
+  apps/server:
+    dependencies:
+      '@libsql/client':
+        specifier: ^0.18.0
+        version: 0.18.0
+      '@river/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@river/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@river/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      ws:
+        specifier: 8.21.3
+        version: 8.21.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.6
+        version: 24.13.6
+      '@types/ws':
+        specifier: 8.18.1
+        version: 8.18.1
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+
   apps/site:
     dependencies:
       '@astrojs/react':
@@ -137,6 +183,80 @@ importers:
         specifier: ^4.3.3
         version: 4.3.3
 
+  apps/web:
+    dependencies:
+      '@river/app':
+        specifier: workspace:*
+        version: link:../../packages/app
+      '@river/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+    devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.3.3
+        version: 4.3.3(vite@7.3.6(@types/node@24.13.6)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: ^5.2.0
+        version: 5.2.0(supports-color@7.2.0)(vite@7.3.6(@types/node@24.13.6)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.3.6
+        version: 7.3.6(@types/node@24.13.6)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)
+
+  packages/app:
+    dependencies:
+      '@river/client':
+        specifier: workspace:*
+        version: link:../client
+      '@river/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@river/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@river/ui':
+        specifier: workspace:*
+        version: link:../ui
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+
+  packages/client:
+    dependencies:
+      '@river/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@river/storage':
+        specifier: workspace:*
+        version: link:../storage
+
   packages/engine: {}
 
   packages/i18n:
@@ -145,14 +265,53 @@ importers:
         specifier: workspace:*
         version: link:../engine
 
+  packages/protocol:
+    dependencies:
+      '@river/engine':
+        specifier: workspace:*
+        version: link:../engine
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
+  packages/runtime:
+    dependencies:
+      '@river/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@river/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@river/storage':
+        specifier: workspace:*
+        version: link:../storage
+
+  packages/storage:
+    dependencies:
+      '@libsql/client':
+        specifier: ^0.18.0
+        version: 0.18.0
+      '@river/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@river/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/ui:
     dependencies:
       '@river/engine':
         specifier: workspace:*
         version: link:../engine
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
       cn:
         specifier: ^0.4.0
         version: 0.4.0
+      radix-ui:
+        specifier: ^1.6.7
+        version: 1.6.7(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react:
         specifier: ^19.3.0
         version: 19.3.0

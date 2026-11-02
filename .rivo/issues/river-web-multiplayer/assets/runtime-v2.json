@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {"title": "River：一个权威牌局状态", "locale": "zh-CN", "output": ".rivo/issues/river-web-multiplayer/assets/runtime-v2.html", "quality_profile": "showcase"},
+  "components": [
+    {"id":"ui","type":"frontend","label":"共享 React 应用","sublabel":"Web / Electron","pos":[40,260],"size":[220,90]},
+    {"id":"runtime","type":"backend","label":"房间运行时","sublabel":"串行操作 → 权威状态","pos":[430,260],"size":[220,90]},
+    {"id":"db","type":"database","label":"本地 SQLite","sublabel":"房间快照 + 命令回执","pos":[820,260],"size":[220,90]},
+    {"id":"agent","type":"backend","label":"Electron Agent","sublabel":"本地模型与密钥","pos":[430,40],"size":[220,90]}
+  ],
+  "connections": [
+    {"id":"command","from":"ui","to":"runtime","label":"WS / IPC 操作","fromSide":"right","toSide":"left"},
+    {"id":"save","from":"runtime","to":"db","label":"原子保存","fromSide":"right","toSide":"left"},
+    {"id":"views","from":"runtime","to":"ui","label":"玩家可见视图","fromSide":"bottom","toSide":"bottom","via":[[540,450],[150,450]]},
+    {"id":"agentcommand","from":"agent","to":"runtime","label":"独立玩家连接","fromSide":"bottom","toSide":"top"}
+  ],
+  "cards": [
+    {"dot":"emerald","title":"一个状态","items":["发牌、筹码、行动位均由运行时决定","本地用 Electron Node，联机用服务 Node"]},
+    {"dot":"cyan","title":"直接同步","items":["保存成功后按玩家身份生成视图","重连取得最新状态；事件仅供动效"]}
+  ]
+}

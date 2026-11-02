@@ -1,0 +1,19 @@
+{
+  "name": "@river/storage",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./player": "./src/player.ts",
+    "./room": "./src/room.ts",
+    "./sqlite": "./src/sqlite.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@river/engine": "workspace:*",
+    "@river/protocol": "workspace:*",
+    "@libsql/client": "^0.18.0"
+  }
+}

@@ -1,4 +1,4 @@
-import { FULL, shuffle, type Rng } from './eval'
+import { FULL, shuffle, type RandomInput } from './eval'
 import type { Card, Street } from './types'
 
 // 一手牌里每一次从牌堆取牌都产生一个事件；UI 的动画和声音按同一份顺序消费。
@@ -15,16 +15,37 @@ export interface DealEvent {
   burn: boolean
 }
 
+export interface DeckState {
+  schemaVersion: 1
+  cards: Card[]
+}
+
 // 牌堆只负责顺序：洗牌、切牌、逐张取牌。发牌记录由 Table 负责。
 export class Deck {
   private cards: Card[]
 
-  constructor(rng: Rng) {
+  constructor(rng: RandomInput) {
     this.cards = shuffle(FULL.slice(), rng)
   }
 
   get remaining() {
     return this.cards.length
+  }
+
+  exportState(): DeckState {
+    return { schemaVersion: 1, cards: this.cards.slice() }
+  }
+
+  static importState(state: DeckState): Deck {
+    if (state.schemaVersion !== 1 || !Array.isArray(state.cards)) throw new Error('unsupported deck state')
+    const seen = new Set<Card>()
+    for (const card of state.cards) {
+      if (!FULL.includes(card) || seen.has(card)) throw new Error('invalid deck state')
+      seen.add(card)
+    }
+    const deck = Object.create(Deck.prototype) as Deck
+    deck.cards = state.cards.slice()
+    return deck
   }
 
   // 切牌：把最上面 n 张移到最下面。取牌从数组尾部开始，所以顶部是尾部。

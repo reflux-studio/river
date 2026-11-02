@@ -3,12 +3,31 @@
 import type { Card, HandCat } from './types'
 
 export type Rng = () => number
+export interface RandomSource {
+  /** An unbiased uint32 sample from a host supplied source. */
+  nextUint32(): number
+}
+export type RandomInput = Rng | RandomSource
+
+const U32_RANGE = 0x1_0000_0000
+
+/** Uniform integer in [0, upperExclusive), using rejection sampling. */
+export function randomInt(source: RandomInput, upperExclusive: number): number {
+  if (!Number.isSafeInteger(upperExclusive) || upperExclusive <= 0 || upperExclusive > U32_RANGE) throw new Error('invalid random bound')
+  if (typeof source === 'function') return Math.trunc(source() * upperExclusive)
+  const limit = Math.floor(U32_RANGE / upperExclusive) * upperExclusive
+  for (;;) {
+    const sample = source.nextUint32()
+    if (!Number.isInteger(sample) || sample < 0 || sample >= U32_RANGE) throw new Error('random source must return uint32 samples')
+    if (sample < limit) return sample % upperExclusive
+  }
+}
 
 const R = '23456789TJQKA'
 export const FULL: Card[] = []
 for (const r of R) for (const s of 'shdc') FULL.push(r + s)
 const CAT: HandCat[] = ['highCard', 'pair', 'twoPair', 'trips', 'straight', 'flush', 'fullHouse', 'quads', 'straightFlush']
-export const shuffle = <T>(a: T[], rng: Rng): T[] => { for (let i = a.length - 1; i > 0; i--) { const j = rng() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]] } return a }
+export const shuffle = <T>(a: T[], rng: RandomInput): T[] => { for (let i = a.length - 1; i > 0; i--) { const j = randomInt(rng, i + 1); [a[i], a[j]] = [a[j], a[i]] } return a }
 const rv = (c: Card) => R.indexOf(c[0]) + 2
 const combCache: Record<number, number[][]> = {}
 function combos(n: number): number[][] {
@@ -60,7 +79,7 @@ function looseCat(cards: Card[]): number {
   const v = Object.values(cnt).sort((a, b) => b - a)
   if (v[0] === 4) return 7; if (v[0] === 3) return 3; if (v[0] === 2 && v[1] === 2) return 2; if (v[0] === 2) return 1; return 0
 }
-export function equity(hole: Card[], board: Card[], nOpp: number, iters?: number, rng: Rng = Math.random): number {
+export function equity(hole: Card[], board: Card[], nOpp: number, iters: number | undefined, rng: Rng): number {
   if (nOpp <= 0) return 1
   iters = iters || 300
   const known = new Set(hole.concat(board))
@@ -68,7 +87,7 @@ export function equity(hole: Card[], board: Card[], nOpp: number, iters?: number
   const need = 2 * nOpp + (5 - board.length)
   let win = 0
   for (let it = 0; it < iters; it++) {
-    for (let i = 0; i < need; i++) { const j = i + (rng() * (rest.length - i) | 0); const t = rest[i]; rest[i] = rest[j]; rest[j] = t }
+    for (let i = 0; i < need; i++) { const j = i + randomInt(rng, rest.length - i); const t = rest[i]; rest[i] = rest[j]; rest[j] = t }
     const b = board.concat(rest.slice(2 * nOpp, need))
     const my = best(hole.concat(b))
     let lose = false, ties = 0

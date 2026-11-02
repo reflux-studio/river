@@ -6,6 +6,7 @@ import { guardQuit, registerIpc } from './ipc'
 import { fxRates, loadFx, refreshFx } from './models/fx'
 import { loadPrices, refreshPrices } from './models/prices'
 import { TableRunner } from './table/runner'
+import { registerOnline } from './online'
 import { NotificationAccess, TurnNotifications, type TurnNotice } from './notifications'
 import { checkNow, initUpdater, installUpdate, readyVersion } from './updater'
 
@@ -60,7 +61,7 @@ function createWindow() {
     icon: iconPath,
     width: 1280,
     height: 800,
-    minWidth: 880,
+    minWidth: 360,
     minHeight: 600,
     // 顶栏 52px 高，红绿灯/窗口按钮需与其对齐；overlay 颜色须与 renderer index.css 的 --topbar 同步
     ...(process.platform === 'darwin'
@@ -115,6 +116,7 @@ if (instanceLock) app.whenReady().then(async () => {
     await loadPrices()
     await loadFx()
     await runner.init()
+    await registerOnline(ipcMain, () => win, app.getPath('userData'))
   } catch (e) {
     // 这时可能读不到库：按系统语言
     dialog.showErrorBox(dict(resolveLocale(app.getLocale())).desktop.error.startFailed, e instanceof Error ? e.message : String(e))

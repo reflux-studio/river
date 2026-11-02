@@ -28,7 +28,8 @@ function talkTool() {
     description: p.description,
     schema: z.object({
       say: z.string().optional().describe(p.say),
-      note: z.string().optional().describe(p.note)
+      note: z.string().optional().describe(p.note),
+      showSlots: z.array(z.union([z.literal(0), z.literal(1)])).max(2).optional().describe('Optionally show your first card (0), second card (1), both, or neither after the hand')
     })
   }
 }

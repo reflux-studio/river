@@ -9,7 +9,11 @@
     "build:site": "pnpm --filter ./apps/site build",
     "dist": "pnpm --filter ./apps/desktop dist",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "dev:web": "pnpm --filter @river/web dev",
+    "dev:server": "pnpm --filter @river/server dev",
+    "build:web": "pnpm --filter @river/web build",
+    "build:server": "pnpm --filter @river/server build"
   },
   "devDependencies": {
     "@types/node": "^24.13.6",
