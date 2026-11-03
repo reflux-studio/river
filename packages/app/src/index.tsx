@@ -127,7 +127,13 @@ export function RiverApp({
       await audio.prepare()
       await action()
     } catch (cause) {
-      setError(String(cause))
+      setError(
+        cause instanceof Error
+          ? cause.message === 'timeout'
+            ? text.lobby.timeout
+            : cause.message
+          : String(cause)
+      )
     } finally {
       setBusy(false)
     }

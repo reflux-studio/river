@@ -4,9 +4,10 @@ import { Switch } from '@river/ui'
 export const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(' ')
 
 export const panel = 'flex min-w-0 flex-col gap-[18px] rounded-[14px] border bg-white px-[22px] py-5'
-export const pill = 'rounded-full border border-input bg-white px-3.5 py-[7px] text-[13px] whitespace-nowrap hover:bg-accent'
+export const pill =
+  'inline-flex items-center gap-1.5 rounded-full border border-input bg-white px-3.5 py-[7px] text-[13px] whitespace-nowrap hover:bg-accent'
 export const primary =
-  'rounded-full bg-foreground px-5 py-2.5 text-sm font-medium whitespace-nowrap text-white hover:bg-foreground/85 disabled:opacity-40'
+  'inline-flex items-center justify-center gap-1.5 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium whitespace-nowrap text-white hover:bg-foreground/85 disabled:opacity-40'
 export const ghost = 'rounded-full px-2.5 py-1 text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground'
 export const field =
   'w-full rounded-[10px] border border-input bg-white px-3 py-2 text-sm outline-none focus:border-foreground/40'

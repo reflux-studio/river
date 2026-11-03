@@ -38,7 +38,7 @@ function Bubble({ text, up, seat }: { text: string; up: boolean; seat: number })
   )
 }
 
-export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact }: {
+export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact, onSeatClick, seatActionLabel }: {
   seat: SeatView
   i: number
   n: number
@@ -47,6 +47,8 @@ export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact }:
   back: Back
   labels: { sb: string; bb: string }
   compact?: boolean
+  onSeatClick?: () => void
+  seatActionLabel?: string
 }) {
   const active = p.thinking || (isHero && heroTurn)
   const up = Math.sin(angle(i, n)) > -0.2
@@ -54,18 +56,27 @@ export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact }:
   const dim = p.folded || p.out
   if (p.empty)
     return (
-      <div
+      <button
+        type="button"
         data-table-seat
-        className="absolute flex -translate-1/2 items-center justify-center"
-        style={{ ...polar(i, n, 40, compact ? 32 : 36), zIndex: 2 }}
+        onClick={onSeatClick}
+        aria-label={seatActionLabel ? `${seatActionLabel} ${p.name}` : p.name}
+        tabIndex={onSeatClick ? 0 : -1}
+        className="absolute flex -translate-1/2 items-center justify-center border-0 bg-transparent p-0"
+        style={{ ...polar(i, n, compact ? 36 : 40, compact ? 32 : 36), zIndex: 2 }}
       >
-        <div className="flex size-[42px] items-center justify-center rounded-full border border-dashed border-[#c9c9c4] bg-white/70 text-[12px] font-medium text-[#8e8e93] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)] backdrop-blur-[2px]">
+        <span
+          className={cn(
+            'flex size-[42px] items-center justify-center rounded-full border border-dashed border-[#c9c9c4] bg-white/70 text-[12px] font-medium text-[#8e8e93] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)] backdrop-blur-[2px]',
+            onSeatClick && 'cursor-pointer transition hover:border-foreground hover:bg-white hover:text-foreground'
+          )}
+        >
           {p.name}
-        </div>
-      </div>
+        </span>
+      </button>
     )
   return (
-    <div data-table-seat className="absolute flex -translate-1/2 flex-col items-center gap-1.5 whitespace-nowrap" style={{ ...polar(i, n, 40, compact ? 32 : 36), zIndex: p.bubble ? 6 : 2 }}>
+    <div data-table-seat className="absolute flex -translate-1/2 flex-col items-center gap-1.5 whitespace-nowrap" style={{ ...polar(i, n, compact ? 36 : 40, compact ? 32 : 36), zIndex: p.bubble ? 6 : 2 }}>
       {p.bubble && up && <Bubble text={p.bubble} up seat={i} />}
       {p.cards ? (
         <div data-seat-cards={i} className={cn('-mb-3.5 flex', isHero ? 'gap-1' : 'gap-[3px]', (p.mucked || (isHero && p.folded)) && 'opacity-45 grayscale')}>
@@ -91,7 +102,7 @@ export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact }:
             : p.winner ? '0 0 0 6px oklch(0.55 0.14 155 / 0.22), 0 4px 14px rgba(0,0,0,0.12)' : '0 4px 14px rgba(0,0,0,0.1)'
         }}
       >
-        <Avatar ini={p.ini} hue={isHero ? undefined : p.hue} size={36} />
+        <Avatar ini={p.ini} hue={isHero ? undefined : p.hue} size={compact ? 28 : 36} />
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-semibold">{p.name}</span>
@@ -116,6 +127,14 @@ export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact }:
         >
           <span className="size-1.5 rounded-full" style={{ background: tone.dot }} />
           {p.status}
+        </div>
+      )}
+      {p.progress !== undefined && (
+        <div className="h-[3px] w-16 overflow-hidden rounded-full bg-black/10">
+          <div
+            className="h-full rounded-full bg-blue transition-[width] duration-500"
+            style={{ width: `${Math.round(p.progress * 100)}%` }}
+          />
         </div>
       )}
       {p.bubble && !up && <Bubble text={p.bubble} up={false} seat={i} />}

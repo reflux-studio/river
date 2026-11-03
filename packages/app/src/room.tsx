@@ -22,8 +22,8 @@ import { actionWords, streets } from './text'
 import type { TableAudio } from './audio'
 import { number } from './format'
 import { RoomPanel } from './room-panel'
-import { IconBack, IconChat, IconLink, IconMuted, IconSend, IconUsers, IconVolume } from './icons'
-import { cx, field, ghost, pill, primary } from './ui'
+import { IconBack, IconChat, IconCheck, IconLink, IconMuted, IconSend, IconUsers, IconVolume } from './icons'
+import { cx, field, pill, primary } from './ui'
 
 type Send = <T extends CommandType>(type: T, payload: CommandPayload<T>) => Promise<unknown>
 
@@ -327,7 +327,13 @@ export function Room({
       onError('')
       return result
     } catch (error) {
-      onError(error instanceof Error ? error.message : String(error))
+      onError(
+        error instanceof Error
+          ? error.message === 'timeout'
+            ? text.room.timeout
+            : error.message
+          : String(error)
+      )
       return undefined
     }
   }
@@ -351,10 +357,10 @@ export function Room({
     r: connected && !view.paused && legal?.minRaiseTo !== null && legal ? () => void act('raise') : undefined
   })
 
-  const seconds = (at: number | null) =>
-    at === null ? null : Math.max(0, Math.ceil((at - now) / 1000))
-  const turnSeconds = seconds(hand?.turn?.deadlineAt ?? null)
-  const showingSeconds = seconds(hand?.showingEndsAt ?? null)
+  const fraction = (end: number | null, total: number) =>
+    end === null ? undefined : Math.max(0, Math.min(1, (end - now) / total))
+  const turnProgress = fraction(hand?.turn?.deadlineAt ?? null, view.rules.humanTurnMs)
+  const showingProgress = fraction(hand?.showingEndsAt ?? null, view.rules.showingMs)
   const winnerBySeat = new Map((hand?.winners ?? []).map((winner) => [winner.seatId, winner.amount]))
   const rotated = Array.from(
     { length: view.rules.capacity },
@@ -394,7 +400,7 @@ export function Room({
           : player.sittingOut
             ? text.room.turn.sittingOut
             : active
-              ? text.room.turn.acting(turnSeconds)
+              ? text.room.turn.acting()
               : equity !== undefined
                 ? text.room.equity(Math.round(equity * 100))
                 : ''
@@ -418,7 +424,8 @@ export function Room({
         ? player.hole.map((slot) => (slot.visibility === 'known' ? slot.card : null))
         : undefined,
       status,
-      statusTone: player.allIn ? 'red' : active ? 'blue' : winnerBySeat.has(seatId) ? 'green' : 'muted'
+      statusTone: player.allIn ? 'red' : active ? 'blue' : winnerBySeat.has(seatId) ? 'green' : 'muted',
+      progress: active && connected ? turnProgress : undefined
     }
   })
 
@@ -484,30 +491,25 @@ export function Room({
       : view.paused
         ? text.room.paused
         : decision
-          ? text.room.turn.yours(turnSeconds)
+          ? text.room.turn.yours()
           : hand?.turn
             ? text.room.waitingFor(
-                view.participants.find((p) => p.seatId === hand.turn!.seatId)?.name ?? '',
-                turnSeconds
+                view.participants.find((p) => p.seatId === hand.turn!.seatId)?.name ?? ''
               )
             : view.phase === 'showing'
-              ? text.room.showing(showingSeconds)
+              ? text.room.showing()
               : !view.started
                 ? text.room.waitingHost
                 : text.room.waiting
-
-  const pre = view.self.preAction && hand && view.self.preAction.handId === hand.handId ? view.self.preAction : null
-  const preActions = ['check', 'fold', 'checkOrFold'] as const
-  const preLabel = (action: (typeof preActions)[number]) =>
-    action === 'check' ? text.room.pre.check : action === 'fold' ? text.room.pre.fold : text.room.pre.checkOrFold
-  const canPreaction =
-    !!hand &&
-    view.phase === 'playing' &&
-    !!self.hole &&
-    !self.folded &&
-    !self.allIn &&
-    hand.street !== 'showdown' &&
-    !decision
+  const statusProgress = connected
+    ? decision
+      ? turnProgress
+      : hand?.turn
+        ? turnProgress
+        : view.phase === 'showing'
+          ? showingProgress
+          : undefined
+    : undefined
 
   const presets = (() => {
     if (!legal || legal.minRaiseTo === null || legal.maxRaiseTo === null) return []
@@ -534,58 +536,63 @@ export function Room({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2 text-[13px] md:px-4">
+      <div className="flex flex-nowrap items-center gap-2 border-b bg-background px-3 py-2 text-[13px] md:px-4">
         <button
-          className="flex size-7 items-center justify-center rounded-full text-label hover:bg-accent"
+          className="flex size-7 shrink-0 items-center justify-center rounded-full text-label hover:bg-accent"
           onClick={() => void leave()}
           aria-label={text.room.back}
           title={text.room.back}
         >
           <IconBack />
         </button>
-        <span className="font-semibold">
-          {text.room.room} <code className="font-normal text-muted-foreground">{view.roomId.slice(0, 8)}</code>
-        </span>
-        <span className="text-muted-foreground">
-          {view.rules.smallBlind}/{view.rules.bigBlind}
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-semibold">
+            {text.room.room}{' '}
+            <code className="font-normal text-muted-foreground">{view.roomId.slice(0, 8)}</code>
+          </span>
+          <span className="hidden shrink-0 text-muted-foreground sm:inline">
+            {view.rules.smallBlind}/{view.rules.bigBlind}
+          </span>
+        </div>
         {view.paused && (
-          <span className="rounded-full bg-[oklch(0.97_0.02_25)] px-2.5 py-0.5 text-xs font-medium text-lose">
+          <span className="shrink-0 rounded-full bg-[oklch(0.97_0.02_25)] px-2 py-0.5 text-xs font-medium text-lose">
             {text.room.paused}
           </span>
         )}
         {!connected && (
-          <span className="rounded-full bg-[oklch(0.97_0.02_25)] px-2.5 py-0.5 text-xs font-medium text-lose">
+          <span className="hidden shrink-0 rounded-full bg-[oklch(0.97_0.02_25)] px-2 py-0.5 text-xs font-medium text-lose sm:inline">
             {text.status.reconnecting}
           </span>
         )}
         <div className="flex-1" />
-        {invite ? (
-          <button className={pill} onClick={() => void copy()}>
-            <IconLink />
-            {copied ? text.room.inviteCopied : text.room.invite}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {invite ? (
+            <button
+              className={pill}
+              onClick={() => void copy()}
+              aria-label={copied ? text.room.inviteCopied : text.room.invite}
+              title={copied ? text.room.inviteCopied : text.room.invite}
+            >
+              {copied ? <IconCheck /> : <IconLink />}
+              <span className="hidden sm:inline">{copied ? text.room.inviteCopied : text.room.invite}</span>
+            </button>
+          ) : (
+            <span className="text-xs text-muted-foreground">{text.room.local}</span>
+          )}
+          <button className={pill} onClick={() => setShowChat((value) => !value)} aria-label={text.room.chat} title={text.room.chat}>
+            <IconChat />
+            <span className="hidden sm:inline">{text.room.chat}</span>
           </button>
-        ) : (
-          <span className="text-xs text-muted-foreground">{text.room.local}</span>
-        )}
-        <button className={pill} onClick={() => setShowChat((value) => !value)} aria-label={text.room.chat}>
-          <IconChat />
-          <span className="hidden sm:inline">{text.room.chat}</span>
-        </button>
-        <button className={pill} onClick={() => setShowPanel((value) => !value)} aria-label={text.room.panel}>
-          <IconUsers />
-          <span className="hidden sm:inline">{text.room.panel}</span>
-        </button>
-        {host && view.rules.coachAllowed && (
-          <button className={pill} onClick={() => setShowCoach((value) => !value)}>
-            {text.room.coachTitle}
+          <button className={pill} onClick={() => setShowPanel((value) => !value)} aria-label={text.room.panel} title={text.room.panel}>
+            <IconUsers />
+            <span className="hidden sm:inline">{text.room.panel}</span>
           </button>
-        )}
-        {isHost && !view.started && (
-          <button className={primary} onClick={() => void send('room.start', {})}>
-            {text.room.start}
-          </button>
-        )}
+          {host && view.rules.coachAllowed && (
+            <button className={pill} onClick={() => setShowCoach((value) => !value)}>
+              {text.room.coachTitle}
+            </button>
+          )}
+        </div>
       </div>
 
       <main className="river-room relative flex min-h-0 flex-1">
@@ -683,6 +690,12 @@ export function Room({
               dealOrder={dealOrder}
               onDealStart={(count) => audio.deal(count)}
               compact={phone}
+              onSeatClick={
+                self.seatId === null && view.phase !== 'closed'
+                  ? (index) => void send('seat.sit', { seatId: rotated[index] })
+                  : undefined
+              }
+              seatActionLabel={text.room.sitHere}
             >
               <div className="pointer-events-none absolute inset-0 z-10">
                 <div className="absolute top-3 left-4 flex max-w-[60%] flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
@@ -773,14 +786,30 @@ export function Room({
                     </button>
                   ))}
                   <div className="flex-1" />
-                  <span
-                    className={cx(
-                      'text-[13px] whitespace-nowrap',
-                      decision && !view.paused ? 'text-blue' : 'text-muted-foreground'
-                    )}
-                  >
-                    {status}
-                  </span>
+                  {isHost && !view.started ? (
+                    <button className={primary} onClick={() => void send('room.start', {})}>
+                      {text.room.start}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {statusProgress !== undefined && (
+                        <div className="h-1 w-16 overflow-hidden rounded-full bg-black/10">
+                          <div
+                            className="h-full rounded-full bg-blue transition-[width] duration-500"
+                            style={{ width: `${Math.round(statusProgress * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                      <span
+                        className={cx(
+                          'text-[13px] whitespace-nowrap',
+                          decision && !view.paused ? 'text-blue' : 'text-muted-foreground'
+                        )}
+                      >
+                        {status}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {decision && legal ? (
@@ -832,62 +861,7 @@ export function Room({
                 ) : (
                   <>
                     {self.seatId === null && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[13px] text-muted-foreground">{text.room.chooseSeat}</span>
-                        {rotated
-                          .filter((seatId) => !view.participants.some((p) => p.seatId === seatId))
-                          .map((seatId) => (
-                            <button
-                              key={seatId}
-                              className={pill}
-                              onClick={() => void send('seat.sit', { seatId })}
-                            >
-                              {text.room.seat(seatId + 1)}
-                            </button>
-                          ))}
-                      </div>
-                    )}
-                    {canPreaction && (
-                      <div className="flex flex-col gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[13px] text-label">{text.room.pre.title}</span>
-                          {preActions.map((action) => {
-                            const selected = pre?.action === action
-                            return (
-                              <button
-                                key={action}
-                                className={cx(
-                                  pill,
-                                  selected && 'border-foreground bg-muted font-semibold'
-                                )}
-                                onClick={() =>
-                                  void send(
-                                    selected ? 'preaction.clear' : 'preaction.set',
-                                    selected
-                                      ? {}
-                                      : {
-                                          handId: hand!.handId,
-                                          street: hand!.street as 'preflop' | 'flop' | 'turn' | 'river',
-                                          action
-                                        }
-                                  )
-                                }
-                              >
-                                {preLabel(action)}
-                              </button>
-                            )
-                          })}
-                          <span className="text-xs text-muted-foreground">{text.room.pre.hint}</span>
-                        </div>
-                        {pre && (
-                          <div className="flex items-center gap-2 text-[13px] text-blue">
-                            {text.room.pre.selected(preLabel(pre.action))}
-                            <button className={ghost} onClick={() => void send('preaction.clear', {})}>
-                              {text.room.pre.cancel}
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <span className="text-[13px] text-muted-foreground">{text.room.chooseSeat}</span>
                     )}
                     {view.phase === 'showing' && hand && self.hole && !dismissedReveal && (
                       <div className="flex flex-col gap-2 border-t border-divider pt-3">

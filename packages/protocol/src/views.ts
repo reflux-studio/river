@@ -14,11 +14,6 @@ export const HoleSlotSchema = z.discriminatedUnion('visibility', [
   z.object({ visibility: z.literal('hidden') }),
   z.object({ visibility: z.literal('known'), card, source: z.enum(['own', 'public', 'spectator']) })
 ])
-export const PreActionSchema = z.object({
-  handId: id,
-  street: z.enum(['preflop', 'flop', 'turn', 'river']),
-  action: z.enum(['check', 'fold', 'checkOrFold'])
-})
 export const PublicTurnViewSchema = z.object({
   decisionId: id,
   seatId,
@@ -108,7 +103,6 @@ export const RoomViewSchema = z.object({
     participantId: id,
     seatId: seatId.nullable(),
     viewMode: z.enum(['player', 'spectator']),
-    preAction: PreActionSchema.nullable(),
     historyHead: z.number().int().nonnegative(),
     agentGrant: z.object({ grantId: id, maxAgents: z.number().int() }).nullable().optional()
   }),

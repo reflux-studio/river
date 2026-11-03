@@ -61,17 +61,14 @@
 @container (max-width: 600px) {
   [data-table-seat] {
     gap: 3px;
-    max-width: 96px;
+    max-width: 120px;
   }
   [data-table-seat] [data-seat] {
     gap: 4px;
     padding: 5px 8px;
   }
-  [data-table-seat] [data-seat] > :first-child {
-    display: none;
-  }
   [data-table-seat] [data-seat] .text-sm {
-    max-width: 78px;
+    max-width: 64px;
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 12px;

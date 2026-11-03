@@ -55,6 +55,7 @@ const zh = {
     noHistory: '还没有记录。',
     errorName: '先起一个昵称。',
     errorRoom: '先填写邀请链接或房间号。',
+    timeout: '连接超时，请重试。',
     connectionHint: '连接地址只影响这一台设备。'
   },
   room: {
@@ -82,7 +83,7 @@ const zh = {
     sb: '小盲',
     bb: '大盲',
     aiBlocked: 'AI 等待房主处理',
-    waitingFor: (name: string, sec: number | null) => `等待 ${name}${sec === null ? '' : ` · ${sec} 秒`}`,
+    waitingFor: (name: string) => `等待 ${name}`,
     spectator: '观战中',
     offline: '离线',
     you: '你',
@@ -90,8 +91,8 @@ const zh = {
     sitHere: '入座',
     chooseSeat: '选择空位入座',
     turn: {
-      yours: (sec: number | null) => `轮到你${sec === null ? '' : ` · ${sec} 秒`}`,
-      acting: (sec: number | null) => `行动中${sec === null ? '' : ` · ${sec} 秒`}`,
+      yours: () => '轮到你',
+      acting: () => '行动中',
       toCall: (n: string) => `跟注 ${n}`,
       check: '可以过牌',
       allIn: '全下',
@@ -111,15 +112,6 @@ const zh = {
       pot: '满池',
       max: '全下'
     },
-    pre: {
-      title: '轮到我时',
-      check: '过牌',
-      fold: '弃牌',
-      checkOrFold: '过牌或弃牌',
-      hint: '仅本街有效，可随时取消',
-      selected: (action: string) => `已预约：${action}`,
-      cancel: '取消'
-    },
     reveal: {
       title: '亮牌',
       hint: '选择要亮的牌；不操作则不亮',
@@ -128,7 +120,7 @@ const zh = {
       revealed: '已亮',
       slot: (n: number) => `第 ${n} 张`
     },
-    showing: (sec: number | null) => (sec === null ? '展示中' : `展示剩 ${sec} 秒`),
+    showing: () => '展示中',
     panelTitle: '房间',
     players: '玩家',
     host: '房主',
@@ -160,6 +152,7 @@ const zh = {
     danger: '本场操作',
     closeRoom: '散桌',
     chatTitle: '公屏',
+    timeout: '操作超时，请重试。',
     chatEmpty: '还没有人发言。',
     chatPlaceholder: '说点什么…',
     send: '发送',
@@ -277,6 +270,7 @@ const en: WebText = {
     noHistory: 'No sessions yet.',
     errorName: 'Pick a name first.',
     errorRoom: 'Paste an invite link or room id first.',
+    timeout: 'Connection timed out. Try again.',
     connectionHint: 'The server address only affects this device.'
   },
   room: {
@@ -304,7 +298,7 @@ const en: WebText = {
     sb: 'SB',
     bb: 'BB',
     aiBlocked: 'AI waiting for the host',
-    waitingFor: (name: string, sec: number | null) => `Waiting for ${name}${sec === null ? '' : ` · ${sec}s`}`,
+    waitingFor: (name: string) => `Waiting for ${name}`,
     spectator: 'Spectating',
     offline: 'Offline',
     you: 'You',
@@ -312,8 +306,8 @@ const en: WebText = {
     sitHere: 'Sit',
     chooseSeat: 'Choose an empty seat',
     turn: {
-      yours: (sec: number | null) => `Your turn${sec === null ? '' : ` · ${sec}s`}`,
-      acting: (sec: number | null) => `Acting${sec === null ? '' : ` · ${sec}s`}`,
+      yours: () => 'Your turn',
+      acting: () => 'Acting',
       toCall: (n: string) => `Call ${n}`,
       check: 'Check available',
       allIn: 'All-in',
@@ -333,15 +327,6 @@ const en: WebText = {
       pot: 'Pot',
       max: 'All-in'
     },
-    pre: {
-      title: 'When it’s my turn',
-      check: 'Check',
-      fold: 'Fold',
-      checkOrFold: 'Check or fold',
-      hint: 'This street only; cancel anytime',
-      selected: (action: string) => `Set: ${action}`,
-      cancel: 'Cancel'
-    },
     reveal: {
       title: 'Show cards',
       hint: 'Pick the cards to show; do nothing to keep them hidden',
@@ -350,7 +335,7 @@ const en: WebText = {
       revealed: 'Shown',
       slot: (n: number) => `Card ${n}`
     },
-    showing: (sec: number | null) => (sec === null ? 'Reviewing' : `${sec}s left to show`),
+    showing: () => 'Reviewing',
     panelTitle: 'Room',
     players: 'Players',
     host: 'Host',
@@ -382,6 +367,7 @@ const en: WebText = {
     danger: 'This session',
     closeRoom: 'Close room',
     chatTitle: 'Chat',
+    timeout: 'Request timed out. Try again.',
     chatEmpty: 'No messages yet.',
     chatPlaceholder: 'Say something…',
     send: 'Send',

@@ -97,10 +97,6 @@ export interface RoomState {
   timers: TimerState[]
   decision: DecisionState | null
   deferredRemovals: string[]
-  preActions: Record<
-    string,
-    { handId: string; street: 'preflop' | 'flop' | 'turn' | 'river'; action: 'check' | 'fold' | 'checkOrFold' }
-  >
   publicChat: RoomView['chat']
   historyHeads: Record<string, number>
   history: Record<string, PersonalChange[]>

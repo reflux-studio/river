@@ -7,7 +7,7 @@ import { BetChip, ChipStacks, Seat } from './seat'
 import type { Back, DealCard, Fx, SeatView } from './types'
 
 // 桌面椭圆、底池、公共牌、下注筹码、座位与特效层。要缩放请包一层外部元素：全下震屏会改写本组件根节点的 transform
-export function TableStage({ seats, board, pot, done, handNo, heroSeat, heroTurn, felt: F, back, fx, labels, dealId, dealOrder, onDealStart, compact, children }: {
+export function TableStage({ seats, board, pot, done, handNo, heroSeat, heroTurn, felt: F, back, fx, labels, dealId, dealOrder, onDealStart, compact, onSeatClick, seatActionLabel, children }: {
   seats: SeatView[]
   board: Card[]
   pot: number
@@ -27,6 +27,8 @@ export function TableStage({ seats, board, pot, done, handNo, heroSeat, heroTurn
   onDealStart?: (count: number) => void
   // 窄屏压缩座位环，给底部操作栏留出空间
   compact?: boolean
+  onSeatClick?: (index: number) => void
+  seatActionLabel?: string
   children?: ReactNode
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -66,7 +68,7 @@ export function TableStage({ seats, board, pot, done, handNo, heroSeat, heroTurn
       </div>
 
       {seats.map((s, i) => s.bet > 0 && <BetChip key={i} amount={s.bet} i={i} n={n} dark={F.dark} compact={compact} />)}
-      {seats.map((s, i) => <Seat key={i} seat={s} i={i} n={n} isHero={i === heroSeat} heroTurn={heroTurn} back={back} labels={labels} compact={compact} />)}
+      {seats.map((s, i) => <Seat key={i} seat={s} i={i} n={n} isHero={i === heroSeat} heroTurn={heroTurn} back={back} labels={labels} compact={compact} onSeatClick={onSeatClick ? () => onSeatClick(i) : undefined} seatActionLabel={seatActionLabel} />)}
       <div ref={fxRef} className="pointer-events-none absolute inset-0 z-[8]" />
     </div>
   )

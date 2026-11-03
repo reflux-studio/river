@@ -59,3 +59,9 @@ export const IconSend = (props: SVGProps<SVGSVGElement>) => (
     <path d="M22 2l-7 20-4-9-9-4 20-7z" />
   </svg>
 )
+
+export const IconCheck = (props: SVGProps<SVGSVGElement>) => (
+  <svg {...base(props)}>
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+)

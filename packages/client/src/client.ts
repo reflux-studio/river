@@ -34,7 +34,10 @@ export class RiverClient {
   private session: Session | undefined
   private bootstrap: BootstrapCommand | undefined
   private commands = new Map<string, BoundCommand>()
-  private waiting = new Map<string, { resolve(ack: Ack): void; reject(error: Error): void }>()
+  private waiting = new Map<
+    string,
+    { resolve(ack: Ack): void; reject(error: Error): void; cancel(): void }
+  >()
   private binding: { resolve(): void; reject(error: Error): void } | null = null
   private stopped = false
   private replayPending = false
@@ -91,15 +94,25 @@ export class RiverClient {
   whenBound(): Promise<void> {
     if (this.bound && this.state.connected && this.state.view) return Promise.resolve()
     return new Promise((resolve, reject) => {
-      const unsubscribe = this.subscribe(() => {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      let unsubscribe = () => {}
+      const finish = () => {
+        if (timer) clearTimeout(timer)
+        unsubscribe()
+      }
+      unsubscribe = this.subscribe(() => {
         if (this.state.error) {
-          unsubscribe()
+          finish()
           reject(new Error(this.state.error))
         } else if (this.bound && this.state.view && this.state.connected) {
-          unsubscribe()
+          finish()
           resolve()
         }
       })
+      timer = setTimeout(() => {
+        finish()
+        reject(new Error('timeout'))
+      }, 8_000)
     })
   }
   async forgetRoom(): Promise<void> {
@@ -146,7 +159,25 @@ export class RiverClient {
     this.bootstrap = command
     await this.store.set(`bootstrap:${this.serverUrl}`, command)
     const done = new Promise<void>((resolve, reject) => {
-      this.binding = { resolve, reject }
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const binding = {
+        resolve: () => {
+          if (timer) clearTimeout(timer)
+          resolve()
+        },
+        reject: (error: Error) => {
+          if (timer) clearTimeout(timer)
+          reject(error)
+        }
+      }
+      this.binding = binding
+      timer = setTimeout(() => {
+        if (this.binding !== binding) return
+        this.binding = null
+        this.bootstrap = undefined
+        void this.store.set(`bootstrap:${this.serverUrl}`, null)
+        reject(new Error('timeout'))
+      }, 8_000)
     })
     this.transport.send(command)
     return done
@@ -168,11 +199,31 @@ export class RiverClient {
       this.commands.set(command.commandId, command)
       await this.saveCommands()
     }
-    const result = new Promise<Ack>((resolve, reject) => this.waiting.set(command.commandId, { resolve, reject }))
+    const result = new Promise<Ack>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const finish = (action: () => void) => {
+        if (timer) clearTimeout(timer)
+        action()
+      }
+      this.waiting.set(command.commandId, {
+        resolve: (ack) => finish(() => resolve(ack)),
+        reject: (error) => finish(() => reject(error)),
+        cancel: () => {
+          if (timer) clearTimeout(timer)
+        }
+      })
+      timer = setTimeout(() => {
+        if (!this.waiting.has(command.commandId)) return
+        this.waiting.delete(command.commandId)
+        reject(new Error('timeout'))
+      }, 10_000)
+    })
     try {
       this.transport.send(command)
     } catch (error) {
-      if (readonly) this.waiting.delete(command.commandId)
+      const inflight = this.waiting.get(command.commandId)
+      this.waiting.delete(command.commandId)
+      inflight?.cancel()
       throw error
     }
     return result

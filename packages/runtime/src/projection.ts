@@ -178,7 +178,6 @@ export function projectRoom(state: RoomState, context: ProjectionContext): Proje
       participantId: selfParticipant.participantId,
       seatId: selfParticipant.seatId,
       viewMode: ownSeated ? 'player' : 'spectator',
-      preAction: state.preActions[selfParticipant.participantId] ?? null,
       historyHead: state.historyHeads[context.controllerId] ?? 0,
       agentGrant: state.providers[selfParticipant.participantId] ?? null
     },

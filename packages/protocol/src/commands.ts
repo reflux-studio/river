@@ -55,12 +55,6 @@ export const CommandPayloadSchemas = {
   'decision.retry': z.object({ decisionId: id }),
   'participant.remove': z.object({ targetParticipantId: id }),
   'host.transfer': z.object({ targetParticipantId: id }),
-  'preaction.set': z.object({
-    handId: id,
-    street: z.enum(['preflop', 'flop', 'turn', 'river']),
-    action: z.enum(['check', 'fold', 'checkOrFold'])
-  }),
-  'preaction.clear': z.object({}),
   'hand.reveal': z.object({ handId: id, slots: z.array(z.union([z.literal(0), z.literal(1)])).max(2) }),
   'hand.skipShowing': z.object({ handId: id }),
   'room.pause': z.object({}),

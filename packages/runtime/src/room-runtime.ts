@@ -234,7 +234,6 @@ export class RoomRuntime {
       timers: [],
       decision: null,
       deferredRemovals: [],
-      preActions: {},
       publicChat: [],
       historyHeads: { [controller.controllerId]: 0 },
       history: {},
@@ -1216,35 +1215,6 @@ class RoomActor {
         effects.push(changeEffect(this.deps.id(), this.deps.clock.now(), target, 'hostTransferred'))
         return simpleResult()
       }
-      case 'preaction.set': {
-        const seat = participant.seatId === null ? null : table?.seats()[participant.seatId]
-        if (
-          state.phase !== 'playing' ||
-          !table?.isBettingRoundInProgress() ||
-          !state.decision ||
-          state.decision.participantId === participant.participantId ||
-          participant.seatId === null ||
-          !seat ||
-          seat.folded ||
-          seat.allIn ||
-          seat.out ||
-          participant.exited ||
-          participant.nextHandStand ||
-          payload.handId !== state.currentHandId ||
-          payload.street !== table.roundOfBetting()
-        )
-          throw new RuntimeFault('INVALID_PHASE', 'pre-action is not available for this hand')
-        state.preActions[participant.participantId] = {
-          handId: payload.handId as string,
-          street: payload.street as 'preflop' | 'flop' | 'turn' | 'river',
-          action: payload.action as 'check' | 'fold' | 'checkOrFold'
-        }
-        return simpleResult()
-      }
-      case 'preaction.clear': {
-        delete state.preActions[participant.participantId]
-        return simpleResult()
-      }
       case 'chat.send': {
         if (participant.exited) throw new RuntimeFault('UNBOUND', 'participant has left the room')
         const text = payload.text as string
@@ -1376,19 +1346,9 @@ class RoomActor {
       while (table.isBettingRoundInProgress()) {
         const actingSeat = table.playerToAct()
         const actingParticipant = Object.values(state.participants).find((p) => p.seatId === actingSeat)
-        const preAction = actingParticipant ? state.preActions[actingParticipant.participantId] : undefined
-        if (preAction) delete state.preActions[actingParticipant!.participantId]
-        if (!actingParticipant?.exited && !actingParticipant?.nextHandStand) {
-          if (!preAction || preAction.handId !== state.currentHandId || preAction.street !== table.roundOfBetting())
-            break
-          const legal = table.legalActions().actions
-          const canCheck = legal.includes('check')
-          const canFold = legal.includes('fold')
-          if (preAction.action === 'check' && !canCheck) break
-          if (preAction.action === 'fold' && !canFold) break
-          if (preAction.action === 'checkOrFold' && !canCheck && !canFold) break
-          table.actionTaken(preAction.action === 'fold' ? 'fold' : canCheck ? 'check' : 'fold')
-        } else table.actionTaken(table.legalActions().actions.includes('fold') ? 'fold' : 'check')
+        // 已离座或下手暂离的座位按管理性弃牌处理，保留已投入的筹码
+        if (!actingParticipant?.exited && !actingParticipant?.nextHandStand) break
+        table.actionTaken(table.legalActions().actions.includes('fold') ? 'fold' : 'check')
       }
       if (table.isBettingRoundInProgress()) {
         this.syncStacks(state, table)
@@ -1410,7 +1370,6 @@ class RoomActor {
             data: { slot: priorBoardLength + offset, card }
           })
         )
-      state.preActions = {}
     }
     table.showdown()
     this.syncStacks(state, table)
@@ -1557,7 +1516,6 @@ class RoomActor {
     }
     state.handViewerControllerIds = Object.keys(state.controllers)
     state.revealedSlots = {}
-    state.preActions = {}
     this.createDecision(state, game)
     effects?.push(...dealEffects(this.deps.id, state.currentHandId!, game, this.deps.clock.now()))
     if (!game.isBettingRoundInProgress()) this.advanceHand(state, game, effects ?? [])
@@ -1668,7 +1626,6 @@ class RoomActor {
     }
     state.recovering = false
     state.deferredRemovals = []
-    state.preActions = {}
   }
 
   private recordChange(state: RoomState, controllerId: string, data: PersonalChange['data']): void {

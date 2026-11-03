@@ -29,6 +29,8 @@ export interface SeatView {
   allin: boolean
   status: string
   statusTone: 'muted' | 'blue' | 'green' | 'dark' | 'red'
+  // 行动/展示倒计时剩余比例，0–1；不显示数字
+  progress?: number
   thinking: boolean
   winner: boolean
   // 空位只画座位号，不画完整玩家卡
