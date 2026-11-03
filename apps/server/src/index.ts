@@ -117,11 +117,8 @@ wss.on('connection', (ws) => {
   let greeted = false
   let closed = false
   const helloTimeout = setTimeout(() => ws.close(4000, 'hello timeout'), 5_000)
-  let bindTimeout: ReturnType<typeof setTimeout> | undefined
   lastAuthenticatedAt.set(ws, clock.now())
-  ws.on('pong', () => {
-    if (bindings.has(ws)) lastAuthenticatedAt.set(ws, clock.now())
-  })
+  ws.on('pong', () => lastAuthenticatedAt.set(ws, clock.now()))
   ws.send(
     JSON.stringify(
       WelcomeSchema.parse({ kind: 'welcome', protocol: 1, connectionId, serverAt: clock.now(), heartbeatMs: 10_000 })
@@ -155,9 +152,6 @@ wss.on('connection', (ws) => {
             HelloSchema.parse(raw)
             greeted = true
             clearTimeout(helloTimeout)
-            bindTimeout = setTimeout(() => {
-              if (!bindings.has(ws)) ws.close(4000, 'bind timeout')
-            }, 10_000)
             return
           }
           const bootstrap = BootstrapCommandSchema.safeParse(raw)
@@ -182,7 +176,6 @@ wss.on('connection', (ws) => {
               return
             }
             if (result.kind === 'bound') {
-              if (bindTimeout) clearTimeout(bindTimeout)
               for (const old of sockets.get(result.bound.controllerId) ?? []) {
                 if (old !== ws) old.close(4001, 'session resumed elsewhere')
               }
@@ -234,7 +227,6 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     closed = true
     clearTimeout(helloTimeout)
-    if (bindTimeout) clearTimeout(bindTimeout)
     const binding = bindings.get(ws)
     if (!binding) return
     sockets.get(binding.controllerId)?.delete(ws)

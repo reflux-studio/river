@@ -196,6 +196,7 @@ export class RiverClient {
     } else if (message.kind === 'bound') {
       this.bound = message
       this.replayPending = true
+      this.archiveAttempted = false
       const credential = this.bootstrap && 'credential' in this.bootstrap ? this.bootstrap.credential : this.session
       if (!credential) throw new Error('缺少本地房间凭证')
       this.session = {
@@ -229,14 +230,31 @@ export class RiverClient {
       if (this.commands.delete(message.commandId)) await this.saveCommands()
     } else if (message.kind === 'reject') {
       const error = new Error(message.detail ?? message.code)
+      const resuming = this.bootstrap?.kind === 'session.resume' || (!this.bootstrap && !!this.session)
       if (
         !this.bound &&
-        this.session &&
+        resuming &&
         !this.archiveAttempted &&
         ['ROOM_NOT_FOUND', 'ROOM_CLOSED'].includes(message.code)
       ) {
         this.archiveAttempted = true
-        this.transport.send({ kind: 'archive.authenticate', roomId: this.session.roomId, credential: this.session })
+        this.transport.send({ kind: 'archive.authenticate', roomId: this.session!.roomId, credential: this.session! })
+        return
+      }
+      // 房间已删除或凭证失效：清掉本地会话，回到可建房/入房的大厅连接
+      if (
+        !this.bound &&
+        resuming &&
+        this.archiveAttempted &&
+        ['ROOM_NOT_FOUND', 'ROOM_CLOSED', 'CONTROLLER_MISMATCH'].includes(message.code)
+      ) {
+        this.session = undefined
+        this.bootstrap = undefined
+        this.binding?.reject(error)
+        this.binding = null
+        await this.store.set(`session:${this.serverUrl}`, null)
+        await this.store.set(`bootstrap:${this.serverUrl}`, null)
+        this.update({ view: null, connected: true, error: null, effects: [] })
         return
       }
       this.update({ error: error.message })
