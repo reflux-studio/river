@@ -14,6 +14,7 @@ import {
   type PublicProfile,
   type RoomView
 } from '@river/protocol'
+import { createId } from './id'
 import type { Transport } from './transport'
 
 import type { KeyValueStore } from '@river/storage'
@@ -25,6 +26,10 @@ export interface ClientState {
   effects: Effect[]
 }
 type Session = { roomId: string; controllerId: string; resumeSecret: string }
+
+const info = (...args: unknown[]) => console.info('[river]', ...args)
+const debug = (...args: unknown[]) => console.debug('[river]', ...args)
+const warn = (...args: unknown[]) => console.warn('[river]', ...args)
 
 /** Owns a connection and its latest authorized view. Rendering subscribes to that view. */
 export class RiverClient {
@@ -40,7 +45,7 @@ export class RiverClient {
   >()
   private binding: { resolve(): void; reject(error: Error): void } | null = null
   private stopped = false
-  private replayPending = false
+  private replay: BoundCommand[] = []
   private archiveAttempted = false
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined
   private inbound: Promise<unknown> = Promise.resolve()
@@ -74,22 +79,34 @@ export class RiverClient {
   }
   private async open(): Promise<void> {
     if (this.stopped) return
+    info('socket connecting', this.serverUrl)
     await this.transport.open(
       (message) => {
         this.inbound = this.inbound
           .then(() => this.receive(message))
-          .catch((error) => this.update({ error: String(error) }))
+          .catch((error) => {
+            warn('message failed', error)
+            this.update({ error: String(error) })
+          })
       },
-      () => {
+      (event) => {
+        info('socket closed', event.code, event.reason)
         this.bound = null
         this.update({ connected: false })
-        if (!this.stopped)
-          this.reconnectTimer = setTimeout(
-            () => void this.open().catch((error) => this.update({ error: String(error) })),
-            1000
-          )
+        if (this.stopped) return
+        // 4001：同一凭证在别处重新绑定，本连接是被顶掉的一方；继续重连只会两边互踢
+        if (event.code === 4001) {
+          warn('session resumed elsewhere; stop reconnecting')
+          this.update({ error: '此房间已在另一个窗口打开。' })
+          return
+        }
+        this.reconnectTimer = setTimeout(
+          () => void this.open().catch((error) => this.update({ error: String(error) })),
+          1000
+        )
       }
     )
+    info('socket open')
   }
   whenBound(): Promise<void> {
     if (this.bound && this.state.connected && this.state.view) return Promise.resolve()
@@ -101,12 +118,12 @@ export class RiverClient {
         unsubscribe()
       }
       unsubscribe = this.subscribe(() => {
-        if (this.state.error) {
-          finish()
-          reject(new Error(this.state.error))
-        } else if (this.bound && this.state.view && this.state.connected) {
+        if (this.bound && this.state.view && this.state.connected) {
           finish()
           resolve()
+        } else if (this.state.error) {
+          finish()
+          reject(new Error(this.state.error))
         }
       })
       timer = setTimeout(() => {
@@ -122,6 +139,7 @@ export class RiverClient {
     this.bootstrap = undefined
     this.bound = null
     this.commands.clear()
+    this.replay = []
     await this.store.set(`session:${this.serverUrl}`, null)
     await this.store.set(`bootstrap:${this.serverUrl}`, null)
     await this.saveCommands()
@@ -139,7 +157,7 @@ export class RiverClient {
   async create(profile: PublicProfile, rules: CommandPayload<'room.rules'>['rules']): Promise<void> {
     return this.bind({
       kind: 'room.create',
-      commandId: crypto.randomUUID(),
+      commandId: createId(),
       credential: this.credential(),
       profile,
       rules
@@ -149,15 +167,16 @@ export class RiverClient {
     const saved = await this.store.get<Session>(`credential:${this.serverUrl}:${roomId}`)
     return saved
       ? this.bind({ kind: 'session.resume', roomId, credential: saved })
-      : this.bind({ kind: 'room.join', commandId: crypto.randomUUID(), roomId, credential: this.credential(), profile })
+      : this.bind({ kind: 'room.join', commandId: createId(), roomId, credential: this.credential(), profile })
   }
   private credential() {
-    return { controllerId: crypto.randomUUID(), resumeSecret: crypto.randomUUID() + crypto.randomUUID() }
+    return { controllerId: createId(), resumeSecret: createId() + createId() }
   }
   private async bind(command: BootstrapCommand): Promise<void> {
     command = BootstrapCommandSchema.parse(command)
     this.bootstrap = command
     await this.store.set(`bootstrap:${this.serverUrl}`, command)
+    let settle!: { resolve(): void; reject(error: Error): void }
     const done = new Promise<void>((resolve, reject) => {
       let timer: ReturnType<typeof setTimeout> | undefined
       const binding = {
@@ -170,16 +189,27 @@ export class RiverClient {
           reject(error)
         }
       }
+      settle = binding
       this.binding = binding
       timer = setTimeout(() => {
         if (this.binding !== binding) return
+        warn('bootstrap timeout', command.kind)
         this.binding = null
         this.bootstrap = undefined
         void this.store.set(`bootstrap:${this.serverUrl}`, null)
         reject(new Error('timeout'))
       }, 8_000)
     })
-    this.transport.send(command)
+    info('bootstrap →', command.kind, 'roomId' in command ? command.roomId.slice(0, 8) : '')
+    try {
+      this.transport.send(command)
+    } catch (error) {
+      warn('bootstrap send failed', error)
+      this.binding = null
+      this.bootstrap = undefined
+      void this.store.set(`bootstrap:${this.serverUrl}`, null)
+      settle.reject(error instanceof Error ? error : new Error(String(error)))
+    }
     return done
   }
 
@@ -188,7 +218,7 @@ export class RiverClient {
     const command: BoundCommand = BoundCommandSchema.parse({
       kind: 'command',
       protocol: 1,
-      commandId: crypto.randomUUID(),
+      commandId: createId(),
       roomId: this.bound.roomId,
       serverEpoch: this.bound.serverEpoch,
       type,
@@ -214,13 +244,16 @@ export class RiverClient {
       })
       timer = setTimeout(() => {
         if (!this.waiting.has(command.commandId)) return
+        warn('command timeout', type)
         this.waiting.delete(command.commandId)
         reject(new Error('timeout'))
       }, 10_000)
     })
+    debug('command →', type)
     try {
       this.transport.send(command)
     } catch (error) {
+      warn('command send failed', type, error)
       const inflight = this.waiting.get(command.commandId)
       this.waiting.delete(command.commandId)
       inflight?.cancel()
@@ -239,14 +272,17 @@ export class RiverClient {
     if (this.stopped) return
     const message = ProtocolOutputSchema.parse(raw)
     if (message.kind === 'welcome') {
+      debug('welcome', message.connectionId.slice(0, 8))
       this.transport.send({ kind: 'hello', protocol: 1, clientVersion: '0.3.2', platform: 'web' })
       if (this.bootstrap) this.transport.send(this.bootstrap)
       else if (this.session)
         this.transport.send({ kind: 'session.resume', roomId: this.session.roomId, credential: this.session })
       else this.update({ connected: true, error: null })
     } else if (message.kind === 'bound') {
+      info('bound', message.roomId.slice(0, 8))
       this.bound = message
-      this.replayPending = true
+      // 只重放绑定前积压的命令；绑定后新发的命令已经在路上，不能重复发送
+      this.replay = [...this.commands.values()]
       this.archiveAttempted = false
       const credential = this.bootstrap && 'credential' in this.bootstrap ? this.bootstrap.credential : this.session
       if (!credential) throw new Error('缺少本地房间凭证')
@@ -262,11 +298,15 @@ export class RiverClient {
       this.binding?.resolve()
       this.binding = null
     } else if (message.kind === 'projection') {
-      if (message.controllerId !== this.bound?.controllerId) return
+      if (message.controllerId !== this.bound?.controllerId) {
+        warn('drop projection for another controller', message.controllerId.slice(0, 8))
+        return
+      }
       this.update({ view: message.view, connected: true, error: null, effects: message.reset ? [] : message.effects })
-      if (this.replayPending) {
-        this.replayPending = false
-        for (const command of this.commands.values()) this.transport.send(command)
+      if (this.replay.length) {
+        debug('replay pending commands', this.replay.length)
+        for (const command of this.replay) this.transport.send(command)
+        this.replay = []
       }
       if (!this.historySync && message.view.self.historyHead > 0) {
         this.historySync = this.syncHistory(message)
@@ -280,6 +320,7 @@ export class RiverClient {
       this.waiting.delete(message.commandId)
       if (this.commands.delete(message.commandId)) await this.saveCommands()
     } else if (message.kind === 'reject') {
+      warn('reject', message.code, message.detail ?? '', message.commandId ?? '')
       const error = new Error(message.detail ?? message.code)
       const resuming = this.bootstrap?.kind === 'session.resume' || (!this.bootstrap && !!this.session)
       if (
@@ -309,25 +350,20 @@ export class RiverClient {
         return
       }
       this.update({ error: error.message })
-      if (
-        this.bootstrap &&
-        'commandId' in this.bootstrap &&
-        (!message.commandId || message.commandId === this.bootstrap.commandId)
-      ) {
+      if (message.commandId && this.waiting.has(message.commandId)) {
+        this.waiting.get(message.commandId)!.reject(error)
+        this.waiting.delete(message.commandId)
+        if (message.code !== 'STORE_UNAVAILABLE' && this.commands.delete(message.commandId)) await this.saveCommands()
+      } else if (!this.bound && this.bootstrap) {
+        // 绑定阶段的拒绝（create/join/resume）可能带服务端生成的 commandId，不能按普通命令处理
         this.binding?.reject(error)
         this.binding = null
         if (!message.retryable) {
           this.bootstrap = undefined
           await this.store.set(`bootstrap:${this.serverUrl}`, null)
         }
-      }
-      if (message.commandId) {
-        this.waiting.get(message.commandId)?.reject(error)
-        this.waiting.delete(message.commandId)
-        if (message.code !== 'STORE_UNAVAILABLE' && this.commands.delete(message.commandId)) await this.saveCommands()
-      } else {
-        this.binding?.reject(error)
-        this.binding = null
+      } else if (message.commandId && this.commands.delete(message.commandId)) {
+        await this.saveCommands()
       }
     }
   }

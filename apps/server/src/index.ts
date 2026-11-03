@@ -27,6 +27,10 @@ const clock: Clock = {
 }
 let ready = false
 let cleanup: ReturnType<typeof setInterval> | undefined
+let deliveryBlocked = false
+
+const log = (...args: unknown[]) => console.info('[river]', ...args)
+const warn = (...args: unknown[]) => console.warn('[river]', ...args)
 
 const runtime = new RoomRuntime({
   store,
@@ -36,7 +40,14 @@ const runtime = new RoomRuntime({
   hash: (value) => createHash('sha256').update(value).digest('hex'),
   serverEpoch,
   deliver: (projections) => {
-    if (!store.isHealthy()) return
+    if (!store.isHealthy()) {
+      if (!deliveryBlocked) {
+        deliveryBlocked = true
+        warn('delivery blocked: storage unavailable')
+      }
+      return
+    }
+    deliveryBlocked = false
     for (const projection of projections) {
       const peers = sockets.get(projection.controllerId)
       if (!peers) continue
@@ -100,6 +111,7 @@ const server = createServer(async (req, res) => {
 const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 })
 server.on('upgrade', (request, socket, head) => {
   if (!ready || !store.isHealthy()) {
+    warn('upgrade rejected: server not ready')
     socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n')
     socket.destroy()
     return
@@ -114,6 +126,7 @@ server.on('upgrade', (request, socket, head) => {
 
 wss.on('connection', (ws) => {
   const connectionId = randomUUID()
+  log('ws open', connectionId.slice(0, 8))
   let greeted = false
   let closed = false
   const helloTimeout = setTimeout(() => ws.close(4000, 'hello timeout'), 5_000)
@@ -166,16 +179,19 @@ wss.on('connection', (ws) => {
               return
             }
             const message = bootstrap.data
+            log('bootstrap', message.kind, 'roomId' in message ? message.roomId.slice(0, 8) : '')
             let result
             if (message.kind === 'room.create') result = await runtime.createRoom(message)
             else if (message.kind === 'room.join') result = await runtime.joinRoom(message)
             else if (message.kind === 'session.resume') result = await runtime.resume(message)
             else result = await runtime.authenticateArchive(message)
             if (result.kind === 'reject') {
+              warn('bootstrap rejected', message.kind, result.reject.code, result.reject.detail ?? '')
               send(ws, result.reject)
               return
             }
             if (result.kind === 'bound') {
+              log('bound', result.bound.roomId.slice(0, 8), result.bound.controllerId.slice(0, 8))
               for (const old of sockets.get(result.bound.controllerId) ?? []) {
                 if (old !== ws) old.close(4001, 'session resumed elsewhere')
               }
@@ -194,6 +210,7 @@ wss.on('connection', (ws) => {
           }
           const binding = bindings.get(ws)
           if (!binding) {
+            warn('command before bind')
             send(ws, {
               kind: 'reject',
               code: 'UNBOUND',
@@ -203,35 +220,46 @@ wss.on('connection', (ws) => {
             return
           }
           if (typeof raw !== 'object' || raw === null || !('roomId' in raw) || raw.roomId !== binding.roomId) {
+            warn('command room mismatch', binding.roomId.slice(0, 8))
             send(ws, { kind: 'reject', code: 'CONTROLLER_MISMATCH', retryable: false })
             return
           }
           lastAuthenticatedAt.set(ws, clock.now())
           const result = await runtime.submit(binding.controllerId, raw, binding.generation)
-          if (result.kind === 'reject') send(ws, result.reject)
-          else if (result.kind === 'ack') send(ws, result.ack)
+          if (result.kind === 'reject') {
+            warn('command rejected', binding.roomId.slice(0, 8), result.reject.code, result.reject.detail ?? '')
+            send(ws, result.reject)
+          } else if (result.kind === 'ack') send(ws, result.ack)
         } catch (error) {
           if (!store.isHealthy()) {
+            warn('storage unavailable; closing', connectionId.slice(0, 8))
             ws.close(1011, 'storage unavailable')
             return
           }
           if (error instanceof Error && 'code' in error && 'retryable' in error) {
+            warn('message failed', connectionId.slice(0, 8), error.message)
             send(ws, { kind: 'reject', code: error.code, retryable: error.retryable, detail: error.message })
             return
           }
+          warn('invalid message', connectionId.slice(0, 8), error instanceof Error ? error.message : 'unknown error')
           send(ws, { kind: 'reject', code: 'INVALID_PAYLOAD', retryable: false, detail: 'invalid protocol message' })
         }
       })
-      .catch(() => ws.close(1011, 'message processing failed'))
+      .catch((error) => {
+        warn('message queue failed', connectionId.slice(0, 8), error instanceof Error ? error.message : 'unknown error')
+        ws.close(1011, 'message processing failed')
+      })
   })
-  ws.on('close', () => {
+  ws.on('close', (code, reason) => {
     closed = true
     clearTimeout(helloTimeout)
+    log('ws close', connectionId.slice(0, 8), code, reason.toString())
     const binding = bindings.get(ws)
     if (!binding) return
     sockets.get(binding.controllerId)?.delete(ws)
     if (!store.isHealthy()) return
-    void runtime.connectionClosed(binding.roomId, binding.controllerId, binding.generation).catch(() => {
+    void runtime.connectionClosed(binding.roomId, binding.controllerId, binding.generation).catch((error) => {
+      warn('connection close failed', error instanceof Error ? error.message : 'unknown error')
       ready = false
     })
   })
@@ -240,6 +268,7 @@ wss.on('connection', (ws) => {
 const heartbeat = setInterval(() => {
   for (const ws of wss.clients) {
     if (clock.now() - (lastAuthenticatedAt.get(ws) ?? 0) >= 30_000) {
+      warn('heartbeat timeout; terminating')
       ws.terminate()
       continue
     }
@@ -249,13 +278,22 @@ const heartbeat = setInterval(() => {
 
 function send(ws: WebSocket, value: unknown): void {
   if (ws.bufferedAmount > 4 * 1024 * 1024) {
+    warn('slow consumer; closing')
     ws.close(4002, 'slow consumer')
     return
   }
+  if (ws.readyState !== WebSocket.OPEN) return
   const parsed = ProtocolOutputSchema.safeParse(value)
-  if (!parsed.success || ws.readyState !== WebSocket.OPEN) return
-  const payload = JSON.stringify(parsed.data)
-  ws.send(payload)
+  if (!parsed.success) {
+    // 静默丢弃会让客户端一直等视图；至少把被丢弃的消息类型和字段错误打出来
+    warn(
+      'invalid outgoing message',
+      typeof value === 'object' && value !== null && 'kind' in value ? value.kind : 'unknown',
+      parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')
+    )
+    return
+  }
+  ws.send(JSON.stringify(parsed.data))
 }
 function addSocket(controllerId: string, ws: WebSocket): void {
   const peers = sockets.get(controllerId) ?? new Set<WebSocket>()

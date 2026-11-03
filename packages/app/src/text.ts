@@ -55,6 +55,7 @@ const zh = {
     noHistory: '还没有记录。',
     errorName: '先起一个昵称。',
     errorRoom: '先填写邀请链接或房间号。',
+    errorRoomFormat: '房间号不完整，请粘贴完整的邀请链接。',
     timeout: '连接超时，请重试。',
     connectionHint: '连接地址只影响这一台设备。'
   },
@@ -114,7 +115,6 @@ const zh = {
     },
     reveal: {
       title: '亮牌',
-      hint: '选择要亮的牌；不操作则不亮',
       button: '亮出',
       skip: '不亮',
       revealed: '已亮',
@@ -270,6 +270,7 @@ const en: WebText = {
     noHistory: 'No sessions yet.',
     errorName: 'Pick a name first.',
     errorRoom: 'Paste an invite link or room id first.',
+    errorRoomFormat: 'That room code is incomplete. Paste the full invite link.',
     timeout: 'Connection timed out. Try again.',
     connectionHint: 'The server address only affects this device.'
   },
@@ -329,7 +330,6 @@ const en: WebText = {
     },
     reveal: {
       title: 'Show cards',
-      hint: 'Pick the cards to show; do nothing to keep them hidden',
       button: 'Show',
       skip: 'Keep hidden',
       revealed: 'Shown',

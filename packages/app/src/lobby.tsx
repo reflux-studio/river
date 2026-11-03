@@ -89,18 +89,16 @@ export function Lobby({
         }}
         placeholder={text.lobby.joinPh}
       />
-      {!named && (
-        <input
-          aria-label={text.lobby.name}
-          className={field}
-          maxLength={80}
-          value={profile.name}
-          onChange={(event) =>
-            onProfile({ ...profile, name: event.target.value, ini: event.target.value.slice(0, 1) || '我' })
-          }
-          placeholder={text.lobby.namePh}
-        />
-      )}
+      <input
+        aria-label={text.lobby.name}
+        className={field}
+        maxLength={80}
+        value={profile.name}
+        onChange={(event) =>
+          onProfile({ ...profile, name: event.target.value, ini: event.target.value.slice(0, 1) || '我' })
+        }
+        placeholder={text.lobby.namePh}
+      />
       <button className={primary} disabled={!connected || !room.trim() || !named || busy} onClick={join}>
         {busy ? text.common.loading : text.lobby.join}
       </button>

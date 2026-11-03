@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { RiverClient, webSocketTransport, type KeyValueStore } from '@river/client'
+import { RiverClient, createId, webSocketTransport, type KeyValueStore } from '@river/client'
 import type { Effect, PublicProfile } from '@river/protocol'
 import type { AppearanceValue } from '@river/ui'
 import { createTableAudio } from './audio'
@@ -23,7 +23,7 @@ const defaultAppearance: AppearanceValue = {
 }
 
 const defaultProfile = (): PublicProfile => ({
-  profileId: crypto.randomUUID(),
+  profileId: createId(),
   name: '',
   ini: '我',
   hue: 158,
@@ -122,10 +122,19 @@ export function RiverApp({
   const enter = async (action: () => Promise<void>) => {
     setBusy(true)
     setError('')
+    // 本地存储或音频初始化都可能不返回；整个进入流程必须有终点，UI 不能无限停在“创建中”
+    let timer: ReturnType<typeof setTimeout> | undefined
     try {
-      await store.set('profile', profile)
-      await audio.prepare()
-      await action()
+      await Promise.race([
+        (async () => {
+          await store.set('profile', profile)
+          void audio.prepare()
+          await action()
+        })(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout')), 20_000)
+        })
+      ])
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -135,6 +144,7 @@ export function RiverApp({
           : String(cause)
       )
     } finally {
+      if (timer) clearTimeout(timer)
       setBusy(false)
     }
   }
@@ -147,7 +157,15 @@ export function RiverApp({
   const join = (room: string) =>
     void enter(async () => {
       if (!client) return
-      const roomId = room.trim().split('/join/').at(-1)!.split(/[/?#]/)[0].trim()
+      const roomId = room
+        .trim()
+        .split('/join/')
+        .at(-1)!
+        .split(/[/?#]/)[0]
+        .trim()
+        .toLowerCase()
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(roomId))
+        throw new Error(text.lobby.errorRoomFormat)
       await client.join(roomId, profile)
       // join 在 bound 时返回，首个投影可能还没到；等视图再按房间的起手买入
       await client.whenBound()

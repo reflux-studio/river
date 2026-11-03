@@ -2,10 +2,8 @@ import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMo
 import {
   ActionControls,
   AppearancePopover,
-  CardBack,
   ChatBubble,
   ChatPanelLayout,
-  PlayingCard,
   RichText,
   TableStage,
   feltOf,
@@ -14,7 +12,7 @@ import {
   type DealCard,
   type SeatView
 } from '@river/ui'
-import type { RiverClient } from '@river/client'
+import { createId, type RiverClient } from '@river/client'
 import type { CommandPayload, CommandType, Effect, ParticipantView, RoomView } from '@river/protocol'
 import type { DesktopHost } from './host'
 import type { Locale, WebText } from './text'
@@ -22,6 +20,7 @@ import { actionWords, streets } from './text'
 import type { TableAudio } from './audio'
 import { number } from './format'
 import { RoomPanel } from './room-panel'
+import { RevealDock } from './reveal'
 import { IconBack, IconChat, IconCheck, IconLink, IconMuted, IconSend, IconUsers, IconVolume } from './icons'
 import { cx, field, pill, primary } from './ui'
 
@@ -348,6 +347,25 @@ export function Room({
       ...(action === 'raise' ? { raiseTo: clamp(raise) } : {})
     })
 
+  const revealCards = async () => {
+    if (!hand || !picked.length) return
+    setSendingReveal(true)
+    try {
+      const result = await send('hand.reveal', {
+        handId: hand.handId,
+        slots: picked as Array<0 | 1>
+      })
+      if (!result) return
+      const next = [...new Set([...revealed, ...picked])]
+      setRevealed(next)
+      setPicked([])
+      const known = self.hole?.filter((slot) => slot.visibility === 'known').length ?? 0
+      if (next.length >= known) setTimeout(() => setDismissedReveal(true), 700)
+    } finally {
+      setSendingReveal(false)
+    }
+  }
+
   useHotkeys({
     f: connected && !view.paused && legal?.canFold ? () => void act('fold') : undefined,
     c:
@@ -461,8 +479,8 @@ export function Room({
       }
       if (!grantId) throw new Error(locale === 'zh' ? '需要房主授权此玩家提供 AI' : 'The host must allow this player to provide AI')
       const credential = {
-        controllerId: crypto.randomUUID(),
-        resumeSecret: crypto.randomUUID() + crypto.randomUUID()
+        controllerId: createId(),
+        resumeSecret: createId() + createId()
       }
       const name = personas.find((persona) => persona.id === templateId)?.name ?? templateId
       const created = await send('agent.create', {
@@ -748,6 +766,32 @@ export function Room({
                     />
                   )}
                 </div>
+                {view.phase === 'showing' &&
+                  hand &&
+                  self.hole &&
+                  !dismissedReveal &&
+                  self.hole.some((slot) => slot.visibility === 'known') && (
+                    <RevealDock
+                      key={hand.handId}
+                      hole={self.hole}
+                      back={appearance.back}
+                      picked={picked}
+                      revealed={revealed}
+                      sending={sendingReveal}
+                      text={text}
+                      phone={phone}
+                      onPick={(index) => {
+                        if (revealed.includes(index)) return
+                        setPicked((value) =>
+                          value.includes(index)
+                            ? value.filter((item) => item !== index)
+                            : [...value, index]
+                        )
+                      }}
+                      onReveal={() => void revealCards()}
+                      onDismiss={() => setDismissedReveal(true)}
+                    />
+                  )}
               </div>
             </TableStage>
           </div>
@@ -858,74 +902,9 @@ export function Room({
                       else if (event.key === 'Escape') event.currentTarget.blur()
                     }}
                   />
-                ) : (
-                  <>
-                    {self.seatId === null && (
-                      <span className="text-[13px] text-muted-foreground">{text.room.chooseSeat}</span>
-                    )}
-                    {view.phase === 'showing' && hand && self.hole && !dismissedReveal && (
-                      <div className="flex flex-col gap-2 border-t border-divider pt-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[13px] text-label">{text.room.reveal.title}</span>
-                          {self.hole.map((slot, index) =>
-                            slot.visibility === 'known' ? (
-                              <button
-                                key={index}
-                                className={cx(
-                                  'relative rounded-[8px] border-2 p-0.5',
-                                  picked.includes(index) ? 'border-foreground' : 'border-transparent'
-                                )}
-                                onClick={() =>
-                                  setPicked((value) =>
-                                    value.includes(index)
-                                      ? value.filter((item) => item !== index)
-                                      : [...value, index]
-                                  )
-                                }
-                                disabled={revealed.includes(index) || sendingReveal}
-                              >
-                                <PlayingCard card={slot.card} w={40} h={56} />
-                                {revealed.includes(index) && (
-                                  <span className="absolute inset-0 flex items-center justify-center rounded-[6px] bg-black/45 text-[10px] font-semibold text-white">
-                                    {text.room.reveal.revealed}
-                                  </span>
-                                )}
-                              </button>
-                            ) : (
-                              <CardBack key={index} back={appearance.back} />
-                            )
-                          )}
-                          <button
-                            className={primary}
-                            disabled={!picked.length || sendingReveal}
-                            onClick={async () => {
-                              if (!picked.length) return
-                              setSendingReveal(true)
-                              try {
-                                const result = await send('hand.reveal', {
-                                  handId: hand.handId,
-                                  slots: picked as Array<0 | 1>
-                                })
-                                if (result) {
-                                  setRevealed((value) => [...new Set([...value, ...picked])])
-                                  setPicked([])
-                                }
-                              } finally {
-                                setSendingReveal(false)
-                              }
-                            }}
-                          >
-                            {text.room.reveal.button}
-                          </button>
-                          <button className={pill} onClick={() => setDismissedReveal(true)}>
-                            {text.room.reveal.skip}
-                          </button>
-                        </div>
-                        <span className="text-xs text-muted-foreground">{text.room.reveal.hint}</span>
-                      </div>
-                    )}
-                  </>
-                )}
+                ) : self.seatId === null ? (
+                  <span className="text-[13px] text-muted-foreground">{text.room.chooseSeat}</span>
+                ) : null}
               </>
             )}
           </div>

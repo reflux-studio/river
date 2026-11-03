@@ -179,3 +179,16 @@
 .river-game[data-desktop='true'] .river-header nav {
   -webkit-app-region: no-drag;
 }
+
+/* 亮出时让牌面完整翻转一圈，作为提交成功的确认 */
+@keyframes river-reveal-flip {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+.river-reveal-flip {
+  animation: river-reveal-flip 520ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}

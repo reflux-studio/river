@@ -79,9 +79,15 @@ export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact, o
     <div data-table-seat className="absolute flex -translate-1/2 flex-col items-center gap-1.5 whitespace-nowrap" style={{ ...polar(i, n, compact ? 36 : 40, compact ? 32 : 36), zIndex: p.bubble ? 6 : 2 }}>
       {p.bubble && up && <Bubble text={p.bubble} up seat={i} />}
       {p.cards ? (
-        <div data-seat-cards={i} className={cn('-mb-3.5 flex', isHero ? 'gap-1' : 'gap-[3px]', (p.mucked || (isHero && p.folded)) && 'opacity-45 grayscale')}>
+        <div data-seat-cards={i} className={cn('-mb-3.5 flex [perspective:400px]', isHero ? 'gap-1' : 'gap-[3px]', (p.mucked || (isHero && p.folded)) && 'opacity-45 grayscale')}>
           {p.cards.map((c, k) =>
-            c === null ? <CardBack key={k} back={back} /> : isHero ? <PlayingCard key={k} card={c} w={60} h={84} rot={k ? 4 : -4} /> : <PlayingCard key={k} card={c} w={44} h={62} />
+            c === null ? (
+              <CardBack key={k} back={back} />
+            ) : isHero ? (
+              <PlayingCard key={k} className="river-card-flip-in" card={c} w={60} h={84} rot={k ? 4 : -4} />
+            ) : (
+              <PlayingCard key={k} className="river-card-flip-in" card={c} w={44} h={62} />
+            )
           )}
         </div>
       ) : (

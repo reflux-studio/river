@@ -1,9 +1,13 @@
 import type { BootstrapCommand, BoundCommand, Hello } from '@river/protocol'
 export type ClientMessage = Hello | BootstrapCommand | BoundCommand
 export interface Transport {
-  open(onMessage: (message: unknown) => void, onClose: () => void): Promise<void>
+  open(onMessage: (message: unknown) => void, onClose: (info: CloseInfo) => void): Promise<void>
   send(message: ClientMessage): void
   close(): void
+}
+export interface CloseInfo {
+  code: number
+  reason: string
 }
 
 export function webSocketTransport(url: string): Transport {
@@ -18,8 +22,8 @@ export function webSocketTransport(url: string): Transport {
         next.onmessage = (event) => {
           if (socket === next) onMessage(JSON.parse(String(event.data)))
         }
-        next.onclose = () => {
-          if (socket === next) onClose()
+        next.onclose = (event) => {
+          if (socket === next) onClose({ code: event.code, reason: event.reason })
         }
       })
     },
