@@ -31,6 +31,8 @@ export interface SeatView {
   statusTone: 'muted' | 'blue' | 'green' | 'dark' | 'red'
   thinking: boolean
   winner: boolean
+  // 空位只画座位号，不画完整玩家卡
+  empty?: boolean
   cards?: (Card | null)[]
   // 教练局一手结束亮出的弃牌者底牌
   mucked?: boolean

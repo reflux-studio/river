@@ -38,7 +38,7 @@ function Bubble({ text, up, seat }: { text: string; up: boolean; seat: number })
   )
 }
 
-export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels }: {
+export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact }: {
   seat: SeatView
   i: number
   n: number
@@ -46,13 +46,26 @@ export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels }: {
   heroTurn: boolean
   back: Back
   labels: { sb: string; bb: string }
+  compact?: boolean
 }) {
   const active = p.thinking || (isHero && heroTurn)
   const up = Math.sin(angle(i, n)) > -0.2
   const tone = TONE[p.statusTone]
   const dim = p.folded || p.out
+  if (p.empty)
+    return (
+      <div
+        data-table-seat
+        className="absolute flex -translate-1/2 items-center justify-center"
+        style={{ ...polar(i, n, 40, compact ? 32 : 36), zIndex: 2 }}
+      >
+        <div className="flex size-[42px] items-center justify-center rounded-full border border-dashed border-[#c9c9c4] bg-white/70 text-[12px] font-medium text-[#8e8e93] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)] backdrop-blur-[2px]">
+          {p.name}
+        </div>
+      </div>
+    )
   return (
-    <div data-table-seat className="absolute flex -translate-1/2 flex-col items-center gap-1.5 whitespace-nowrap" style={{ ...polar(i, n, 40, 36), zIndex: p.bubble ? 6 : 2 }}>
+    <div data-table-seat className="absolute flex -translate-1/2 flex-col items-center gap-1.5 whitespace-nowrap" style={{ ...polar(i, n, 40, compact ? 32 : 36), zIndex: p.bubble ? 6 : 2 }}>
       {p.bubble && up && <Bubble text={p.bubble} up seat={i} />}
       {p.cards ? (
         <div data-seat-cards={i} className={cn('-mb-3.5 flex', isHero ? 'gap-1' : 'gap-[3px]', (p.mucked || (isHero && p.folded)) && 'opacity-45 grayscale')}>
@@ -129,9 +142,9 @@ export function ChipStacks({ amount, w = 24 }: { amount: number; w?: number }) {
   )
 }
 
-export function BetChip({ amount, i, n, dark }: { amount: number; i: number; n: number; dark: boolean }) {
+export function BetChip({ amount, i, n, dark, compact }: { amount: number; i: number; n: number; dark: boolean; compact?: boolean }) {
   return (
-    <div data-bet={i} className="absolute z-[1] flex -translate-1/2 items-center gap-1.5" style={polar(i, n, 25, 21)}>
+    <div data-bet={i} className="absolute z-[1] flex -translate-1/2 items-center gap-1.5" style={polar(i, n, 25, compact ? 19 : 21)}>
       <ChipStacks amount={amount} />
       <span
         className="rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap"
