@@ -191,54 +191,56 @@ export function Lobby({
       </div>
 
       <Panel>
-        <LobbyRow label={text.lobby.name}>
-          <input
-            className={field}
-            maxLength={80}
-            value={profile.name}
-            onChange={(event) =>
-              onProfile({ ...profile, name: event.target.value, ini: event.target.value.slice(0, 1) || '我' })
-            }
-            placeholder={text.lobby.namePh}
-          />
-        </LobbyRow>
-        <LobbyRow label={text.lobby.capacity}>
-          <div className="overflow-x-auto">
-            <Segmented
-              value={rules.capacity}
-              options={Array.from({ length: 9 }, (_, index) => ({
-                label: String(index + 2),
-                value: (index + 2) as Rules['capacity']
-              }))}
-              onChange={(capacity) => setRules({ ...rules, capacity })}
+        <div className="river-create-fields flex flex-col gap-[18px]">
+          <LobbyRow label={text.lobby.name}>
+            <input
+              className={field}
+              maxLength={80}
+              value={profile.name}
+              onChange={(event) =>
+                onProfile({ ...profile, name: event.target.value, ini: event.target.value.slice(0, 1) || '我' })
+              }
+              placeholder={text.lobby.namePh}
             />
-          </div>
-        </LobbyRow>
-        <LobbyRow label={text.lobby.blinds}>
-          <Segmented
-            value={`${rules.smallBlind}/${rules.bigBlind}`}
-            options={[
-              [5, 10],
-              [10, 20],
-              [25, 50]
-            ].map(([small, big]) => ({ label: `${small}/${big}`, value: `${small}/${big}` }))}
-            onChange={(value) => {
-              const [smallBlind, bigBlind] = value.split('/').map(Number)
-              setRules({ ...rules, smallBlind, bigBlind })
-            }}
-          />
-        </LobbyRow>
-        <LobbyRow label={text.lobby.buyIn}>
-          <input
-            aria-label={text.lobby.buyIn}
-            className={field}
-            type="number"
-            min="1"
-            max="1000000000"
-            value={rules.defaultBuyIn}
-            onChange={(event) => setRules({ ...rules, defaultBuyIn: Number(event.target.value) })}
-          />
-        </LobbyRow>
+          </LobbyRow>
+          <LobbyRow label={text.lobby.capacity}>
+            <div className="river-capacity overflow-x-auto">
+              <Segmented
+                value={rules.capacity}
+                options={Array.from({ length: 9 }, (_, index) => ({
+                  label: String(index + 2),
+                  value: (index + 2) as Rules['capacity']
+                }))}
+                onChange={(capacity) => setRules({ ...rules, capacity })}
+              />
+            </div>
+          </LobbyRow>
+          <LobbyRow label={text.lobby.blinds}>
+            <Segmented
+              value={`${rules.smallBlind}/${rules.bigBlind}`}
+              options={[
+                [5, 10],
+                [10, 20],
+                [25, 50]
+              ].map(([small, big]) => ({ label: `${small}/${big}`, value: `${small}/${big}` }))}
+              onChange={(value) => {
+                const [smallBlind, bigBlind] = value.split('/').map(Number)
+                setRules({ ...rules, smallBlind, bigBlind })
+              }}
+            />
+          </LobbyRow>
+          <LobbyRow label={text.lobby.buyIn}>
+            <input
+              aria-label={text.lobby.buyIn}
+              className={field}
+              type="number"
+              min="1"
+              max="1000000000"
+              value={rules.defaultBuyIn}
+              onChange={(event) => setRules({ ...rules, defaultBuyIn: Number(event.target.value) })}
+            />
+          </LobbyRow>
+        </div>
 
         <div className="border-t border-divider pt-3">
           <div className="flex items-center gap-2 pb-1">

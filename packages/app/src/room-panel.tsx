@@ -85,7 +85,7 @@ export function RoomPanel({
         </button>
       </div>
 
-      <div className="border-b border-[#f0f0ee] px-4 py-2.5 md:hidden">
+      <div className="border-b border-[#f0f0ee] px-4 py-2.5 min-[1280px]:hidden">
         <div className="flex gap-1 rounded-[9px] bg-muted p-[3px]">
           {(
             [
@@ -109,7 +109,7 @@ export function RoomPanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-auto px-4 pb-5">
-        <div className={cx(tab !== 'players' && 'max-md:hidden')}>
+        <div className={cx(tab !== 'players' && 'max-[1279px]:hidden')}>
           <Section title={`${text.room.players} ${view.participants.length}`}>
             <div className="flex flex-col">
               {view.participants.map((p) => {
@@ -176,7 +176,7 @@ export function RoomPanel({
           </Section>
         </div>
 
-        <div className={cx(tab !== 'chips' && 'max-md:hidden')}>
+        <div className={cx(tab !== 'chips' && 'max-[1279px]:hidden')}>
           <Section title={text.room.chips}>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-semibold tracking-[-0.01em]">{number(self.stack, locale)}</span>
@@ -241,7 +241,7 @@ export function RoomPanel({
           </Section>
         </div>
 
-        <div className={cx(tab !== 'settings' && 'max-md:hidden')}>
+        <div className={cx(tab !== 'settings' && 'max-[1279px]:hidden')}>
           {isHost && (
             <Section title={text.room.settings} action={<span className="text-[11px] text-muted-foreground">{view.phase === 'waiting' ? text.room.nextHandNote : text.room.settingsLocked}</span>}>
               <SwitchRow

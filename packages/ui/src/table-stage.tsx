@@ -41,6 +41,7 @@ export function TableStage({ seats, board, pot, done, handNo, heroSeat, heroTurn
       {children}
 
       <div
+        data-table-felt
         className="absolute inset-x-[13%] top-[15%] bottom-[16%] rounded-full"
         style={{
           background: `radial-gradient(ellipse 70% 65% at 50% 42%, color-mix(in oklch, ${F.felt}, white 14%) 0%, ${F.felt} 58%, color-mix(in oklch, ${F.felt}, black 28%) 100%)`,
@@ -48,6 +49,7 @@ export function TableStage({ seats, board, pot, done, handNo, heroSeat, heroTurn
         }}
       />
       <div
+        data-table-stitch
         className="pointer-events-none absolute inset-x-[calc(13%+18px)] top-[calc(15%+18px)] bottom-[calc(16%+18px)] rounded-full border"
         style={{ borderColor: F.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.07)' }}
       />

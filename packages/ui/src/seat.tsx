@@ -5,9 +5,20 @@ import { CardBack, PlayingCard } from './cards'
 import { chipBg, chipEdge, stacks } from './felt'
 import type { Back, SeatView } from './types'
 
-// 原型极坐标：第 0 位在正下方，其余顺时针均分
+// 第 0 位在正下方；紧凑多人桌沿两侧分排，其余沿椭圆均分。
 const angle = (i: number, n: number) => ((90 + (i * 360) / n) * Math.PI) / 180
-const polar = (i: number, n: number, rx: number, ry: number) => {
+const polar = (i: number, n: number, rx: number, ry: number, compact = false) => {
+  if (compact && n >= 7) {
+    const top = Math.floor(n / 2)
+    const left = i < top
+    const sideCount = left ? top - 1 : n - top - 1
+    const row = left ? i - 1 : n - i - 1
+    // 中央公共牌落在两排座位之间，自己的座位保持在正下方。
+    const rows = sideCount === 4 ? [79, 62, 38, 21] : sideCount === 3 ? [79, 62, 21] : [75, 25]
+    const x = i === 0 || i === top ? 50 : left ? 17 : 83
+    const y = i === 0 ? 89 : i === top ? 11 : rows[row]
+    return { left: `${50 + (x - 50) * rx / 36}%`, top: `${50 + (y - 50) * ry / 32}%` }
+  }
   const a = angle(i, n)
   return { left: `${50 + rx * Math.cos(a)}%`, top: `${50 + ry * Math.sin(a)}%` }
 }
@@ -63,7 +74,7 @@ export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact, o
         aria-label={seatActionLabel ? `${seatActionLabel} ${p.name}` : p.name}
         tabIndex={onSeatClick ? 0 : -1}
         className="absolute flex -translate-1/2 items-center justify-center border-0 bg-transparent p-0"
-        style={{ ...polar(i, n, compact ? 36 : 40, compact ? 32 : 36), zIndex: 2 }}
+        style={{ ...polar(i, n, compact ? 36 : 40, compact ? 32 : 36, compact), zIndex: 2 }}
       >
         <span
           className={cn(
@@ -76,7 +87,7 @@ export function Seat({ seat: p, i, n, isHero, heroTurn, back, labels, compact, o
       </button>
     )
   return (
-    <div data-table-seat className="absolute flex -translate-1/2 flex-col items-center gap-1.5 whitespace-nowrap" style={{ ...polar(i, n, compact ? 36 : 40, compact ? 32 : 36), zIndex: p.bubble ? 6 : 2 }}>
+    <div data-table-seat className="absolute flex -translate-1/2 flex-col items-center gap-1.5 whitespace-nowrap" style={{ ...polar(i, n, compact ? 36 : 40, compact ? 32 : 36, compact), zIndex: p.bubble ? 6 : 2 }}>
       {p.bubble && up && <Bubble text={p.bubble} up seat={i} />}
       {p.cards ? (
         <div data-seat-cards={i} className={cn('-mb-3.5 flex [perspective:400px]', isHero ? 'gap-1' : 'gap-[3px]', (p.mucked || (isHero && p.folded)) && 'opacity-45 grayscale')}>
@@ -168,8 +179,15 @@ export function ChipStacks({ amount, w = 24 }: { amount: number; w?: number }) {
 }
 
 export function BetChip({ amount, i, n, dark, compact }: { amount: number; i: number; n: number; dark: boolean; compact?: boolean }) {
+  const dense = compact && n >= 7
+  const atEnd = i === 0 || i === Math.floor(n / 2)
+  const position = polar(i, n, dense ? 14 : 25, dense ? (atEnd ? 23 : 32) : compact ? 19 : 21, compact)
+  const y = parseFloat(position.top)
+  if (dense && !atEnd && Math.abs(y - 50) < 15) {
+    position.top = `calc(${position.top} + ${y < 50 ? -24 : 24}px)`
+  }
   return (
-    <div data-bet={i} className="absolute z-[1] flex -translate-1/2 items-center gap-1.5" style={polar(i, n, 25, compact ? 19 : 21)}>
+    <div data-bet={i} className="absolute z-[1] flex -translate-1/2 items-center gap-1.5" style={position}>
       <ChipStacks amount={amount} />
       <span
         className="rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap"

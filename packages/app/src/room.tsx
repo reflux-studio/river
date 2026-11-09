@@ -140,10 +140,10 @@ export function Room({
   onError(message: string): void
   onBack(): void
 }) {
-  const narrow = useMedia('(max-width: 900px)')
+  const narrow = useMedia('(max-width: 1279px)')
   const phone = useMedia('(max-width: 600px)')
-  const [showChat, setShowChat] = useState(() => window.innerWidth >= 1100)
-  const [showCoach, setShowCoach] = useState(() => window.innerWidth >= 1000)
+  const [showChat, setShowChat] = useState(() => window.innerWidth >= 1280)
+  const [showCoach, setShowCoach] = useState(() => window.innerWidth >= 1280)
   const [showPanel, setShowPanel] = useState(false)
   const [showAppearance, setShowAppearance] = useState(false)
   const [raise, setRaise] = useState(view.rules.bigBlind * 2)
@@ -597,16 +597,27 @@ export function Room({
           ) : (
             <span className="text-xs text-muted-foreground">{text.room.local}</span>
           )}
-          <button className={pill} onClick={() => setShowChat((value) => !value)} aria-label={text.room.chat} title={text.room.chat}>
+          <button className={pill} onClick={() => {
+            setShowChat(!showChat)
+            if (narrow) { setShowCoach(false); setShowPanel(false) }
+          }} aria-pressed={showChat} aria-label={text.room.chat} title={text.room.chat}>
             <IconChat />
             <span className="hidden sm:inline">{text.room.chat}</span>
           </button>
-          <button className={pill} onClick={() => setShowPanel((value) => !value)} aria-label={text.room.panel} title={text.room.panel}>
+          <button className={pill} onClick={() => {
+            setShowPanel(!showPanel)
+            setShowCoach(false)
+            if (narrow) setShowChat(false)
+          }} aria-pressed={showPanel} aria-label={text.room.panel} title={text.room.panel}>
             <IconUsers />
             <span className="hidden sm:inline">{text.room.panel}</span>
           </button>
           {host && view.rules.coachAllowed && (
-            <button className={pill} onClick={() => setShowCoach((value) => !value)}>
+            <button className={pill} aria-pressed={showCoach} onClick={() => {
+              setShowCoach(!showCoach)
+              setShowPanel(false)
+              if (narrow) setShowChat(false)
+            }}>
               {text.room.coachTitle}
             </button>
           )}
@@ -691,7 +702,7 @@ export function Room({
         )}
 
         <section className="river-play flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
-          <div className="river-table-stage flex min-h-[560px] flex-1">
+          <div className="river-table-stage flex min-h-[560px] flex-1" data-waiting={!hand}>
             <TableStage
               seats={seats}
               board={hand?.board ?? []}
@@ -716,6 +727,13 @@ export function Room({
               seatActionLabel={text.room.sitHere}
             >
               <div className="pointer-events-none absolute inset-0 z-10">
+                {!hand && (
+                  <div className="absolute top-[48%] left-1/2 flex -translate-1/2 flex-col items-center gap-2 rounded-[14px] bg-black/35 px-4 py-3 text-center text-white">
+                    <span className="text-sm font-semibold">{text.room.room} {view.roomId.slice(0, 8)}</span>
+                    <span className="text-[13px]">{view.participants.filter((p) => p.seatId !== null).length} / {view.rules.capacity}</span>
+                    <span className="text-xs text-white/75">{self.seatId === null ? text.room.chooseSeat : text.room.waiting}</span>
+                  </div>
+                )}
                 <div className="absolute top-3 left-4 flex max-w-[60%] flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
                   <span className="rounded-full bg-white/90 px-3 py-1 shadow-sm">
                     {hand ? `${text.room.hand(hand.number)} · ${streets[locale][hand.street]}` : text.room.waiting}
@@ -912,7 +930,7 @@ export function Room({
 
         {showPanel && (
           <>
-            <div className="river-scrim md:hidden" onClick={() => setShowPanel(false)} />
+            <div className="river-scrim min-[1280px]:hidden" onClick={() => setShowPanel(false)} />
             <RoomPanel
               view={view}
               self={self}

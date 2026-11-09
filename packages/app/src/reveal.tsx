@@ -89,6 +89,7 @@ export function RevealDock({
   )
   return (
     <div
+      data-reveal-dock
       className={cx(
         'pointer-events-auto absolute right-3 bottom-3 z-20 flex flex-col gap-2 rounded-[14px] border bg-white/95 p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.16)] backdrop-blur-sm',
         phone ? 'w-[132px]' : 'w-[216px]'

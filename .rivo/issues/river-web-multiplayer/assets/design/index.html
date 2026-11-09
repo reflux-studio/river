@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>River · 好友联机（交互稿）</title>
+<link rel="icon" href="../assets/river-icon.png">
+
+<!-- React 18 UMD + Babel standalone：浏览器直接跑，不需要构建 -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+
+<!-- 牌局规则与设计常量：与桌面端 app/ 共用同一份，不另起一套 -->
+<script src="../vendor/poker.js"></script>
+<script type="text/babel" data-presets="env,react" src="../app/src/tokens.jsx"></script>
+
+<style>
+/* OD-LAYOUT-PRIMITIVES v1 — structure only: display, flex/grid, overflow, wrapping, ratio, geometry.
+   Put this @layer first; product CSS outside the layer wins ordinary layout rules.
+   Native hidden and closed-dialog states take precedence over component display rules. */
+@layer od-layout {
+  [hidden]:not([hidden="until-found" i]) { display: none !important; }
+  dialog:not([open]) { display: none !important; }
+
+  :where(.od-stack,.od-row,.od-row-top,.od-cluster,.od-grid,.od-field,.od-stat,.od-cell,.od-tile) > :where(*) { min-width: 0; }
+
+  .od-stack   { display: flex; flex-direction: column; gap: var(--od-gap, 8px); }
+  .od-row     { display: flex; align-items: center; gap: var(--od-gap, 8px); }
+  .od-row-top { display: flex; align-items: flex-start; gap: var(--od-gap, 8px); }
+  .od-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--od-gap, 8px); }
+  .od-fill    { flex: 1 1 0; min-width: 0; }
+  .od-fixed   { flex: none; }
+  .od-grid    { display: grid; gap: var(--od-gap, 12px); grid-template-columns: repeat(var(--od-cols, 3), minmax(0, 1fr)); }
+
+  .od-stat, .od-field, .od-cell { display: grid; gap: var(--od-gap, 2px); }
+  :where(.od-stat,.od-field,.od-cell) > :where(*) { display: block; }
+  .od-tile { display: grid; grid-template-rows: auto 1fr; }
+  :where(.od-tile) > :where(*) { display: block; }
+
+  .od-media { display: block; width: 100%; height: auto; aspect-ratio: var(--od-ratio, auto); }
+  .od-media-cover { object-fit: cover; }
+
+  .od-icon { display: inline-block; inline-size: var(--od-icon-size, 1em); block-size: var(--od-icon-size, 1em); flex: none; }
+
+  .od-truncate { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .od-clamp-2, .od-clamp-3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .od-clamp-2 { -webkit-line-clamp: 2; }
+  .od-clamp-3 { -webkit-line-clamp: 3; }
+  .od-lines-2 { min-height: calc(2 * 1.4em); }
+  .od-nowrap  { white-space: nowrap; }
+  .od-keep    { word-break: keep-all; overflow-wrap: anywhere; }
+
+  .od-screen { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+  .od-scroll { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+
+  .od-rail { display: flex; gap: var(--od-gap, 8px); overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none;
+             padding-inline: var(--od-rail-pad, 16px); scroll-padding-inline: var(--od-rail-pad, 16px); }
+  .od-rail::-webkit-scrollbar { display: none; }
+  :where(.od-rail) > :where(*) { flex: none; scroll-snap-align: start; }
+  :where(.od-rail) > :where(:last-child) { margin-inline-end: var(--od-rail-pad, 16px); }
+
+  .od-spacer { flex: none; visibility: hidden; pointer-events: none; }
+  .od-touch  { min-width: 44px; min-height: 44px; }
+}
+:root [hidden]:where(:not([hidden="until-found" i])) { display: none; }
+/* /OD-LAYOUT-PRIMITIVES v1 */
+
+/* 这里只放内联样式做不到的部分：伪类、媒体查询、弹层。
+   颜色与尺寸的主来源仍是 app/src/tokens.jsx 的 TOKENS 与组件里的 S()。 */
+:root{
+  --safe-b:env(safe-area-inset-bottom, 0px);
+  --top-h:52px;
+  /* 与 src/tokens.jsx 的 CONTROL.md.h 一致：CSS 里取不到的档位在这里补一份。 */
+  --ctl-md:36px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;}
+body{
+  background:#fbfbfa;color:#1d1d1f;-webkit-font-smoothing:antialiased;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Hiragino Sans GB','Helvetica Neue',sans-serif;
+}
+#root{height:100%;}
+h1,h2,h3,p{margin:0;}
+button{font-family:inherit;}
+:focus-visible{outline:2px solid oklch(0.6 0.17 255);outline-offset:2px;}
+
+/* 按钮：底色和圆角走内联，hover / disabled 只能靠类 */
+.k-btn{cursor:pointer;border:0;transition:background 150ms cubic-bezier(.2,.8,.3,1),border-color 150ms;}
+.k-btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none;}
+.k-btn--primary:hover{background:#000 !important;}
+.k-btn--ghost:hover{background:#f5f5f3 !important;}
+.k-btn--quiet:hover{background:#f1f1ef !important;}
+.k-btn--danger:hover{background:oklch(0.975 0.015 25) !important;border-color:oklch(0.9 0.06 25) !important;}
+
+/* 空位：虚线和桌布糊在一起看不清，改成实心描边 + 半透明底 */
+.hole{cursor:pointer;transition:background 150ms cubic-bezier(.2,.8,.3,1),transform 150ms cubic-bezier(.2,.8,.3,1);}
+.hole:hover{background:rgba(255,255,255,.34) !important;border-color:#fff !important;transform:scale(1.06);}
+.hole:focus-visible{outline:2px solid #fff;outline-offset:3px;}
+
+.row-hover{transition:background 150ms;}
+.row-hover:hover{background:#f7f7f5;}
+
+/* 输入框：高度并入 CONTROL 标度（md 档 36），和同一行的 md 按钮严格等高。
+   高度写死、上下不写 padding，否则 9px+9px 的内边距会把它撑到 39.6，比按钮高一头。 */
+.k-input{
+  width:100%;box-sizing:border-box;height:var(--ctl-md);padding:0 12px;border:1px solid #e3e3e0;border-radius:10px;
+  font-size:14px;line-height:1;font-family:inherit;color:#1d1d1f;background:#fff;outline:none;
+}
+.k-input::placeholder{color:#a1a1a6;}
+.k-input:focus{border-color:#1d1d1f;}
+/* 数字输入：隐去浏览器自带的上下箭头，配合胶囊形外框使用 */
+input[type=number]{-moz-appearance:textfield;}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+
+/* 设置行 —— 一行最多两个元素，备注永远不参与横向排列。
+ *
+ * 桌面 / 平板：  [标签]            [控件]
+ *                [备注，整行宽]
+ * 手机：         [标签]
+ *                [控件，整宽]
+ *                [备注]
+ *
+ * 上一版把「标签 / 控件 / 备注」三个塞进一条 flex 行，靠 flex-wrap 让它自己掉行：
+ * 375 宽下不是挤成三列，就是掉出一个半截的空行。这不是响应式，是把桌面版压小。
+ * 列数在这里由断点决定，而不是由内容宽度决定。 */
+.form-row{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;
+  align-items:center;column-gap:16px;row-gap:2px;
+}
+.form-row__label{grid-column:1;grid-row:1;font-size:14px;font-weight:500;color:#1d1d1f;line-height:1.4;}
+.form-row__hint{grid-column:1/-1;grid-row:2;font-size:12px;color:#86868b;line-height:1.5;}
+.form-row__control{grid-column:2;grid-row:1;justify-self:end;min-width:0;display:flex;align-items:center;}
+
+/* 抽屉：桌面端贴边滑出，手机端仍然是从底部升起的一片。
+   公屏和房间共用它——同一个组件、同一套关闭方式，只是贴哪条边不同。 */
+.k-drawer{border:0;padding:0;margin:0;background:transparent;width:100%;max-width:100%;height:100%;max-height:100%;display:flex;}
+.k-drawer--right{justify-content:flex-end;}
+.k-drawer--left{justify-content:flex-start;}
+.k-drawer::backdrop{background:rgba(0,0,0,.22);}
+.k-drawer__card{width:min(384px,100vw);height:100%;display:flex;flex-direction:column;background:#fff;overflow:hidden;}
+.k-drawer--right .k-drawer__card{border-left:1px solid #ebebe9;box-shadow:-18px 0 46px rgba(0,0,0,.14);}
+.k-drawer--left .k-drawer__card{border-right:1px solid #ebebe9;box-shadow:18px 0 46px rgba(0,0,0,.14);}
+.k-drawer__head{flex:none;display:flex;align-items:flex-start;gap:8px;padding:16px 16px 12px;border-bottom:1px solid #f0f0ee;}
+.k-drawer__body{flex:1;min-height:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;}
+.k-drawer__foot{flex:none;padding:12px 16px calc(12px + var(--safe-b));border-top:1px solid #f0f0ee;}
+
+/* 快捷键键帽：挂在按钮上，提示 F / C / R */
+.k-key{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;
+  border:1px solid #e3e3e0;border-radius:4px;color:#a1a1a6;font:600 11px/1 ui-monospace,Menlo,monospace;}
+
+/* 弹层 */
+.k-sheet{
+  border:0;padding:0;background:transparent;width:100%;height:100%;max-width:100%;max-height:100%;
+  display:flex;align-items:center;justify-content:center;
+}
+.k-sheet::backdrop{background:rgba(0,0,0,.34);}
+.k-sheet__card{
+  width:min(460px,calc(100vw - 32px));max-height:min(760px,calc(100dvh - 48px));
+  display:flex;flex-direction:column;background:#fff;border-radius:16px;overflow:hidden;
+  box-shadow:0 26px 70px rgba(0,0,0,.3);
+}
+
+/* 断点只决定「收哪些面板 / 换哪种排布」，不缩放任何组件。 */
+@media (max-width:599px){
+  :root{--top-h:46px;}
+  .k-sheet{align-items:flex-end;}
+  .k-sheet__card{width:100%;max-height:calc(100dvh - 32px);border-radius:16px 16px 0 0;padding-bottom:var(--safe-b);}
+
+  /* 抽屉在手机上统一成底部弹层，贴边的阴影和边框都去掉 */
+  .k-drawer{align-items:flex-end;}
+  .k-drawer__card{width:100%;height:auto;max-height:calc(100dvh - 32px);border-radius:16px 16px 0 0;padding-bottom:var(--safe-b);}
+  .k-drawer--left .k-drawer__card,.k-drawer--right .k-drawer__card{border:0;box-shadow:0 -18px 46px rgba(0,0,0,.18);}
+
+  /* 手机上按键帽没有意义，直接不占位置 */
+  .k-key{display:none;}
+
+  /* 手机上设置行变成单列：标签 → 控件（整宽）→ 备注。
+     只有开关这类小控件保留「左标签 / 右控件」两列，才不会浪费一行高度。 */
+  .form-row{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto;row-gap:8px;align-items:start;}
+  .form-row__label{grid-column:1;grid-row:1;}
+  .form-row__control{grid-column:1;grid-row:2;justify-self:stretch;}
+  .form-row__hint{grid-column:1;grid-row:3;}
+
+  .form-row--inline{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;row-gap:4px;align-items:center;}
+  .form-row--inline .form-row__control{grid-column:2;grid-row:1;justify-self:end;}
+  .form-row--inline .form-row__hint{grid-column:1/-1;grid-row:2;}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;transition-duration:.001ms !important;}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- 书写顺序即依赖顺序 -->
+<script>
+/* 脚本带时间戳加载：浏览器会缓存 jsx，静态标签会导致改了看不到效果。
+   文档顺序即依赖顺序，Babel 在 DOMContentLoaded 时按顺序编译这些脚本。 */
+(function () {
+  var v = Date.now();
+  ['src/tokens.jsx', 'src/ui.jsx', 'src/felt.jsx', 'src/room.jsx', 'src/table.jsx', 'src/settings.jsx', 'src/logic.jsx'].forEach(function (f) {
+    var el = document.createElement('script');
+    el.type = 'text/babel';
+    el.setAttribute('data-presets', 'env,react');
+    el.src = f + '?v=' + v;
+    document.body.appendChild(el);
+  });
+})();
+</script>
+</body>
+</html>

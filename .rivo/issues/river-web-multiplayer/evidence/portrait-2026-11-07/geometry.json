@@ -1,0 +1,92 @@
+[
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "horizontalOverflow": false,
+    "seatOverlaps": [],
+    "boardSeatOverlaps": [],
+    "scenario": "phone-playing"
+  },
+  {
+    "viewport": [
+      393,
+      852
+    ],
+    "horizontalOverflow": false,
+    "seatOverlaps": [],
+    "boardSeatOverlaps": [],
+    "scenario": "phone-showing"
+  },
+  {
+    "viewport": [
+      430,
+      932
+    ],
+    "horizontalOverflow": false,
+    "seatOverlaps": [],
+    "boardSeatOverlaps": [],
+    "scenario": "phone-waiting"
+  },
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "horizontalOverflow": false,
+    "seatOverlaps": [],
+    "boardSeatOverlaps": [],
+    "scenario": "phone-seven"
+  },
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "horizontalOverflow": false,
+    "seatOverlaps": [],
+    "boardSeatOverlaps": [],
+    "scenario": "phone-eight"
+  },
+  {
+    "viewport": [
+      390,
+      844
+    ],
+    "horizontalOverflow": false,
+    "seatOverlaps": [],
+    "boardSeatOverlaps": [],
+    "scenario": "phone-nine"
+  },
+  {
+    "viewport": [
+      820,
+      1180
+    ],
+    "horizontalOverflow": false,
+    "seatOverlaps": [],
+    "boardSeatOverlaps": [],
+    "scenario": "tablet"
+  },
+  {
+    "viewport": [
+      1024,
+      768
+    ],
+    "horizontalOverflow": false,
+    "seatOverlaps": [],
+    "boardSeatOverlaps": [],
+    "scenario": "tablet-landscape"
+  },
+  {
+    "viewport": [
+      1440,
+      900
+    ],
+    "horizontalOverflow": false,
+    "seatOverlaps": [],
+    "boardSeatOverlaps": [],
+    "scenario": "desktop"
+  }
+]
